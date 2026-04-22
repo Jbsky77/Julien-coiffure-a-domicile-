@@ -138,6 +138,46 @@ export default function AppointmentForm() {
     navigate("/rdv");
   };
 
+  // Build the RDV confirmation message (SMS/Email)
+  const buildRdvMessage = ({ includePaymentLink = false } = {}) => {
+    const client = clients.find((c) => c.id === form.client_id);
+    const firstName = client?.first_name || client?.last_name || "";
+    const dt = form.date ? new Date(form.date) : null;
+    const jour = dt ? dt.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "";
+    const heure = dt ? dt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }).replace(":", "h") : "";
+    const amount = form.price_final_override ?? preview.final;
+    const prestationsNames = form.services
+      .map((fs) => services.find((s) => s.id === fs.service_id))
+      .filter(Boolean)
+      .map((s) => s.name)
+      .join(" + ");
+    const lines = [
+      `Bonjour ${firstName},`,
+      "",
+      "C'est Julien, votre coiffeur.",
+      `Je vous confirme votre rendez-vous du ${jour} à ${heure}.`,
+      "",
+    ];
+    if (prestationsNames) lines.push(`Prestations : ${prestationsNames}`);
+    lines.push(`Montant : ${Number(amount).toFixed(2).replace(".", ",")} €`);
+    if (includePaymentLink) {
+      lines.push("", "Voici le lien de paiement (à me renvoyer une fois réglé) :", "[insérer votre lien]");
+    }
+    lines.push("", "À très vite,", "Julien Bouche");
+    return lines.join("\n");
+  };
+
+  const buildLinks = (includePaymentLink = false) => {
+    const client = clients.find((c) => c.id === form.client_id);
+    const phone = client?.phone?.replace(/\s/g, "") || "";
+    const msg = buildRdvMessage({ includePaymentLink });
+    const subject = includePaymentLink ? "Lien de paiement — Coiffure à domicile" : "Confirmation de votre rendez-vous";
+    return {
+      sms: phone ? `sms:${phone}?body=${encodeURIComponent(msg)}` : null,
+      mail: `mailto:${client?.email || ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(msg)}`,
+    };
+  };
+
   const fieldBase = "w-full bg-transparent border-b border-slate-300 rounded-none px-0 py-2 focus:border-[#0A192F] focus:outline-none text-base transition-colors";
   const readOnly = isDone || (id && !editMode);
 
@@ -229,6 +269,26 @@ export default function AppointmentForm() {
         </div>
       </div>
 
+      {id && form.client_id && !isDone && (
+        <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-premium space-y-3" data-testid="confirm-rdv-section">
+          <div className="text-[10px] tracking-widest uppercase text-slate-500">Envoyer la confirmation au client</div>
+          <div className="text-xs text-slate-500 italic whitespace-pre-line bg-slate-50 border border-slate-100 rounded-xl p-3 max-h-36 overflow-auto" data-testid="confirm-preview">
+            {buildRdvMessage()}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {(() => {
+              const { sms, mail } = buildLinks(false);
+              return (
+                <>
+                  {sms && <a href={sms} data-testid="send-confirm-sms" className="flex items-center gap-2 px-4 py-2 rounded-full border border-slate-200 text-sm hover:bg-slate-50"><Send className="w-4 h-4" /> SMS</a>}
+                  <a href={mail} data-testid="send-confirm-email" className="flex items-center gap-2 px-4 py-2 rounded-full border border-slate-200 text-sm hover:bg-slate-50"><Send className="w-4 h-4" /> Email</a>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
       {!isDone && id && (
         <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-premium space-y-4">
           <div className="text-[10px] tracking-widest uppercase text-slate-500">Confirmer le paiement</div>
@@ -242,12 +302,7 @@ export default function AppointmentForm() {
           {paymentMode === "LIEN" && (
             <div className="flex flex-wrap gap-2" data-testid="payment-link-actions">
               {(() => {
-                const client = clients.find((c) => c.id === form.client_id);
-                const phone = client?.phone?.replace(/\s/g, "") || "";
-                const amount = form.price_final_override ?? preview.final;
-                const msg = `Bonjour ${client?.first_name || client?.last_name || ""}, voici le lien de paiement pour votre RDV (${amount}€). Merci ! — Julien Bouche`;
-                const sms = phone ? `sms:${phone}?body=${encodeURIComponent(msg)}` : null;
-                const mail = `mailto:?subject=${encodeURIComponent("Lien de paiement")}&body=${encodeURIComponent(msg)}`;
+                const { sms, mail } = buildLinks(true);
                 return (
                   <>
                     {sms && <a href={sms} data-testid="send-link-sms" className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#D4AF37] text-[#C5A059] hover:bg-[#D4AF37]/5"><Send className="w-4 h-4" /> Envoyer par SMS</a>}
