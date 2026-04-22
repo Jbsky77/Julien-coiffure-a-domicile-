@@ -83,31 +83,31 @@ export default function Dashboard() {
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
           <div className="text-[10px] tracking-[0.3em] uppercase text-slate-500 mb-2">Tableau de bord</div>
-          <h1 className="font-serif text-4xl md:text-5xl tracking-tight">Bonjour Julien.</h1>
-          <div className="text-slate-500 mt-2">Voici votre activité de <span className="italic">{fmtMonth(d.month)}</span>.</div>
+          <h1 className="font-serif text-3xl tracking-tight">Bonjour Julien.</h1>
+          <div className="text-xs text-slate-500 mt-1">Activité de <span className="italic">{fmtMonth(d.month)}</span>.</div>
         </div>
-        <button onClick={() => navigate("/rdv/nouveau")} data-testid="dashboard-new-rdv" className="bg-[#0A192F] text-white rounded-full px-6 py-3 text-sm font-medium hover:bg-[#1E3A8A] flex items-center gap-2 self-start">
-          <Plus className="w-4 h-4" /> Nouveau rendez-vous
+        <button onClick={() => navigate("/rdv/nouveau")} data-testid="dashboard-new-rdv" className="bg-[#0A192F] text-white rounded-full px-5 py-2.5 text-xs font-medium hover:bg-[#1E3A8A] flex items-center gap-2 self-start">
+          <Plus className="w-4 h-4" /> Nouveau RDV
         </button>
       </div>
 
       {/* Top KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-3">
         <Widget title="Chiffre d'affaires" tid="kpi-ca">
-          <div className="font-serif text-3xl md:text-4xl">{money2(md.ca_brut)} €</div>
-          <div className="text-xs text-slate-500 mt-1">{md.n_rdv} rendez-vous</div>
+          <div className="font-serif text-xl">{money2(md.ca_brut)} €</div>
+          <div className="text-[11px] text-slate-500 mt-0.5">{md.n_rdv} RDV</div>
         </Widget>
         <Widget title="Marge nette" tid="kpi-marge" actionLabel="Détails" onAction={() => navigate("/compta")}>
-          <div className={`font-serif text-3xl md:text-4xl ${md.marge_nette >= 0 ? "" : "text-[#991B1B]"}`}>{money2(md.marge_nette)} €</div>
-          <div className="text-xs text-slate-500 mt-1">après URSSAF + charges</div>
+          <div className={`font-serif text-xl ${md.marge_nette >= 0 ? "" : "text-[#991B1B]"}`}>{money2(md.marge_nette)} €</div>
+          <div className="text-[11px] text-slate-500 mt-0.5">après charges</div>
         </Widget>
         <Widget title="RDV à venir" tid="kpi-upcoming" actionLabel="Voir" onAction={() => navigate("/rdv")}>
-          <div className="font-serif text-3xl md:text-4xl">{d.upcoming_count}</div>
-          <div className="text-xs text-slate-500 mt-1">{money(d.upcoming_amount)} prévus</div>
+          <div className="font-serif text-xl">{d.upcoming_count}</div>
+          <div className="text-[11px] text-slate-500 mt-0.5">{money(d.upcoming_amount)} prévus</div>
         </Widget>
         <Widget title="Panier moyen" tid="kpi-basket">
-          <div className="font-serif text-3xl md:text-4xl">{money2(d.avg_basket.month)} €</div>
-          <div className="text-xs text-slate-500 mt-1">jour {money2(d.avg_basket.day)}€ · année {money2(d.avg_basket.year)}€</div>
+          <div className="font-serif text-xl">{money2(d.avg_basket.month)} €</div>
+          <div className="text-[11px] text-slate-500 mt-0.5">j {money2(d.avg_basket.day)}€ · an {money2(d.avg_basket.year)}€</div>
         </Widget>
       </div>
 
