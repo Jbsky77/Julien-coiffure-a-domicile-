@@ -41,5 +41,4 @@ export const PAYMENT_MODES = [
   { id: "CHEQUE", label: "Chèque" },
   { id: "ESPECES", label: "Espèces" },
   { id: "VIREMENT", label: "Virement" },
-  { id: "LIEN", label: "Lien de paiement" },
 ];

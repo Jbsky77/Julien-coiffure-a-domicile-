@@ -139,7 +139,7 @@ export default function AppointmentForm() {
   };
 
   // Build the RDV confirmation message (SMS/Email)
-  const buildRdvMessage = ({ includePaymentLink = false } = {}) => {
+  const buildRdvMessage = () => {
     const client = clients.find((c) => c.id === form.client_id);
     const firstName = client?.first_name || client?.last_name || "";
     const dt = form.date ? new Date(form.date) : null;
@@ -160,21 +160,17 @@ export default function AppointmentForm() {
     ];
     if (prestationsNames) lines.push(`Prestations : ${prestationsNames}`);
     lines.push(`Montant : ${Number(amount).toFixed(2).replace(".", ",")} €`);
-    if (includePaymentLink) {
-      lines.push("", "Voici le lien de paiement (à me renvoyer une fois réglé) :", "[insérer votre lien]");
-    }
     lines.push("", "À très vite,", "Julien Bouche");
     return lines.join("\n");
   };
 
-  const buildLinks = (includePaymentLink = false) => {
+  const buildLinks = () => {
     const client = clients.find((c) => c.id === form.client_id);
     const phone = client?.phone?.replace(/\s/g, "") || "";
-    const msg = buildRdvMessage({ includePaymentLink });
-    const subject = includePaymentLink ? "Lien de paiement — Coiffure à domicile" : "Confirmation de votre rendez-vous";
+    const msg = buildRdvMessage();
     return {
       sms: phone ? `sms:${phone}?body=${encodeURIComponent(msg)}` : null,
-      mail: `mailto:${client?.email || ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(msg)}`,
+      mail: `mailto:?subject=${encodeURIComponent("Confirmation de votre rendez-vous")}&body=${encodeURIComponent(msg)}`,
     };
   };
 
@@ -277,7 +273,7 @@ export default function AppointmentForm() {
           </div>
           <div className="flex flex-wrap gap-2">
             {(() => {
-              const { sms, mail } = buildLinks(false);
+              const { sms, mail } = buildLinks();
               return (
                 <>
                   {sms && <a href={sms} data-testid="send-confirm-sms" className="flex items-center gap-2 px-4 py-2 rounded-full border border-slate-200 text-sm hover:bg-slate-50"><Send className="w-4 h-4" /> SMS</a>}
@@ -299,19 +295,6 @@ export default function AppointmentForm() {
               </button>
             ))}
           </div>
-          {paymentMode === "LIEN" && (
-            <div className="flex flex-wrap gap-2" data-testid="payment-link-actions">
-              {(() => {
-                const { sms, mail } = buildLinks(true);
-                return (
-                  <>
-                    {sms && <a href={sms} data-testid="send-link-sms" className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#D4AF37] text-[#C5A059] hover:bg-[#D4AF37]/5"><Send className="w-4 h-4" /> Envoyer par SMS</a>}
-                    <a href={mail} data-testid="send-link-email" className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#D4AF37] text-[#C5A059] hover:bg-[#D4AF37]/5"><Send className="w-4 h-4" /> Envoyer par Email</a>
-                  </>
-                );
-              })()}
-            </div>
-          )}
           <button onClick={finish} data-testid="finish-rdv-btn" className="w-full bg-gold-gradient text-white rounded-full px-8 py-4 font-medium flex items-center justify-center gap-2">
             <CheckCircle2 className="w-4 h-4" /> Valider le paiement & terminer
           </button>
