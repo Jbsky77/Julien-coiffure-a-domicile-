@@ -346,6 +346,26 @@ async def clients_update(cid: str, payload: Dict[str, Any], user: User = Depends
     return doc
 
 
+@api.post("/clients/import")
+async def clients_import(payload: Dict[str, Any], user: User = Depends(get_current_user)):
+    items = payload.get("clients", [])
+    created = 0
+    for it in items:
+        if not it.get("last_name"):
+            continue
+        c = Client(
+            first_name=it.get("first_name", ""),
+            last_name=it.get("last_name", ""),
+            phone=it.get("phone", ""),
+            address=it.get("address", ""),
+            comment=it.get("comment", ""),
+            birthday=it.get("birthday") or None,
+        )
+        await db.clients.insert_one(c.model_dump())
+        created += 1
+    return {"created": created}
+
+
 @api.delete("/clients/{cid}")
 async def clients_delete(cid: str, user: User = Depends(get_current_user)):
     await db.clients.delete_one({"id": cid})

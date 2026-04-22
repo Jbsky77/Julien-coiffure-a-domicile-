@@ -35,6 +35,33 @@ export default function Dashboard() {
 
   useEffect(() => { load(); }, []);
 
+  // Install prompt (PWA)
+  const [installEvt, setInstallEvt] = useState(null);
+  useEffect(() => {
+    const h = (e) => { e.preventDefault(); setInstallEvt(e); };
+    window.addEventListener("beforeinstallprompt", h);
+    return () => window.removeEventListener("beforeinstallprompt", h);
+  }, []);
+
+  // Birthday notifications (weekly check)
+  useEffect(() => {
+    if (!d || !("Notification" in window)) return;
+    const KEY = "jb_last_birthday_notif";
+    const last = localStorage.getItem(KEY);
+    const today = new Date().toDateString();
+    if (last === today) return;
+    if (Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+    if (Notification.permission === "granted" && d.upcoming_birthdays.length > 0) {
+      const names = d.upcoming_birthdays.map((c) => `${c.first_name} ${c.last_name}`.trim()).join(", ");
+      try {
+        new Notification("🎂 Anniversaires à venir", { body: names, tag: "birthdays" });
+        localStorage.setItem(KEY, today);
+      } catch {}
+    }
+  }, [d]);
+
   if (!d) return <div className="text-slate-500">Chargement…</div>;
 
   const md = d.month_data;
@@ -43,6 +70,15 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8" data-testid="dashboard-page">
+      {installEvt && (
+        <div className="bg-[#0A192F] text-white rounded-2xl p-4 flex items-center justify-between gap-4" data-testid="install-banner">
+          <div className="text-sm">Installez l'application sur votre écran d'accueil pour un accès rapide.</div>
+          <div className="flex gap-2">
+            <button onClick={async () => { installEvt.prompt(); await installEvt.userChoice; setInstallEvt(null); }} data-testid="install-btn" className="bg-gold-gradient text-white rounded-full px-4 py-2 text-sm">Installer</button>
+            <button onClick={() => setInstallEvt(null)} className="text-white/60 text-sm">Plus tard</button>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>

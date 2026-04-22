@@ -1,14 +1,62 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Upload } from "lucide-react";
 import { toast } from "sonner";
+
+// Parse CSV: header row with first_name,last_name,phone,address,birthday,comment
+function parseCSV(txt) {
+  const lines = txt.split(/\r?\n/).filter(Boolean);
+  if (lines.length === 0) return [];
+  const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
+  return lines.slice(1).map((l) => {
+    const cells = l.split(",").map((c) => c.trim());
+    const o = {};
+    headers.forEach((h, i) => { o[h] = cells[i] || ""; });
+    return o;
+  });
+}
+
+// Parse vCard
+function parseVCF(txt) {
+  const cards = txt.split(/BEGIN:VCARD/i).slice(1);
+  return cards.map((raw) => {
+    const lines = raw.split(/\r?\n/);
+    const out = { first_name: "", last_name: "", phone: "", address: "", birthday: "", comment: "" };
+    for (const line of lines) {
+      if (line.startsWith("FN:")) {
+        const full = line.slice(3).trim();
+        if (!out.first_name && !out.last_name) {
+          const parts = full.split(" ");
+          out.first_name = parts.slice(0, -1).join(" ");
+          out.last_name = parts.slice(-1)[0] || full;
+        }
+      } else if (line.startsWith("N:")) {
+        const [ln, fn] = line.slice(2).split(";");
+        out.last_name = (ln || "").trim();
+        out.first_name = (fn || "").trim();
+      } else if (line.includes("TEL")) {
+        const v = line.split(":").slice(1).join(":").trim();
+        if (v) out.phone = v;
+      } else if (line.startsWith("BDAY:") || line.startsWith("BDAY;")) {
+        const v = line.split(":").slice(1).join(":").trim();
+        if (/^\d{8}$/.test(v)) out.birthday = `${v.slice(0,4)}-${v.slice(4,6)}-${v.slice(6,8)}`;
+        else if (/^\d{4}-\d{2}-\d{2}/.test(v)) out.birthday = v.slice(0, 10);
+      } else if (line.includes("ADR")) {
+        const v = line.split(":").slice(1).join(":").trim().replace(/;+/g, " ").trim();
+        if (v) out.address = v;
+      }
+    }
+    return out;
+  }).filter((x) => x.last_name || x.first_name);
+}
 
 export default function Clients() {
   const [list, setList] = useState([]);
   const [q, setQ] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ first_name: "", last_name: "", phone: "", address: "", comment: "", birthday: "" });
+  const fileRef = useRef(null);
 
   const load = async () => {
     const r = await api.get("/clients");
@@ -22,6 +70,18 @@ export default function Clients() {
     toast.success("Client créé");
     setShowAdd(false);
     setForm({ first_name: "", last_name: "", phone: "", address: "", comment: "", birthday: "" });
+    load();
+  };
+
+  const onImportFile = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const txt = await f.text();
+    const items = f.name.toLowerCase().endsWith(".vcf") ? parseVCF(txt) : parseCSV(txt);
+    if (items.length === 0) { toast.error("Aucun contact détecté"); return; }
+    const r = await api.post("/clients/import", { clients: items });
+    toast.success(`${r.data.created} client(s) importé(s)`);
+    e.target.value = "";
     load();
   };
 
@@ -39,9 +99,13 @@ export default function Clients() {
           <div className="text-[10px] tracking-[0.3em] uppercase text-slate-500 mb-2">Répertoire</div>
           <h1 className="font-serif text-4xl md:text-5xl tracking-tight">Clients</h1>
         </div>
-        <button onClick={() => setShowAdd((s) => !s)} data-testid="toggle-add-client" className="bg-[#0A192F] text-white rounded-full px-6 py-3 text-sm font-medium hover:bg-[#1E3A8A] flex items-center gap-2">
-          <Plus className="w-4 h-4" /> Nouveau
-        </button>
+        <div className="flex gap-2">
+          <input ref={fileRef} type="file" accept=".csv,.vcf,text/csv,text/vcard" onChange={onImportFile} className="hidden" data-testid="import-file-input" />
+          <button onClick={() => fileRef.current?.click()} data-testid="import-contacts-btn" className="rounded-full px-4 py-3 border border-slate-200 text-sm flex items-center gap-2 hover:bg-slate-50"><Upload className="w-4 h-4" /> Importer</button>
+          <button onClick={() => setShowAdd((s) => !s)} data-testid="toggle-add-client" className="bg-[#0A192F] text-white rounded-full px-6 py-3 text-sm font-medium hover:bg-[#1E3A8A] flex items-center gap-2">
+            <Plus className="w-4 h-4" /> Nouveau
+          </button>
+        </div>
       </div>
 
       {showAdd && (

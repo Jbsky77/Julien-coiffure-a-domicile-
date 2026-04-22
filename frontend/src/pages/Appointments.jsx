@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { api, money, fmtDate, fmtTime } from "@/lib/api";
 import { Link, useNavigate } from "react-router-dom";
-import { CalendarClock, Plus, CheckCircle2, Circle } from "lucide-react";
+import { CalendarClock, Plus, CheckCircle2, Circle, LayoutList, CalendarDays, CalendarRange } from "lucide-react";
+import CalendarView from "@/components/app/CalendarView";
 
 export default function Appointments() {
   const [list, setList] = useState([]);
   const [tab, setTab] = useState("upcoming");
+  const [view, setView] = useState("list"); // list | week | month
+  const [cursor, setCursor] = useState(new Date());
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -32,12 +35,22 @@ export default function Appointments() {
         </button>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex gap-2 items-center flex-wrap">
         <button onClick={() => setTab("upcoming")} data-testid="tab-upcoming" className={`px-4 py-2 rounded-full text-sm ${tab === "upcoming" ? "bg-[#0A192F] text-white" : "border border-slate-200 text-slate-600"}`}>À venir ({upcoming.length})</button>
         <button onClick={() => setTab("done")} data-testid="tab-done" className={`px-4 py-2 rounded-full text-sm ${tab === "done" ? "bg-[#0A192F] text-white" : "border border-slate-200 text-slate-600"}`}>Historique ({done.length})</button>
+        <div className="flex-1" />
+        <div className="flex gap-1 bg-slate-100 rounded-full p-1">
+          <button onClick={() => setView("list")} data-testid="view-list" title="Liste" className={`px-3 py-1.5 rounded-full ${view === "list" ? "bg-white shadow-sm" : "text-slate-500"}`}><LayoutList className="w-4 h-4" /></button>
+          <button onClick={() => setView("week")} data-testid="view-week" title="Semaine" className={`px-3 py-1.5 rounded-full ${view === "week" ? "bg-white shadow-sm" : "text-slate-500"}`}><CalendarDays className="w-4 h-4" /></button>
+          <button onClick={() => setView("month")} data-testid="view-month" title="Mois" className={`px-3 py-1.5 rounded-full ${view === "month" ? "bg-white shadow-sm" : "text-slate-500"}`}><CalendarRange className="w-4 h-4" /></button>
+        </div>
       </div>
 
-      {shown.length === 0 ? (
+      {view !== "list" && (
+        <CalendarView appointments={list} view={view} cursor={cursor} setCursor={setCursor} />
+      )}
+
+      {view === "list" && (shown.length === 0 ? (
         <div className="text-slate-400 text-sm py-16 text-center">Aucun rendez-vous.</div>
       ) : (
         <ul className="space-y-2">
@@ -61,7 +74,7 @@ export default function Appointments() {
             </li>
           ))}
         </ul>
-      )}
+      ))}
     </div>
   );
 }

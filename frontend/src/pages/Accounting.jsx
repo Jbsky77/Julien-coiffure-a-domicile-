@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { api, money, money2, fmtMonth } from "@/lib/api";
 import { toast } from "sonner";
-import { ExternalLink, RefreshCcw, ChevronLeft, ChevronRight } from "lucide-react";
+import { ExternalLink, RefreshCcw, ChevronLeft, ChevronRight, Download, FileText } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 function currentYYYYMM() {
   const d = new Date();
@@ -38,6 +40,74 @@ export default function Accounting() {
     const r = await api.post(`/accounting/reset/${monthKey}`);
     toast.success(`Mois remis à 0 (${r.data.deleted} RDV supprimés)`);
     load();
+  };
+
+  const exportCSV = () => {
+    const rows = [
+      ["Mois", fmtMonth(yyyymm)],
+      ["CA brut (€)", money2(data.ca_brut)],
+      ["RDV", data.n_rdv],
+      ["URSSAF 22% (arrondi sup.) €", data.urssaf_ceil],
+      ["Consommables €", money2(data.consumables)],
+      ["Frais fixes €", money2(data.fixed_costs)],
+      ["KM total", money2(data.total_km)],
+      ["Carburant facturé €", money2(data.fuel_charged)],
+      ["Carburant coût réel €", money2(data.fuel_real_cost)],
+      ["Carburant balance €", money2(data.fuel_balance)],
+      ["Marge nette €", money2(data.marge_nette)],
+      [""],
+      ["Règlements par mode", "Nombre", "Montant €"],
+      ...Object.entries(data.payment_breakdown || {}).map(([k, v]) => [k, v.count, money2(v.amount)]),
+    ];
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `compta-${yyyymm}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportPDF = () => {
+    const doc = new jsPDF();
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(22);
+    doc.setTextColor("#0A192F");
+    doc.text("Coiffure à domicile Julien Bouche", 14, 20);
+    doc.setFontSize(11);
+    doc.setTextColor("#64748B");
+    doc.text(`Comptabilité · ${fmtMonth(yyyymm)}`, 14, 28);
+    autoTable(doc, {
+      startY: 36,
+      head: [["Indicateur", "Valeur"]],
+      body: [
+        ["CA brut", `${money2(data.ca_brut)} €`],
+        ["Nombre de RDV", String(data.n_rdv)],
+        ["URSSAF 22% (↑)", `${data.urssaf_ceil} €`],
+        ["Consommables", `${money2(data.consumables)} €`],
+        ["Frais fixes", `${money2(data.fixed_costs)} €`],
+        ["KM parcourus", `${money2(data.total_km)} km`],
+        ["Carburant facturé", `${money2(data.fuel_charged)} €`],
+        ["Carburant coût réel", `${money2(data.fuel_real_cost)} €`],
+        ["Balance carburant", `${money2(data.fuel_balance)} €`],
+        ["Marge nette", `${money2(data.marge_nette)} €`],
+      ],
+      theme: "grid",
+      headStyles: { fillColor: [10, 25, 47], textColor: 255 },
+      styles: { font: "helvetica", fontSize: 10 },
+    });
+    const payments = Object.entries(data.payment_breakdown || {});
+    if (payments.length) {
+      autoTable(doc, {
+        head: [["Mode de règlement", "Nombre", "Montant"]],
+        body: payments.map(([k, v]) => [k, String(v.count), `${money2(v.amount)} €`]),
+        theme: "grid",
+        headStyles: { fillColor: [212, 175, 55], textColor: 255 },
+        styles: { font: "helvetica", fontSize: 10 },
+      });
+    }
+    doc.save(`compta-${yyyymm}.pdf`);
   };
 
   if (!data) return <div className="text-slate-500">Chargement…</div>;
@@ -97,6 +167,8 @@ export default function Accounting() {
           </div>
 
           <div className="flex flex-wrap gap-3">
+            <button onClick={exportCSV} data-testid="export-csv-btn" className="px-6 py-3 rounded-full border border-slate-200 hover:bg-slate-50 text-sm flex items-center gap-2"><Download className="w-4 h-4" /> Export CSV</button>
+            <button onClick={exportPDF} data-testid="export-pdf-btn" className="px-6 py-3 rounded-full bg-gold-gradient text-white text-sm flex items-center gap-2"><FileText className="w-4 h-4" /> Export PDF</button>
             <button onClick={() => resetMonth(yyyymm)} data-testid="reset-month-btn" className="px-6 py-3 rounded-full border border-red-200 text-[#991B1B] hover:bg-red-50 text-sm flex items-center gap-2"><RefreshCcw className="w-4 h-4" /> Remettre ce mois à 0</button>
           </div>
         </>

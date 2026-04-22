@@ -17,6 +17,18 @@ Julien Bouche — coiffeur indépendant auto-entrepreneur, mobile, passe d'un cl
 - Persistance MongoDB multi-appareils
 - Navigation cliquable partout (listes, cartes, historique)
 
+## Implemented (v1.1 — 2026-04)
+- **v1 base** (voir ci-dessous)
+- **Calendrier** Vue Semaine + Vue Mois (grille 7 jours / 42 cellules) avec navigation ← →
+- **PWA installable** : manifest.json + service worker + bannière d'installation sur le Dashboard
+- **Notifications navigateur** : rappel anniversaires automatique à l'ouverture (1× par jour max, localStorage)
+- **Export comptabilité** CSV (UTF-8 BOM Excel) + PDF stylé (jspdf + autoTable, branding navy + or)
+- **Lien Google Maps corrigé** : ouverture via `window.open(url, "_blank", "noopener,noreferrer")` avec fallback
+- **Contacts clients** : boutons SMS (`sms:` natif) + Email (`mailto:` natif) avec message pré-rempli
+- **Lien de paiement** : boutons "Envoyer par SMS" / "Envoyer par Email" avec le montant pré-rempli
+- **Import contacts** CSV (headers: first_name,last_name,phone,address,birthday,comment) + vCard (.vcf)
+- Backend : nouvel endpoint `POST /api/clients/import` pour l'import en masse
+
 ## Implemented (v1 — 2026-04)
 - Google OAuth + protection des routes, Layout sidebar desktop + bottom nav mobile
 - **Prestations**: 5 prestations par défaut (HOMME/FEMME/ENFANT), CRUD dans Réglages, prix éditables

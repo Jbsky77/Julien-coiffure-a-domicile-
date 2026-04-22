@@ -232,9 +232,22 @@ export default function AppointmentForm() {
             ))}
           </div>
           {paymentMode === "LIEN" && (
-            <button className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#D4AF37] text-[#C5A059]" onClick={() => toast.success("Lien envoyé (simulé)")} data-testid="send-link-btn">
-              <Send className="w-4 h-4" /> Envoyer lien
-            </button>
+            <div className="flex flex-wrap gap-2" data-testid="payment-link-actions">
+              {(() => {
+                const client = clients.find((c) => c.id === form.client_id);
+                const phone = client?.phone?.replace(/\s/g, "") || "";
+                const amount = form.price_final_override ?? preview.final;
+                const msg = `Bonjour ${client?.first_name || client?.last_name || ""}, voici le lien de paiement pour votre RDV (${amount}€). Merci ! — Julien Bouche`;
+                const sms = phone ? `sms:${phone}?body=${encodeURIComponent(msg)}` : null;
+                const mail = `mailto:?subject=${encodeURIComponent("Lien de paiement")}&body=${encodeURIComponent(msg)}`;
+                return (
+                  <>
+                    {sms && <a href={sms} data-testid="send-link-sms" className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#D4AF37] text-[#C5A059] hover:bg-[#D4AF37]/5"><Send className="w-4 h-4" /> Envoyer par SMS</a>}
+                    <a href={mail} data-testid="send-link-email" className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#D4AF37] text-[#C5A059] hover:bg-[#D4AF37]/5"><Send className="w-4 h-4" /> Envoyer par Email</a>
+                  </>
+                );
+              })()}
+            </div>
           )}
           <button onClick={finish} data-testid="finish-rdv-btn" className="w-full bg-gold-gradient text-white rounded-full px-8 py-4 font-medium flex items-center justify-center gap-2">
             <CheckCircle2 className="w-4 h-4" /> Valider le paiement & terminer

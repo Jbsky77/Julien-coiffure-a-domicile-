@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { api, money, money2, fmtDate, fmtTime } from "@/lib/api";
-import { ArrowLeft, MapPin, Phone, Cake, Plus, Trash2, Save, Gift, Users as UsersIcon } from "lucide-react";
+import { ArrowLeft, MapPin, Phone, Cake, Plus, Trash2, Save, Gift, Users as UsersIcon, Mail, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 
 function LoyaltyRow({ count, label, price }) {
@@ -87,6 +87,13 @@ export default function ClientDetail() {
   const fb = "w-full bg-transparent border-b border-slate-300 rounded-none px-0 py-2 focus:border-[#0A192F] focus:outline-none text-base";
 
   const mapsUrl = c.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.address)}` : null;
+  const openMaps = () => {
+    if (!mapsUrl) return;
+    const w = window.open(mapsUrl, "_blank", "noopener,noreferrer");
+    if (!w) window.location.href = mapsUrl;
+  };
+  const smsLink = c.phone ? `sms:${c.phone.replace(/\s/g, "")}?body=${encodeURIComponent(`Bonjour ${c.first_name || ""}, c'est Julien Bouche. `)}` : null;
+  const mailLink = `mailto:?subject=${encodeURIComponent("Prendre rendez-vous")}&body=${encodeURIComponent(`Bonjour ${c.first_name || c.last_name},\n\nJ'espère que vous allez bien. Souhaitez-vous prendre un nouveau rendez-vous ?\n\nÀ bientôt,\nJulien Bouche`)}`;
 
   return (
     <div className="space-y-8 max-w-5xl" data-testid="client-detail-page">
@@ -99,10 +106,12 @@ export default function ClientDetail() {
           <div className="text-slate-500 mt-2 text-sm flex flex-wrap items-center gap-4">
             {c.phone && <span className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" /> {c.phone}</span>}
             {c.birthday && <span className="flex items-center gap-1.5"><Cake className="w-3.5 h-3.5" /> {new Date(c.birthday).toLocaleDateString("fr-FR")}</span>}
-            {mapsUrl && <a href={mapsUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 hover:text-[#0A192F]" data-testid="maps-link"><MapPin className="w-3.5 h-3.5" /> Voir sur Google Maps</a>}
+            {mapsUrl && <button onClick={openMaps} className="flex items-center gap-1.5 hover:text-[#0A192F]" data-testid="maps-link"><MapPin className="w-3.5 h-3.5" /> Voir sur Google Maps</button>}
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          {smsLink && <a href={smsLink} data-testid="sms-link" className="rounded-full px-4 py-2.5 border border-slate-200 text-sm flex items-center gap-2"><MessageSquare className="w-4 h-4" /> SMS</a>}
+          <a href={mailLink} data-testid="mail-link" className="rounded-full px-4 py-2.5 border border-slate-200 text-sm flex items-center gap-2"><Mail className="w-4 h-4" /> Email</a>
           <Link to={`/rdv/nouveau?client=${c.id}`} data-testid="client-new-rdv" className="bg-[#0A192F] text-white rounded-full px-5 py-2.5 text-sm font-medium hover:bg-[#1E3A8A] flex items-center gap-2"><Plus className="w-4 h-4" /> RDV</Link>
           <button onClick={remove} data-testid="delete-client-btn" className="rounded-full px-4 py-2.5 border border-red-200 text-[#991B1B] hover:bg-red-50"><Trash2 className="w-4 h-4" /></button>
         </div>
