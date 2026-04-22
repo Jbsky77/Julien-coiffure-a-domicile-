@@ -14,6 +14,7 @@ import ClientDetail from "@/pages/ClientDetail";
 import Accounting from "@/pages/Accounting";
 import Stock from "@/pages/Stock";
 import Settings from "@/pages/Settings";
+import Analytics from "@/pages/Analytics";
 import Layout from "@/components/app/Layout";
 
 function AuthCallback() {
@@ -81,6 +82,7 @@ function RootRouter() {
         <Route path="/compta" element={<Accounting />} />
         <Route path="/stock" element={<Stock />} />
         <Route path="/reglages" element={<Settings />} />
+        <Route path="/analytics" element={<Analytics />} />
       </Route>
     </Routes>
   );

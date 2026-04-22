@@ -1,7 +1,31 @@
 import React, { useEffect, useState } from "react";
-import { api, money } from "@/lib/api";
+import { api, money, API } from "@/lib/api";
 import { toast } from "sonner";
-import { Plus, Trash2, Save } from "lucide-react";
+import { Plus, Trash2, Save, Copy, Calendar } from "lucide-react";
+
+function IcalBlock() {
+  const [url, setUrl] = useState("");
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await api.get("/calendar/ical-url");
+        setUrl(`${API}/calendar/${r.data.token}.ics`);
+      } catch (e) {}
+    })();
+  }, []);
+  const copy = async () => {
+    if (!url) return toast.error("Session indisponible — reconnectez-vous");
+    await navigator.clipboard.writeText(url);
+    toast.success("URL copiée dans le presse-papiers");
+  };
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <input data-testid="ical-url" readOnly value={url || "Reconnectez-vous pour générer l'URL"} className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-full px-4 py-2 text-xs text-slate-600" />
+      <button onClick={copy} data-testid="ical-copy" className="rounded-full px-4 py-2 border border-slate-200 text-sm flex items-center gap-2"><Copy className="w-4 h-4" /> Copier</button>
+      {url && <a href={url} download="julienbouche.ics" data-testid="ical-download" className="rounded-full px-4 py-2 bg-[#0A192F] text-white text-sm flex items-center gap-2"><Calendar className="w-4 h-4" /> Télécharger .ics</a>}
+    </div>
+  );
+}
 
 const CATS = ["HOMME", "FEMME", "ENFANT", "AUTRE"];
 
@@ -50,6 +74,12 @@ export default function Settings() {
         <div className="text-[10px] tracking-[0.3em] uppercase text-slate-500 mb-2">Paramètres</div>
         <h1 className="font-serif text-4xl md:text-5xl tracking-tight">Réglages</h1>
       </div>
+
+      <section className="bg-white border border-slate-100 rounded-2xl p-6 shadow-premium">
+        <div className="text-[10px] tracking-widest uppercase text-slate-500 mb-3">Synchronisation agenda (iCal)</div>
+        <div className="text-sm text-slate-500 mb-4">Ajoutez cette URL dans Google Calendar (Autres agendas › À partir de l'URL) ou Apple Calendar (Fichier › Nouvelle souscription calendrier) pour voir vos RDV sur tous vos appareils.</div>
+        <IcalBlock />
+      </section>
 
       <section className="bg-white border border-slate-100 rounded-2xl p-6 shadow-premium">
         <div className="text-[10px] tracking-widest uppercase text-slate-500 mb-5">Variables comptables</div>

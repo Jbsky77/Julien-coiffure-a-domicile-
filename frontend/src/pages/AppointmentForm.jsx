@@ -131,6 +131,13 @@ export default function AppointmentForm() {
     navigate("/rdv");
   };
 
+  const cancel = async () => {
+    if (!window.confirm("Marquer ce rendez-vous comme annulé (no-show) ?")) return;
+    await api.post(`/appointments/${id}/cancel`);
+    toast.success("Rendez-vous annulé");
+    navigate("/rdv");
+  };
+
   const fieldBase = "w-full bg-transparent border-b border-slate-300 rounded-none px-0 py-2 focus:border-[#0A192F] focus:outline-none text-base transition-colors";
   const readOnly = isDone || (id && !editMode);
 
@@ -150,6 +157,7 @@ export default function AppointmentForm() {
       </div>
 
       {isDone && <div className="bg-[#166534]/10 border border-[#166534]/30 rounded-2xl px-6 py-3 text-[#166534] text-sm flex items-center gap-2"><CheckCircle2 className="w-4 h-4" /> Rendez-vous terminé — {rdv.payment_mode}</div>}
+      {rdv?.status === "cancelled" && <div className="bg-red-50 border border-red-200 rounded-2xl px-6 py-3 text-[#991B1B] text-sm">Rendez-vous annulé (no-show)</div>}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
@@ -260,6 +268,9 @@ export default function AppointmentForm() {
           <button onClick={save} data-testid="save-rdv-btn" className="bg-[#0A192F] text-white rounded-full px-8 py-3 font-medium hover:bg-[#1E3A8A]">
             {id ? "Enregistrer les modifications" : "Créer le rendez-vous"}
           </button>
+        )}
+        {id && !isDone && rdv?.status !== "cancelled" && (
+          <button onClick={cancel} data-testid="cancel-rdv-btn" className="rounded-full px-4 py-3 border border-red-200 text-[#991B1B] hover:bg-red-50 text-sm">Annuler (no-show)</button>
         )}
         {id && (
           <button onClick={remove} data-testid="delete-rdv-btn" className="rounded-full px-4 py-3 border border-red-200 text-[#991B1B] hover:bg-red-50 flex items-center gap-2">

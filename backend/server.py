@@ -508,6 +508,115 @@ async def appointments_finish(rid: str, payload: FinishAppointment, user: User =
     return await db.appointments.find_one({"id": rid}, {"_id": 0})
 
 
+@api.post("/appointments/{rid}/cancel")
+async def appointments_cancel(rid: str, user: User = Depends(get_current_user)):
+    rdv = await db.appointments.find_one({"id": rid}, {"_id": 0})
+    if not rdv:
+        raise HTTPException(404, "Not found")
+    await db.appointments.update_one({"id": rid}, {"$set": {"status": "cancelled"}})
+    return await db.appointments.find_one({"id": rid}, {"_id": 0})
+
+
+@api.get("/analytics")
+async def analytics(user: User = Depends(get_current_user)):
+    rdvs = await db.appointments.find({"status": "done"}, {"_id": 0}).to_list(20000)
+    clients = await db.clients.find({}, {"_id": 0}).to_list(5000)
+    # Top prestations
+    svc_stats = {}
+    for r in rdvs:
+        for s in r["services"]:
+            k = s["service_id"]
+            e = svc_stats.setdefault(k, {"service_id": k, "name": s["name"], "count": 0, "revenue": 0.0})
+            e["count"] += 1
+            if not s.get("is_gift"):
+                e["revenue"] += s["price"]
+    top_services = sorted(svc_stats.values(), key=lambda x: x["revenue"], reverse=True)
+    # Top clients
+    client_stats = {}
+    for r in rdvs:
+        k = r["client_id"]
+        e = client_stats.setdefault(k, {"client_id": k, "client_name": r.get("client_name", ""), "count": 0, "revenue": 0.0})
+        e["count"] += 1
+        e["revenue"] += r["price_final"]
+    top_clients = sorted(client_stats.values(), key=lambda x: x["revenue"], reverse=True)
+    # Seasonal (per month current year)
+    now = datetime.now(timezone.utc)
+    seasonal = [{"month": m, "label": ["Jan","Fév","Mar","Avr","Mai","Juin","Juil","Aoû","Sep","Oct","Nov","Déc"][m-1], "ca": 0.0, "n": 0} for m in range(1, 13)]
+    for r in rdvs:
+        try:
+            dt = datetime.fromisoformat((r.get("finished_at") or r["date"]).replace("Z", "+00:00"))
+        except Exception:
+            continue
+        if dt.year == now.year:
+            seasonal[dt.month - 1]["ca"] += r["price_final"]
+            seasonal[dt.month - 1]["n"] += 1
+    # Weekdays
+    weekdays = [{"day": i, "label": ["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"][i], "ca": 0.0, "n": 0} for i in range(7)]
+    for r in rdvs:
+        try:
+            dt = datetime.fromisoformat((r.get("finished_at") or r["date"]).replace("Z", "+00:00"))
+            idx = (dt.weekday())  # Mon=0
+            weekdays[idx]["ca"] += r["price_final"]
+            weekdays[idx]["n"] += 1
+        except Exception:
+            continue
+    total = sum(r["price_final"] for r in rdvs)
+    return {
+        "top_services": top_services,
+        "top_clients": top_clients,
+        "seasonal": seasonal,
+        "weekdays": weekdays,
+        "total_ca": round(total, 2),
+        "total_rdv": len(rdvs),
+        "total_clients": len(clients),
+    }
+
+
+@api.get("/calendar/ical-url")
+async def ical_url_endpoint(request: Request, session_token: Optional[str] = Cookie(default=None), authorization: Optional[str] = Header(default=None)):
+    token = session_token
+    if not token and authorization and authorization.startswith("Bearer "):
+        token = authorization[7:]
+    if not token:
+        raise HTTPException(401, "Not authenticated")
+    sess = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
+    if not sess:
+        raise HTTPException(401, "Invalid session")
+    return {"url": f"/api/calendar/{token}.ics", "token": token}
+
+
+@api.get("/calendar/{token}.ics")
+async def ical_feed(token: str):
+    sess = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
+    if not sess:
+        raise HTTPException(401, "Invalid token")
+    rdvs = await db.appointments.find({"status": {"$in": ["scheduled", "done"]}}, {"_id": 0}).to_list(5000)
+    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Julien Bouche//FR", "CALSCALE:GREGORIAN", "X-WR-CALNAME:Julien Bouche · RDV"]
+    for r in rdvs:
+        try:
+            dt = datetime.fromisoformat(r["date"].replace("Z", "+00:00"))
+        except Exception:
+            continue
+        start = dt.strftime("%Y%m%dT%H%M%SZ")
+        end_dt = dt + timedelta(minutes=60)
+        end = end_dt.strftime("%Y%m%dT%H%M%SZ")
+        summary = f"{r.get('client_name','RDV')} · {', '.join([s['name'] for s in r['services']])}"
+        lines += [
+            "BEGIN:VEVENT",
+            f"UID:{r['id']}@julienbouche",
+            f"DTSTAMP:{start}",
+            f"DTSTART:{start}",
+            f"DTEND:{end}",
+            f"SUMMARY:{summary}",
+            f"DESCRIPTION:Montant {r['price_final']}€ — {r.get('notes','')}",
+            f"STATUS:{'CONFIRMED' if r['status']=='done' else 'TENTATIVE'}",
+            "END:VEVENT",
+        ]
+    lines.append("END:VCALENDAR")
+    from fastapi.responses import Response as FResponse
+    return FResponse("\r\n".join(lines), media_type="text/calendar")
+
+
 @api.delete("/appointments/{rid}")
 async def appointments_delete(rid: str, user: User = Depends(get_current_user)):
     await db.appointments.delete_one({"id": rid})

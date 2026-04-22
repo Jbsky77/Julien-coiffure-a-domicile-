@@ -17,6 +17,12 @@ Julien Bouche — coiffeur indépendant auto-entrepreneur, mobile, passe d'un cl
 - Persistance MongoDB multi-appareils
 - Navigation cliquable partout (listes, cartes, historique)
 
+## Implemented (v1.2 — 2026-04)
+- **Statut "Annulé" (no-show)** : bouton "Annuler (no-show)" sur la fiche RDV, onglet "Annulés" dans la liste
+- **Synchronisation agenda iCal** : endpoint `GET /api/calendar/:token.ics` + section dans Réglages avec URL copiable et bouton téléchargement .ics (compatible Google Calendar, Apple Calendar, Outlook)
+- **Tableau analytique** `/analytics` (nouveau bouton "Stats" dans la nav) : CA par mois (barres), meilleurs jours de la semaine, Top prestations, Top clients avec liens vers les fiches
+- **Refonte UI en cadre mobile natif** : suppression de la sidebar desktop, affichage phone-frame centré (480px, rounded corners, shadow) sur écran large, plein écran sur mobile, nav en haut (raccourcis Stock/Réglages/Déconnexion) + nav en bas (Accueil/RDV/Clients/Compta/Stats) façon iOS
+
 ## Implemented (v1.1 — 2026-04)
 - **v1 base** (voir ci-dessous)
 - **Calendrier** Vue Semaine + Vue Mois (grille 7 jours / 42 cellules) avec navigation ← →
