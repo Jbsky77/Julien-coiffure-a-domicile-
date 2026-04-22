@@ -102,6 +102,12 @@ body {
 }
 .animate-fade-up { animation: fade-up 0.4s ease-out both; }
 
+/* Hide Emergent platform badge */
+#emergent-badge,
+a[href*="emergent.sh"][id*="badge"],
+a[href*="emergent.sh"][style*="position: fixed"],
+a[href*="emergent-badge"] { display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important; }
+
 /* Elegant divider */
 .divider {
   height: 1px;

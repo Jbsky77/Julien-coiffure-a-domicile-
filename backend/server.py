@@ -153,25 +153,8 @@ async def get_current_user(
     session_token: Optional[str] = Cookie(default=None),
     authorization: Optional[str] = Header(default=None),
 ) -> User:
-    token = session_token
-    if not token and authorization and authorization.startswith("Bearer "):
-        token = authorization[7:]
-    if not token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    sess = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
-    if not sess:
-        raise HTTPException(status_code=401, detail="Invalid session")
-    expires_at = sess.get("expires_at")
-    if isinstance(expires_at, str):
-        expires_at = datetime.fromisoformat(expires_at)
-    if expires_at and expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
-    if expires_at and expires_at < datetime.now(timezone.utc):
-        raise HTTPException(status_code=401, detail="Session expired")
-    user_doc = await db.users.find_one({"user_id": sess["user_id"]}, {"_id": 0})
-    if not user_doc:
-        raise HTTPException(status_code=401, detail="User not found")
-    return User(**user_doc)
+    # Auth disabled: return default local user (single-user app for Julien)
+    return User(user_id="local-julien", email="julien@local", name="Julien Bouche", picture="")
 
 
 @api.post("/auth/google/session")

@@ -1,6 +1,6 @@
 import React from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { LayoutDashboard, CalendarClock, Users, Receipt, Package, Settings as SettingsIcon, LogOut, Scissors, TrendingUp } from "lucide-react";
+import { LayoutDashboard, CalendarClock, Users, Receipt, Package, Settings as SettingsIcon, Scissors, TrendingUp } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 const NAV = [
@@ -17,7 +17,6 @@ const MORE = [
 ];
 
 export default function Layout({ children }) {
-  const { user, logout } = useAuth();
   const navigate = useNavigate();
   return (
     <div className="min-h-screen bg-slate-100 md:flex md:items-start md:justify-center md:py-8">
@@ -38,7 +37,6 @@ export default function Layout({ children }) {
                 <n.icon className="w-4 h-4" strokeWidth={1.5} />
               </NavLink>
             ))}
-            <button onClick={logout} data-testid="logout-btn" className="p-2 rounded-full text-slate-500 hover:bg-slate-50"><LogOut className="w-4 h-4" /></button>
           </div>
         </header>
 
