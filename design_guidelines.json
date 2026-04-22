@@ -1,0 +1,89 @@
+{
+  "theme": "light",
+  "archetype": "Archetype 5 (Jewel & Luxury) - Adapted Light Mode",
+  "colors": {
+    "background": "#FFFFFF",
+    "surface": "#F8FAFC",
+    "primary": "#0A192F",
+    "secondary": "#1E3A8A",
+    "accent_gold": "#D4AF37",
+    "text_main": "#0A192F",
+    "text_muted": "#64748B",
+    "border_subtle": "#E2E8F0",
+    "danger": "#991B1B",
+    "success": "#166534"
+  },
+  "typography": {
+    "heading_font": "Cormorant Garamond",
+    "body_font": "Outfit",
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl font-serif tracking-tight font-medium text-[#0A192F]",
+      "h2": "text-2xl sm:text-3xl font-serif tracking-tight font-medium text-[#0A192F]",
+      "h3": "text-xl sm:text-2xl font-serif font-medium text-[#0A192F]",
+      "h4": "text-lg sm:text-xl font-sans font-semibold text-[#0A192F]",
+      "body": "text-base font-sans leading-relaxed text-[#64748B]",
+      "small": "text-sm font-sans tracking-wide uppercase text-[#64748B]"
+    }
+  },
+  "spacing_and_layout": {
+    "strategy": "Mobile-First Premium",
+    "container_padding": "px-6 py-8",
+    "gap_standard": "gap-6",
+    "grid_dashboard": "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6",
+    "border_radius": "rounded-2xl",
+    "surface_treatment": "Cardless or extremely subtle 1px border (border-slate-200) with generous p-6 internal padding. Use shadow-sm for elevated components (modals/dropdowns), otherwise keep it flat and elegant."
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-[#0A192F] text-white rounded-full px-8 py-3 font-sans font-medium hover:bg-[#1E3A8A] transition-colors",
+      "secondary": "bg-white text-[#0A192F] border border-[#0A192F] rounded-full px-8 py-3 font-sans font-medium hover:bg-slate-50 transition-colors",
+      "gold_accent": "bg-gradient-to-r from-[#C5A059] to-[#D4AF37] text-white rounded-full px-8 py-3 font-sans font-medium shadow-md"
+    },
+    "inputs": {
+      "style": "bg-transparent border-b border-slate-300 rounded-none px-0 py-2 focus:border-[#0A192F] focus:ring-0 font-sans text-base transition-colors"
+    },
+    "cards": {
+      "dashboard_widget": "bg-white border border-slate-100 rounded-2xl p-6 shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
+    },
+    "navigation": {
+      "mobile_bottom_nav": "fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-slate-100 px-6 py-4 flex justify-between items-center z-50",
+      "desktop_sidebar": "w-64 bg-[#F8FAFC] border-r border-slate-100 h-screen sticky top-0 p-6 hidden md:block"
+    },
+    "charts": {
+      "stock_donut": "Recharts PieChart/Donut. Colors: ['#0A192F', '#1E3A8A', '#D4AF37', '#94A3B8', '#CBD5E1']. Remove axis lines, clean tooltip.",
+      "forecast_bar": "Recharts BarChart. Use subtle rounded top corners for bars (radius=[4, 4, 0, 0])."
+    },
+    "loyalty_tracker": {
+      "style": "Horizontal progress bar or row of 5 circular slots + 1 larger golden slot for the free service. Use lucide-react 'Star' or 'Scissors' icons."
+    }
+  },
+  "motion": {
+    "hover": "transition-all duration-300 ease-in-out",
+    "page_load": "framer-motion initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}",
+    "list_stagger": "staggerChildren: 0.1"
+  },
+  "accessibility_and_testing": {
+    "contrast": "Ensure text over #D4AF37 meets contrast guidelines. If needed, use #0A192F for text inside gold elements.",
+    "test_ids": "Every interactive element MUST have a data-testid attribute (e.g., data-testid='login-button', data-testid='appointment-submit', data-testid='loyalty-step')."
+  },
+  "image_urls": {
+    "hero_login": {
+      "url": "https://images.pexels.com/photos/13068360/pexels-photo-13068360.jpeg",
+      "description": "Elegant premium white salon interior, perfect for the login screen background with a dark blue overlay or elegant glassmorphism card on top."
+    },
+    "tools_abstract": {
+      "url": "https://images.pexels.com/photos/8468134/pexels-photo-8468134.jpeg",
+      "description": "Flat lay of elegant hairdresser tools on white. Can be used for onboarding, empty states, or service category headers."
+    }
+  },
+  "instructions_to_main_agent": [
+    "This app is in French. All copy must be in elegant French (e.g., 'Prendre rendez-vous', 'Tableau de bord', 'Fidélité').",
+    "Use 'Cormorant Garamond' for all main headings (h1, h2) to establish the luxury artisan feel, and 'Outfit' for all UI/body text to maintain high legibility.",
+    "Mobile-First Layout is CRITICAL. The primary navigation should be a bottom tab bar on mobile screens. Core actions (Add Appointment, Checkout) must be thumb-reachable.",
+    "For the '5+1' CRM Loyalty program, design a visually striking element using the accent_gold color (#D4AF37). Show 5 steps (slate-200 to primary blue when filled) and a glowing gold 6th step (Gratuit).",
+    "The Dashboard requires a Donut Chart for Stock. Use Recharts via Shadcn. Use the custom colors defined in the charts section.",
+    "The URSSAF calculation is 22% of revenue. Place this elegantly in the accounting dashboard with a clear 'Déclarer' action button.",
+    "Fuel cost tracker should visually show tiers (2.5€ per 10km).",
+    "Never use generic standard HTML inputs. Heavily customize Shadcn inputs to look like premium fields (e.g., bottom border only, or soft gray background with rounded corners)."
+  ]
+}
