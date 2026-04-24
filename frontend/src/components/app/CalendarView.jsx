@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { money, fmtTime } from "@/lib/api";
+import { money, fmtTime, genderClasses } from "@/lib/api";
 
 const WEEKDAYS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 const MONTHS = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
@@ -16,7 +16,7 @@ function startOfWeek(d) {
 function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
 function sameDay(a, b) { return a.toDateString() === b.toDateString(); }
 
-export default function CalendarView({ appointments, view, cursor, setCursor }) {
+export default function CalendarView({ appointments, clientMap = {}, view, cursor, setCursor }) {
   const byDay = useMemo(() => {
     const map = {};
     appointments.forEach((r) => {
@@ -49,13 +49,17 @@ export default function CalendarView({ appointments, view, cursor, setCursor }) 
                 <div className="text-[10px] uppercase tracking-widest text-slate-500">{WEEKDAYS[(d.getDay()+6)%7]}</div>
                 <div className={`font-serif text-2xl ${today ? "text-[#D4AF37]" : ""}`}>{d.getDate()}</div>
                 <ul className="mt-3 space-y-1.5">
-                  {items.map((r) => (
-                    <li key={r.id}>
-                      <Link to={`/rdv/${r.id}`} className="block text-xs p-2 rounded-lg bg-slate-50 hover:bg-slate-100">
-                        <span className="font-medium">{fmtTime(r.date)}</span> · {r.client_name}
-                      </Link>
-                    </li>
-                  ))}
+                  {items.map((r) => {
+                    const cl = clientMap[r.client_id];
+                    const gc = genderClasses(cl?.gender);
+                    return (
+                      <li key={r.id}>
+                        <Link to={`/rdv/${r.id}`} className={`block text-xs p-2 rounded-lg ${gc.bg} border ${gc.border} hover:opacity-80`}>
+                          <span className="font-medium">{fmtTime(r.date)}</span> · {r.client_name}
+                        </Link>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             );
@@ -88,13 +92,17 @@ export default function CalendarView({ appointments, view, cursor, setCursor }) 
             <div key={d.toISOString()} className={`bg-white border rounded-xl p-2 min-h-[92px] ${today ? "border-[#0A192F]" : "border-slate-100"} ${inMonth ? "" : "opacity-40"}`}>
               <div className={`text-sm font-medium ${today ? "text-[#D4AF37]" : ""}`}>{d.getDate()}</div>
               <ul className="mt-1 space-y-0.5">
-                {items.slice(0, 3).map((r) => (
-                  <li key={r.id} className="truncate text-[10px]">
-                    <Link to={`/rdv/${r.id}`} className="text-slate-600 hover:text-[#0A192F]">
-                      <span className="text-[#1E3A8A]">{fmtTime(r.date)}</span> {r.client_name}
-                    </Link>
-                  </li>
-                ))}
+                {items.slice(0, 3).map((r) => {
+                  const cl = clientMap[r.client_id];
+                  const tint = cl?.gender === "F" ? "text-pink-700" : cl?.gender === "H" ? "text-blue-700" : "text-slate-600";
+                  return (
+                    <li key={r.id} className="truncate text-[10px]">
+                      <Link to={`/rdv/${r.id}`} className={`${tint} hover:opacity-70`}>
+                        <span className="text-[#1E3A8A]">{fmtTime(r.date)}</span> {r.client_name}
+                      </Link>
+                    </li>
+                  );
+                })}
                 {items.length > 3 && <li className="text-[10px] text-slate-400">+{items.length - 3}</li>}
               </ul>
             </div>

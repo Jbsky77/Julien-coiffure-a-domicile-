@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { api, money, money2, fmtDate, fmtTime } from "@/lib/api";
+import { api, money, money2, fmtDate, fmtTime, genderClasses, genderLabel, computeAge } from "@/lib/api";
 import { ArrowLeft, MapPin, Phone, Cake, Plus, Trash2, Save, Gift, Users as UsersIcon, Mail, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 
@@ -43,6 +43,7 @@ export default function ClientDetail() {
     setEditing({
       first_name: r.data.client.first_name,
       last_name: r.data.client.last_name,
+      gender: r.data.client.gender || "",
       phone: r.data.client.phone,
       address: r.data.client.address,
       comment: r.data.client.comment,
@@ -55,6 +56,8 @@ export default function ClientDetail() {
 
   if (!data) return <div className="text-slate-500">Chargement…</div>;
   const c = data.client;
+  const gc = genderClasses(c.gender);
+  const age = computeAge(c.birthday);
 
   const save = async () => {
     await api.put(`/clients/${id}`, editing);
@@ -102,16 +105,19 @@ export default function ClientDetail() {
   const mailLink = `mailto:?subject=${encodeURIComponent("Prendre rendez-vous")}&body=${encodeURIComponent(`Bonjour ${c.first_name || c.last_name},\n\nJ'espère que vous allez bien. Souhaitez-vous prendre un nouveau rendez-vous ?\n\nÀ bientôt,\nJulien Bouche`)}`;
 
   return (
-    <div className="space-y-8 max-w-5xl" data-testid="client-detail-page">
+    <div className={`space-y-8 max-w-5xl p-4 rounded-3xl border-2 ${gc.border} ${gc.bg}`} data-testid="client-detail-page">
       <button onClick={() => navigate(-1)} className="text-sm text-slate-500 hover:text-[#0A192F] flex items-center gap-1"><ArrowLeft className="w-4 h-4" /> Retour</button>
 
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
           <div className="text-[10px] tracking-[0.3em] uppercase text-slate-500 mb-2">Fiche client</div>
-          <h1 className="font-serif text-4xl md:text-5xl tracking-tight">{c.first_name} <span className="font-semibold">{c.last_name}</span></h1>
+          <h1 className="font-serif text-4xl md:text-5xl tracking-tight">
+            {genderLabel(c.gender) && <span className="text-slate-500 text-2xl md:text-3xl mr-2">{genderLabel(c.gender)}</span>}
+            {c.first_name} <span className="font-semibold">{c.last_name}</span>
+          </h1>
           <div className="text-slate-500 mt-2 text-sm flex flex-wrap items-center gap-4">
             {c.phone && <span className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" /> {c.phone}</span>}
-            {c.birthday && <span className="flex items-center gap-1.5"><Cake className="w-3.5 h-3.5" /> {new Date(c.birthday).toLocaleDateString("fr-FR")}</span>}
+            {c.birthday && <span className="flex items-center gap-1.5"><Cake className="w-3.5 h-3.5" /> {new Date(c.birthday).toLocaleDateString("fr-FR")}{age !== null && <span className="ml-1">· {age} ans</span>}</span>}
             {mapsUrl && <button onClick={openMaps} className="flex items-center gap-1.5 hover:text-[#0A192F]" data-testid="maps-link"><MapPin className="w-3.5 h-3.5" /> Voir sur Google Maps</button>}
           </div>
         </div>
@@ -139,10 +145,22 @@ export default function ClientDetail() {
 
       {tab === "infos" && (
         <div className="bg-white border border-slate-100 rounded-2xl p-6 grid grid-cols-1 md:grid-cols-2 gap-6 shadow-premium">
+          <div className="md:col-span-2">
+            <label className="text-[10px] tracking-widest uppercase text-slate-500">Civilité</label>
+            <div className="flex gap-2 mt-2">
+              {[{ v: "", l: "—" }, { v: "H", l: "M. (Homme)" }, { v: "F", l: "Mme (Femme)" }].map((g) => (
+                <button key={g.v} type="button" onClick={() => setEditing({ ...editing, gender: g.v })} data-testid={`gender-${g.v || "none"}`} className={`px-4 py-2 rounded-full text-sm ${editing.gender === g.v ? (g.v === "H" ? "bg-blue-500 text-white" : g.v === "F" ? "bg-pink-500 text-white" : "bg-[#0A192F] text-white") : "border border-slate-200 text-slate-600"}`}>{g.l}</button>
+              ))}
+            </div>
+          </div>
           <div><label className="text-[10px] tracking-widest uppercase text-slate-500">Prénom</label><input className={fb} value={editing.first_name} onChange={(e) => setEditing({ ...editing, first_name: e.target.value })} /></div>
           <div><label className="text-[10px] tracking-widest uppercase text-slate-500">Nom</label><input className={fb} value={editing.last_name} onChange={(e) => setEditing({ ...editing, last_name: e.target.value })} /></div>
           <div><label className="text-[10px] tracking-widest uppercase text-slate-500">Téléphone</label><input className={fb} value={editing.phone} onChange={(e) => setEditing({ ...editing, phone: e.target.value })} /></div>
-          <div><label className="text-[10px] tracking-widest uppercase text-slate-500">Anniversaire</label><input type="date" className={fb} value={editing.birthday} onChange={(e) => setEditing({ ...editing, birthday: e.target.value })} /></div>
+          <div>
+            <label className="text-[10px] tracking-widest uppercase text-slate-500">Anniversaire</label>
+            <input type="date" className={fb} value={editing.birthday} onChange={(e) => setEditing({ ...editing, birthday: e.target.value })} />
+            {computeAge(editing.birthday) !== null && <div className="text-xs text-slate-500 mt-1">{computeAge(editing.birthday)} ans</div>}
+          </div>
           <div className="md:col-span-2"><label className="text-[10px] tracking-widest uppercase text-slate-500">Adresse</label><input className={fb} value={editing.address} onChange={(e) => setEditing({ ...editing, address: e.target.value })} /></div>
           <div className="md:col-span-2"><label className="text-[10px] tracking-widest uppercase text-slate-500">Commentaire permanent</label><textarea rows={3} className={`${fb} resize-none`} value={editing.comment} onChange={(e) => setEditing({ ...editing, comment: e.target.value })} /></div>
           <div>

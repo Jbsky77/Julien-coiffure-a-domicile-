@@ -1,20 +1,24 @@
-import React, { useEffect, useState } from "react";
-import { api, money, fmtDate, fmtTime } from "@/lib/api";
+import React, { useEffect, useState, useMemo } from "react";
+import { api, money, fmtDate, fmtTime, genderClasses, genderLabel } from "@/lib/api";
 import { Link, useNavigate } from "react-router-dom";
 import { CalendarClock, Plus, CheckCircle2, Circle, LayoutList, CalendarDays, CalendarRange } from "lucide-react";
 import CalendarView from "@/components/app/CalendarView";
 
 export default function Appointments() {
   const [list, setList] = useState([]);
+  const [clientMap, setClientMap] = useState({});
   const [tab, setTab] = useState("upcoming");
-  const [view, setView] = useState("list"); // list | week | month
+  const [view, setView] = useState("list");
   const [cursor, setCursor] = useState(new Date());
   const navigate = useNavigate();
 
   useEffect(() => {
     (async () => {
-      const r = await api.get("/appointments");
+      const [r, c] = await Promise.all([api.get("/appointments"), api.get("/clients")]);
       setList(r.data);
+      const map = {};
+      c.data.forEach((x) => { map[x.id] = x; });
+      setClientMap(map);
     })();
   }, []);
 
@@ -49,32 +53,39 @@ export default function Appointments() {
       </div>
 
       {view !== "list" && (
-        <CalendarView appointments={list} view={view} cursor={cursor} setCursor={setCursor} />
+        <CalendarView appointments={list} clientMap={clientMap} view={view} cursor={cursor} setCursor={setCursor} />
       )}
 
       {view === "list" && (shown.length === 0 ? (
         <div className="text-slate-400 text-sm py-16 text-center">Aucun rendez-vous.</div>
       ) : (
         <ul className="space-y-2">
-          {shown.map((r) => (
-            <li key={r.id}>
-              <Link to={`/rdv/${r.id}`} data-testid={`rdv-item-${r.id}`} className="flex items-center gap-4 p-5 bg-white border border-slate-100 rounded-2xl hover:shadow-premium transition-all">
-                {r.status === "done" ? <CheckCircle2 className="w-5 h-5 text-[#166534]" /> : r.status === "cancelled" ? <Circle className="w-5 h-5 text-[#991B1B]" /> : <Circle className="w-5 h-5 text-[#1E3A8A]" />}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <div className="font-medium">{r.client_name}</div>
-                    {r.family_pack_applied && <span className="text-[9px] tracking-wider uppercase px-2 py-0.5 rounded-full bg-[#D4AF37]/10 text-[#C5A059] border border-[#D4AF37]/30">Pack Famille</span>}
-                    {r.gift_applied && <span className="text-[9px] tracking-wider uppercase px-2 py-0.5 rounded-full bg-[#D4AF37]/10 text-[#C5A059] border border-[#D4AF37]/30">Gratuité</span>}
+          {shown.map((r) => {
+            const cl = clientMap[r.client_id];
+            const gc = genderClasses(cl?.gender);
+            return (
+              <li key={r.id}>
+                <Link to={`/rdv/${r.id}`} data-testid={`rdv-item-${r.id}`} className={`flex items-center gap-4 p-5 ${gc.bg} border-2 ${gc.border} rounded-2xl hover:shadow-premium transition-all`}>
+                  {r.status === "done" ? <CheckCircle2 className="w-5 h-5 text-[#166534]" /> : r.status === "cancelled" ? <Circle className="w-5 h-5 text-[#991B1B]" /> : <Circle className={`w-5 h-5 ${cl?.gender === "F" ? "text-pink-500" : cl?.gender === "H" ? "text-blue-500" : "text-[#1E3A8A]"}`} />}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="font-medium">
+                        {genderLabel(cl?.gender) && <span className="text-slate-500 text-xs mr-1">{genderLabel(cl?.gender)}</span>}
+                        {r.client_name}
+                      </div>
+                      {r.family_pack_applied && <span className="text-[9px] tracking-wider uppercase px-2 py-0.5 rounded-full bg-[#D4AF37]/10 text-[#C5A059] border border-[#D4AF37]/30">Pack Famille</span>}
+                      {r.gift_applied && <span className="text-[9px] tracking-wider uppercase px-2 py-0.5 rounded-full bg-[#D4AF37]/10 text-[#C5A059] border border-[#D4AF37]/30">Gratuité</span>}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-1">{fmtDate(r.date)} · {fmtTime(r.date)} · {r.services.map(s => s.name).join(", ") || "—"}</div>
                   </div>
-                  <div className="text-xs text-slate-500 mt-1">{fmtDate(r.date)} · {fmtTime(r.date)} · {r.services.map(s => s.name).join(", ") || "—"}</div>
-                </div>
-                <div className="text-right">
-                  <div className="font-serif text-xl">{money(r.price_final)}</div>
-                  <div className="text-[10px] tracking-wider uppercase text-slate-400">{r.payment_mode || "—"}</div>
-                </div>
-              </Link>
-            </li>
-          ))}
+                  <div className="text-right">
+                    <div className="font-serif text-xl">{money(r.price_final)}</div>
+                    <div className="text-[10px] tracking-wider uppercase text-slate-400">{r.payment_mode || "—"}</div>
+                  </div>
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       ))}
     </div>

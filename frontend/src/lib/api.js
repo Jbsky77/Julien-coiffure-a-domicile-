@@ -42,3 +42,45 @@ export const PAYMENT_MODES = [
   { id: "ESPECES", label: "Espèces" },
   { id: "VIREMENT", label: "Virement" },
 ];
+
+// Gender helpers
+export const computeAge = (birthday) => {
+  if (!birthday) return null;
+  try {
+    const d = new Date(birthday);
+    const today = new Date();
+    let age = today.getFullYear() - d.getFullYear();
+    const m = today.getMonth() - d.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
+    return age;
+  } catch {
+    return null;
+  }
+};
+
+export const genderLabel = (g) => (g === "H" ? "M." : g === "F" ? "Mme" : "");
+
+// Tailwind color classes by gender
+export const genderClasses = (g) => {
+  if (g === "H") return {
+    bg: "bg-blue-50",
+    border: "border-blue-200",
+    accent: "bg-blue-500",
+    text: "text-blue-900",
+    pill: "bg-blue-100 text-blue-800 border-blue-200",
+  };
+  if (g === "F") return {
+    bg: "bg-pink-50",
+    border: "border-pink-200",
+    accent: "bg-pink-500",
+    text: "text-pink-900",
+    pill: "bg-pink-100 text-pink-800 border-pink-200",
+  };
+  return {
+    bg: "bg-white",
+    border: "border-slate-100",
+    accent: "bg-slate-400",
+    text: "text-slate-900",
+    pill: "bg-slate-100 text-slate-700 border-slate-200",
+  };
+};

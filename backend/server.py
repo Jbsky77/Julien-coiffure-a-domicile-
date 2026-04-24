@@ -50,6 +50,7 @@ class Client(BaseModel):
     id: str = Field(default_factory=lambda: f"cli_{uuid.uuid4().hex[:10]}")
     first_name: str = ""
     last_name: str
+    gender: Optional[str] = None  # "H" | "F" | None
     phone: str = ""
     address: str = ""
     comment: str = ""
@@ -64,6 +65,7 @@ class Client(BaseModel):
 class ClientCreate(BaseModel):
     first_name: str = ""
     last_name: str
+    gender: Optional[str] = None
     phone: str = ""
     address: str = ""
     comment: str = ""
@@ -545,6 +547,45 @@ async def analytics(user: User = Depends(get_current_user)):
         except Exception:
             continue
     total = sum(r["price_final"] for r in rdvs)
+    # Gender & age stats
+    def compute_age(bd):
+        try:
+            d = datetime.fromisoformat(bd)
+            today = datetime.now(timezone.utc)
+            yrs = today.year - d.year - ((today.month, today.day) < (d.month, d.day))
+            return yrs
+        except Exception:
+            return None
+    gender_counts = {"H": 0, "F": 0, "N": 0}
+    age_buckets = {"<18": 0, "18-29": 0, "30-44": 0, "45-59": 0, "60+": 0, "N/A": 0}
+    gender_rev = {"H": 0.0, "F": 0.0, "N": 0.0}
+    for c in clients:
+        g = c.get("gender") or "N"
+        gender_counts[g] = gender_counts.get(g, 0) + 1
+        age = compute_age(c.get("birthday")) if c.get("birthday") else None
+        if age is None:
+            age_buckets["N/A"] += 1
+        elif age < 18:
+            age_buckets["<18"] += 1
+        elif age < 30:
+            age_buckets["18-29"] += 1
+        elif age < 45:
+            age_buckets["30-44"] += 1
+        elif age < 60:
+            age_buckets["45-59"] += 1
+        else:
+            age_buckets["60+"] += 1
+    # Revenue by gender
+    client_gender = {c["id"]: (c.get("gender") or "N") for c in clients}
+    for r in rdvs:
+        g = client_gender.get(r["client_id"], "N")
+        gender_rev[g] = gender_rev.get(g, 0.0) + r["price_final"]
+    gender_stats = [
+        {"gender": "H", "label": "Hommes", "count": gender_counts.get("H", 0), "revenue": round(gender_rev.get("H", 0), 2)},
+        {"gender": "F", "label": "Femmes", "count": gender_counts.get("F", 0), "revenue": round(gender_rev.get("F", 0), 2)},
+        {"gender": "N", "label": "Non précisé", "count": gender_counts.get("N", 0), "revenue": round(gender_rev.get("N", 0), 2)},
+    ]
+    age_stats = [{"range": k, "count": v} for k, v in age_buckets.items()]
     return {
         "top_services": top_services,
         "top_clients": top_clients,
@@ -553,6 +594,8 @@ async def analytics(user: User = Depends(get_current_user)):
         "total_ca": round(total, 2),
         "total_rdv": len(rdvs),
         "total_clients": len(clients),
+        "gender_stats": gender_stats,
+        "age_stats": age_stats,
     }
 
 
