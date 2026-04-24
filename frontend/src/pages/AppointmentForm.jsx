@@ -22,6 +22,7 @@ export default function AppointmentForm() {
   const [rdv, setRdv] = useState(null);
   const [clientLoyalty, setClientLoyalty] = useState({});
   const [paymentMode, setPaymentMode] = useState("CB");
+  const [duration, setDuration] = useState("");
   const [editMode, setEditMode] = useState(!id);
   const [preview, setPreview] = useState({ base: 0, fuel: 0, final: 0, family: false });
 
@@ -46,6 +47,7 @@ export default function AppointmentForm() {
             price_final_override: existing.price_final,
           });
           setPaymentMode(existing.payment_mode || "CB");
+          setDuration(existing.duration_minutes || "");
           setEditMode(false);
         }
       }
@@ -115,7 +117,11 @@ export default function AppointmentForm() {
 
   const finish = async () => {
     try {
-      const payload = { payment_mode: paymentMode, price_final: form.price_final_override ?? preview.final };
+      const payload = {
+        payment_mode: paymentMode,
+        price_final: form.price_final_override ?? preview.final,
+        duration_minutes: duration === "" ? null : parseInt(duration),
+      };
       await api.post(`/appointments/${id}/finish`, payload);
       toast.success("Paiement confirmé. Rendez-vous terminé.");
       navigate("/rdv");
@@ -294,6 +300,11 @@ export default function AppointmentForm() {
                 {p.label}
               </button>
             ))}
+          </div>
+          <div>
+            <label className="text-[10px] tracking-widest uppercase text-slate-500">Temps passé (minutes)</label>
+            <input type="number" min="0" step="5" data-testid="rdv-duration-input" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="Ex : 45" className={fieldBase} />
+            <div className="text-xs text-slate-500 mt-1">Enregistré à la validation du paiement (sera affiché dans la fiche client et les stats)</div>
           </div>
           <button onClick={finish} data-testid="finish-rdv-btn" className="w-full bg-gold-gradient text-white rounded-full px-8 py-4 font-medium flex items-center justify-center gap-2">
             <CheckCircle2 className="w-4 h-4" /> Valider le paiement & terminer

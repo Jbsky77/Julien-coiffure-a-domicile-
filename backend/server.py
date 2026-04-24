@@ -92,10 +92,11 @@ class Appointment(BaseModel):
     price_base: float = 0
     fuel_supplement: float = 0
     price_final: float = 0  # editable
-    payment_mode: Optional[str] = None  # CB, CHEQUE, ESPECES, VIREMENT, LIEN
-    status: str = "scheduled"  # scheduled | done | cancelled
+    payment_mode: Optional[str] = None
+    status: str = "scheduled"
     family_pack_applied: bool = False
     gift_applied: bool = False
+    duration_minutes: Optional[int] = None
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     finished_at: Optional[str] = None
 
@@ -120,6 +121,7 @@ class AppointmentUpdate(BaseModel):
 class FinishAppointment(BaseModel):
     payment_mode: str
     price_final: Optional[float] = None
+    duration_minutes: Optional[int] = None
 
 
 class StockItem(BaseModel):
@@ -468,14 +470,17 @@ async def appointments_finish(rid: str, payload: FinishAppointment, user: User =
     if rdv.get("status") == "done":
         raise HTTPException(400, "Already finished")
     final = payload.price_final if payload.price_final is not None else rdv["price_final"]
+    update_fields = {
+        "status": "done",
+        "payment_mode": payload.payment_mode,
+        "price_final": final,
+        "finished_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if payload.duration_minutes is not None:
+        update_fields["duration_minutes"] = payload.duration_minutes
     await db.appointments.update_one(
         {"id": rid},
-        {"$set": {
-            "status": "done",
-            "payment_mode": payload.payment_mode,
-            "price_final": final,
-            "finished_at": datetime.now(timezone.utc).isoformat(),
-        }},
+        {"$set": update_fields},
     )
     # Update client loyalty counters - count paid services per service_id; reset for gifted
     client = await db.clients.find_one({"id": rdv["client_id"]}, {"_id": 0})
@@ -586,6 +591,14 @@ async def analytics(user: User = Depends(get_current_user)):
         {"gender": "N", "label": "Non précisé", "count": gender_counts.get("N", 0), "revenue": round(gender_rev.get("N", 0), 2)},
     ]
     age_stats = [{"range": k, "count": v} for k, v in age_buckets.items()]
+    # Average age (only clients with birthday)
+    ages = [compute_age(c.get("birthday")) for c in clients if c.get("birthday")]
+    ages = [a for a in ages if a is not None]
+    average_age = round(sum(ages) / len(ages), 1) if ages else None
+    # Average duration (done rdvs with duration)
+    durations = [r.get("duration_minutes") for r in rdvs if r.get("duration_minutes")]
+    average_duration = round(sum(durations) / len(durations), 1) if durations else None
+    total_duration = sum(durations) if durations else 0
     return {
         "top_services": top_services,
         "top_clients": top_clients,
@@ -596,6 +609,9 @@ async def analytics(user: User = Depends(get_current_user)):
         "total_clients": len(clients),
         "gender_stats": gender_stats,
         "age_stats": age_stats,
+        "average_age": average_age,
+        "average_duration_minutes": average_duration,
+        "total_duration_minutes": total_duration,
     }
 
 

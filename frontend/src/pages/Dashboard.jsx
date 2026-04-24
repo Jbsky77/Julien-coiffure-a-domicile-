@@ -6,9 +6,17 @@ import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis
 
 const PIE_COLORS = ["#0A192F", "#1E3A8A", "#D4AF37", "#94A3B8", "#CBD5E1", "#64748B"];
 
-function Widget({ title, children, actionLabel, onAction, tid }) {
+function Widget({ title, children, actionLabel, onAction, tid, color }) {
+  const colorMap = {
+    blue: "bg-blue-50/50 border-blue-100",
+    pink: "bg-pink-50/50 border-pink-100",
+    gold: "bg-[#D4AF37]/5 border-[#D4AF37]/20",
+    green: "bg-green-50/50 border-green-100",
+    rose: "bg-rose-50/50 border-rose-100",
+  };
+  const cls = color ? colorMap[color] : "bg-white border-slate-100";
   return (
-    <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-premium" data-testid={tid}>
+    <div className={`${cls} border rounded-2xl p-6 shadow-premium`} data-testid={tid}>
       <div className="flex items-center justify-between mb-4">
         <div className="text-[10px] tracking-[0.25em] uppercase text-slate-500">{title}</div>
         {actionLabel && (
@@ -93,20 +101,20 @@ export default function Dashboard() {
 
       {/* Top KPIs */}
       <div className="grid grid-cols-2 gap-3">
-        <Widget title="Chiffre d'affaires" tid="kpi-ca">
-          <div className="font-serif text-xl">{money2(md.ca_brut)} €</div>
+        <Widget title="Chiffre d'affaires" tid="kpi-ca" color="gold">
+          <div className="font-serif text-xl text-[#C5A059]">{money2(md.ca_brut)} €</div>
           <div className="text-[11px] text-slate-500 mt-0.5">{md.n_rdv} RDV</div>
         </Widget>
-        <Widget title="Marge nette" tid="kpi-marge" actionLabel="Détails" onAction={() => navigate("/compta")}>
-          <div className={`font-serif text-xl ${md.marge_nette >= 0 ? "" : "text-[#991B1B]"}`}>{money2(md.marge_nette)} €</div>
+        <Widget title="Marge nette" tid="kpi-marge" actionLabel="Détails" onAction={() => navigate("/compta")} color="green">
+          <div className={`font-serif text-xl ${md.marge_nette >= 0 ? "text-green-700" : "text-[#991B1B]"}`}>{money2(md.marge_nette)} €</div>
           <div className="text-[11px] text-slate-500 mt-0.5">après charges</div>
         </Widget>
-        <Widget title="RDV à venir" tid="kpi-upcoming" actionLabel="Voir" onAction={() => navigate("/rdv")}>
-          <div className="font-serif text-xl">{d.upcoming_count}</div>
+        <Widget title="RDV à venir" tid="kpi-upcoming" actionLabel="Voir" onAction={() => navigate("/rdv")} color="blue">
+          <div className="font-serif text-xl text-blue-600">{d.upcoming_count}</div>
           <div className="text-[11px] text-slate-500 mt-0.5">{money(d.upcoming_amount)} prévus</div>
         </Widget>
-        <Widget title="Panier moyen" tid="kpi-basket">
-          <div className="font-serif text-xl">{money2(d.avg_basket.month)} €</div>
+        <Widget title="Panier moyen" tid="kpi-basket" color="pink">
+          <div className="font-serif text-xl text-pink-600">{money2(d.avg_basket.month)} €</div>
           <div className="text-[11px] text-slate-500 mt-0.5">j {money2(d.avg_basket.day)}€ · an {money2(d.avg_basket.year)}€</div>
         </Widget>
       </div>
@@ -149,7 +157,7 @@ export default function Dashboard() {
           )}
         </Widget>
 
-        <Widget title="Anniversaires (7 jours)" tid="widget-birthdays">
+        <Widget title="Anniversaires (7 jours)" tid="widget-birthdays" color="pink">
           {d.upcoming_birthdays.length === 0 ? <div className="text-slate-400 text-sm">Aucun anniversaire imminent.</div> : (
             <ul className="space-y-3">
               {d.upcoming_birthdays.map((c) => (
@@ -192,7 +200,7 @@ export default function Dashboard() {
           </div>
         </Widget>
 
-        <Widget title="Prestations offertes" tid="widget-gifts">
+        <Widget title="Prestations offertes" tid="widget-gifts" color="gold">
           <div className="flex items-center gap-2">
             <Gift className="w-5 h-5 text-[#D4AF37]" />
             <div className="font-serif text-3xl">{d.gifts_month.count}</div>

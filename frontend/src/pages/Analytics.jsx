@@ -16,10 +16,12 @@ export default function Analytics() {
         <h1 className="font-serif text-3xl tracking-tight">Statistiques</h1>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
-        <div className="bg-white border border-slate-100 rounded-2xl p-4"><div className="text-[10px] uppercase tracking-widest text-slate-500">CA total</div><div className="font-serif text-xl mt-1">{money2(d.total_ca)} €</div></div>
-        <div className="bg-white border border-slate-100 rounded-2xl p-4"><div className="text-[10px] uppercase tracking-widest text-slate-500">RDV</div><div className="font-serif text-xl mt-1">{d.total_rdv}</div></div>
-        <div className="bg-white border border-slate-100 rounded-2xl p-4"><div className="text-[10px] uppercase tracking-widest text-slate-500">Clients</div><div className="font-serif text-xl mt-1">{d.total_clients}</div></div>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="bg-white border border-[#D4AF37]/30 rounded-2xl p-4"><div className="text-[10px] uppercase tracking-widest text-slate-500">CA total</div><div className="font-serif text-xl mt-1 text-[#C5A059]">{money2(d.total_ca)} €</div></div>
+        <div className="bg-white border border-blue-100 rounded-2xl p-4"><div className="text-[10px] uppercase tracking-widest text-slate-500">RDV</div><div className="font-serif text-xl mt-1 text-blue-600">{d.total_rdv}</div></div>
+        <div className="bg-white border border-pink-100 rounded-2xl p-4"><div className="text-[10px] uppercase tracking-widest text-slate-500">Clients</div><div className="font-serif text-xl mt-1 text-pink-600">{d.total_clients}</div></div>
+        <div className="bg-white border border-green-100 rounded-2xl p-4" data-testid="avg-age-stat"><div className="text-[10px] uppercase tracking-widest text-slate-500">Âge moyen</div><div className="font-serif text-xl mt-1 text-green-700">{d.average_age != null ? `${d.average_age} ans` : "—"}</div></div>
+        <div className="bg-white border border-purple-100 rounded-2xl p-4" data-testid="avg-duration-stat"><div className="text-[10px] uppercase tracking-widest text-slate-500">Durée moy.</div><div className="font-serif text-xl mt-1 text-purple-600">{d.average_duration_minutes != null ? `${d.average_duration_minutes} min` : "—"}</div><div className="text-[9px] text-slate-500 mt-0.5">Total : {d.total_duration_minutes || 0} min</div></div>
       </div>
 
       <div className="bg-white border border-slate-100 rounded-2xl p-5" data-testid="gender-stats">

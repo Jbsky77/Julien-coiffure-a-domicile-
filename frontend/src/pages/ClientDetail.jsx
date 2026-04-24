@@ -93,6 +93,9 @@ export default function ClientDetail() {
   const cbTotal = done.filter((a) => a.payment_mode === "CB").reduce((acc, a) => acc + a.price_final, 0);
   const cbFees = cbTotal * cbFeeRate;
   const netReceived = total - cbFees;
+  const durations = done.map((a) => a.duration_minutes).filter((x) => x);
+  const avgDuration = durations.length ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) : 0;
+  const totalDuration = durations.reduce((a, b) => a + b, 0);
   const fb = "w-full bg-transparent border-b border-slate-300 rounded-none px-0 py-2 focus:border-[#0A192F] focus:outline-none text-base";
 
   const mapsUrl = c.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.address)}` : null;
@@ -130,11 +133,12 @@ export default function ClientDetail() {
       </div>
 
       {/* Stats strip */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="bg-white border border-slate-100 rounded-2xl p-5"><div className="text-[10px] tracking-widest uppercase text-slate-500">RDV terminés</div><div className="font-serif text-2xl">{done.length}</div></div>
-        <div className="bg-white border border-slate-100 rounded-2xl p-5"><div className="text-[10px] tracking-widest uppercase text-slate-500">Panier moyen</div><div className="font-serif text-2xl">{money2(avg)} €</div></div>
-        <div className="bg-white border border-slate-100 rounded-2xl p-5"><div className="text-[10px] tracking-widest uppercase text-slate-500">Total encaissé</div><div className="font-serif text-2xl">{money2(total)} €</div></div>
-        <div className="bg-white border border-slate-100 rounded-2xl p-5" data-testid="client-cb-fees"><div className="text-[10px] tracking-widest uppercase text-slate-500">Frais CB ({(cbFeeRate * 100).toFixed(2).replace(".", ",")}%)</div><div className="font-serif text-2xl text-[#991B1B]">-{money2(cbFees)} €</div><div className="text-[10px] text-slate-500 mt-0.5">Net: {money2(netReceived)} €</div></div>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="bg-white border border-blue-100 rounded-2xl p-5"><div className="text-[10px] tracking-widest uppercase text-slate-500">RDV terminés</div><div className="font-serif text-2xl text-blue-600">{done.length}</div></div>
+        <div className="bg-white border border-[#D4AF37]/30 rounded-2xl p-5"><div className="text-[10px] tracking-widest uppercase text-slate-500">Panier moyen</div><div className="font-serif text-2xl text-[#C5A059]">{money2(avg)} €</div></div>
+        <div className="bg-white border border-green-100 rounded-2xl p-5"><div className="text-[10px] tracking-widest uppercase text-slate-500">Total encaissé</div><div className="font-serif text-2xl text-green-700">{money2(total)} €</div></div>
+        <div className="bg-white border border-pink-100 rounded-2xl p-5" data-testid="client-avg-duration"><div className="text-[10px] tracking-widest uppercase text-slate-500">Temps moyen</div><div className="font-serif text-2xl text-pink-600">{avgDuration} <span className="text-sm">min</span></div><div className="text-[10px] text-slate-500 mt-0.5">Total : {totalDuration} min</div></div>
+        <div className="bg-white border border-red-100 rounded-2xl p-5" data-testid="client-cb-fees"><div className="text-[10px] tracking-widest uppercase text-slate-500">Frais CB ({(cbFeeRate * 100).toFixed(2).replace(".", ",")}%)</div><div className="font-serif text-2xl text-[#991B1B]">-{money2(cbFees)} €</div><div className="text-[10px] text-slate-500 mt-0.5">Net: {money2(netReceived)} €</div></div>
       </div>
 
       <div className="flex gap-2 flex-wrap">
@@ -174,9 +178,19 @@ export default function ClientDetail() {
 
       {tab === "loyalty" && (
         <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-premium divide-y divide-slate-100">
-          {services.map((s) => (
-            <LoyaltyRow key={s.id} count={c.loyalty_counters?.[s.id] || 0} label={s.name} price={s.price} />
-          ))}
+          {(() => {
+            const isChild = age !== null && age < 18;
+            const filtered = services.filter((s) => {
+              if (isChild) return s.category === "ENFANT";
+              if (c.gender === "H") return s.category === "HOMME" || s.category === "AUTRE";
+              if (c.gender === "F") return s.category === "FEMME" || s.category === "AUTRE";
+              return true; // gender not set → show all
+            });
+            if (filtered.length === 0) return <div className="text-slate-400 text-sm py-3">Aucune prestation pour cette catégorie.</div>;
+            return filtered.map((s) => (
+              <LoyaltyRow key={s.id} count={c.loyalty_counters?.[s.id] || 0} label={s.name} price={s.price} />
+            ));
+          })()}
         </div>
       )}
 
@@ -189,7 +203,7 @@ export default function ClientDetail() {
               return (
                 <Link key={a.id} to={`/rdv/${a.id}`} className="flex items-center gap-4 p-4 rounded-2xl border border-slate-100 bg-white hover:shadow-premium" data-testid={`history-rdv-${a.id}`}>
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium">{fmtDate(a.date)} · {fmtTime(a.date)}</div>
+                    <div className="font-medium">{fmtDate(a.date)} · {fmtTime(a.date)}{a.duration_minutes ? <span className="text-xs text-pink-600 ml-2">· {a.duration_minutes} min</span> : null}</div>
                     <div className="text-xs text-slate-500 truncate">{a.services.map(s => s.name + (s.is_gift ? " 🎁" : "")).join(", ")}</div>
                     {isCB && <div className="text-[10px] text-[#991B1B] mt-0.5">Commission CB : -{money2(fee)} € · Net {money2(a.price_final - fee)} €</div>}
                   </div>
