@@ -86,6 +86,10 @@ export default function ClientDetail() {
   const done = data.appointments.filter((a) => a.status === "done");
   const avg = done.length ? done.reduce((a, b) => a + b.price_final, 0) / done.length : 0;
   const total = done.reduce((a, b) => a + b.price_final, 0);
+  const cbFeeRate = settings.cb_fee_rate || 0.0175;
+  const cbTotal = done.filter((a) => a.payment_mode === "CB").reduce((acc, a) => acc + a.price_final, 0);
+  const cbFees = cbTotal * cbFeeRate;
+  const netReceived = total - cbFees;
   const fb = "w-full bg-transparent border-b border-slate-300 rounded-none px-0 py-2 focus:border-[#0A192F] focus:outline-none text-base";
 
   const mapsUrl = c.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.address)}` : null;
