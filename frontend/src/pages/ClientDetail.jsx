@@ -30,14 +30,16 @@ export default function ClientDetail() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [services, setServices] = useState([]);
+  const [settings, setSettings] = useState({ cb_fee_rate: 0.0175 });
   const [tab, setTab] = useState("infos");
   const [cf, setCf] = useState({ key: "", value: "" });
   const [editing, setEditing] = useState({});
 
   const load = async () => {
-    const [r, s] = await Promise.all([api.get(`/clients/${id}`), api.get("/services")]);
+    const [r, s, st] = await Promise.all([api.get(`/clients/${id}`), api.get("/services"), api.get("/settings")]);
     setData(r.data);
     setServices(s.data);
+    setSettings(st.data);
     setEditing({
       first_name: r.data.client.first_name,
       last_name: r.data.client.last_name,
@@ -118,10 +120,11 @@ export default function ClientDetail() {
       </div>
 
       {/* Stats strip */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="bg-white border border-slate-100 rounded-2xl p-5"><div className="text-[10px] tracking-widest uppercase text-slate-500">RDV terminés</div><div className="font-serif text-2xl">{done.length}</div></div>
         <div className="bg-white border border-slate-100 rounded-2xl p-5"><div className="text-[10px] tracking-widest uppercase text-slate-500">Panier moyen</div><div className="font-serif text-2xl">{money2(avg)} €</div></div>
-        <div className="bg-white border border-slate-100 rounded-2xl p-5"><div className="text-[10px] tracking-widest uppercase text-slate-500">Total cumulé</div><div className="font-serif text-2xl">{money2(total)} €</div></div>
+        <div className="bg-white border border-slate-100 rounded-2xl p-5"><div className="text-[10px] tracking-widest uppercase text-slate-500">Total encaissé</div><div className="font-serif text-2xl">{money2(total)} €</div></div>
+        <div className="bg-white border border-slate-100 rounded-2xl p-5" data-testid="client-cb-fees"><div className="text-[10px] tracking-widest uppercase text-slate-500">Frais CB ({(cbFeeRate * 100).toFixed(2).replace(".", ",")}%)</div><div className="font-serif text-2xl text-[#991B1B]">-{money2(cbFees)} €</div><div className="text-[10px] text-slate-500 mt-0.5">Net: {money2(netReceived)} €</div></div>
       </div>
 
       <div className="flex gap-2 flex-wrap">
@@ -158,18 +161,23 @@ export default function ClientDetail() {
       {tab === "history" && (
         <div className="space-y-2">
           {data.appointments.length === 0 ? <div className="text-slate-400 text-sm">Aucun historique.</div> :
-            data.appointments.map((a) => (
-              <Link key={a.id} to={`/rdv/${a.id}`} className="flex items-center gap-4 p-4 rounded-2xl border border-slate-100 bg-white hover:shadow-premium">
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium">{fmtDate(a.date)} · {fmtTime(a.date)}</div>
-                  <div className="text-xs text-slate-500 truncate">{a.services.map(s => s.name + (s.is_gift ? " 🎁" : "")).join(", ")}</div>
-                </div>
-                <div className="text-right">
-                  <div className="font-serif text-lg">{money(a.price_final)}</div>
-                  <div className="text-[10px] tracking-widest uppercase text-slate-400">{a.status === "done" ? a.payment_mode : "Prévu"}</div>
-                </div>
-              </Link>
-            ))
+            data.appointments.map((a) => {
+              const isCB = a.status === "done" && a.payment_mode === "CB";
+              const fee = isCB ? a.price_final * cbFeeRate : 0;
+              return (
+                <Link key={a.id} to={`/rdv/${a.id}`} className="flex items-center gap-4 p-4 rounded-2xl border border-slate-100 bg-white hover:shadow-premium" data-testid={`history-rdv-${a.id}`}>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium">{fmtDate(a.date)} · {fmtTime(a.date)}</div>
+                    <div className="text-xs text-slate-500 truncate">{a.services.map(s => s.name + (s.is_gift ? " 🎁" : "")).join(", ")}</div>
+                    {isCB && <div className="text-[10px] text-[#991B1B] mt-0.5">Commission CB : -{money2(fee)} € · Net {money2(a.price_final - fee)} €</div>}
+                  </div>
+                  <div className="text-right">
+                    <div className="font-serif text-lg">{money(a.price_final)}</div>
+                    <div className="text-[10px] tracking-widest uppercase text-slate-400">{a.status === "done" ? a.payment_mode : a.status === "cancelled" ? "Annulé" : "Prévu"}</div>
+                  </div>
+                </Link>
+              );
+            })
           }
         </div>
       )}

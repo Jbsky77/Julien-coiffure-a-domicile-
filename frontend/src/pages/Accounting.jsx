@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { api, money, money2, fmtMonth } from "@/lib/api";
 import { toast } from "sonner";
-import { ExternalLink, RefreshCcw, ChevronLeft, ChevronRight, Download, FileText } from "lucide-react";
+import { ExternalLink, RefreshCcw, ChevronLeft, ChevronRight, Download, FileText, CreditCard } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -21,13 +21,27 @@ export default function Accounting() {
   const [data, setData] = useState(null);
   const [months, setMonths] = useState([]);
   const [tab, setTab] = useState("summary");
+  const [cbPeriod, setCbPeriod] = useState("month");
+  const [cbData, setCbData] = useState(null);
+  const [selectedReset, setSelectedReset] = useState([]);
 
   const load = async () => {
-    const [r, m] = await Promise.all([api.get(`/accounting/month/${yyyymm}`), api.get("/accounting/months")]);
+    const [r, m, cb] = await Promise.all([
+      api.get(`/accounting/month/${yyyymm}`),
+      api.get("/accounting/months"),
+      api.get(`/accounting/cb-fees?period=${cbPeriod}`),
+    ]);
     setData(r.data);
     setMonths(m.data);
+    setCbData(cb.data);
   };
-  useEffect(() => { load(); }, [yyyymm]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [yyyymm]);
+  useEffect(() => {
+    (async () => {
+      const cb = await api.get(`/accounting/cb-fees?period=${cbPeriod}`);
+      setCbData(cb.data);
+    })();
+  }, [cbPeriod]);
 
   const setStatus = async (monthKey, patch) => {
     await api.post(`/accounting/urssaf/${monthKey}`, patch);
@@ -39,6 +53,19 @@ export default function Accounting() {
     if (!window.confirm(`Supprimer tous les RDV de ${fmtMonth(monthKey)} et remettre le mois à 0 ?`)) return;
     const r = await api.post(`/accounting/reset/${monthKey}`);
     toast.success(`Mois remis à 0 (${r.data.deleted} RDV supprimés)`);
+    load();
+  };
+
+  const toggleResetMonth = (m) => {
+    setSelectedReset((prev) => prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]);
+  };
+
+  const resetMulti = async () => {
+    if (selectedReset.length === 0) return toast.error("Sélectionnez au moins un mois");
+    if (!window.confirm(`Supprimer tous les RDV de ${selectedReset.length} mois sélectionné(s) ?`)) return;
+    const r = await api.post("/accounting/reset-multi", { months: selectedReset });
+    toast.success(`${r.data.deleted} RDV supprimés sur ${selectedReset.length} mois`);
+    setSelectedReset([]);
     load();
   };
 
@@ -120,7 +147,7 @@ export default function Accounting() {
       </div>
 
       <div className="flex gap-2 flex-wrap">
-        {[{ id: "summary", l: "Mois en cours" }, { id: "urssaf", l: "URSSAF" }, { id: "all", l: "Historique des mois" }].map((t) => (
+        {[{ id: "summary", l: "Mois en cours" }, { id: "cb", l: "Frais CB" }, { id: "urssaf", l: "URSSAF" }, { id: "reset", l: "Réinitialiser" }, { id: "all", l: "Historique" }].map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)} data-testid={`tab-${t.id}`} className={`px-4 py-2 rounded-full text-sm ${tab === t.id ? "bg-[#0A192F] text-white" : "border border-slate-200 text-slate-600"}`}>{t.l}</button>
         ))}
       </div>
@@ -138,6 +165,18 @@ export default function Accounting() {
             <div className="bg-white border border-slate-100 rounded-2xl p-5"><div className="text-[10px] tracking-widest uppercase text-slate-500">URSSAF (22%, ↑)</div><div className="font-serif text-3xl mt-1">{data.urssaf_ceil} €</div></div>
             <div className="bg-white border border-slate-100 rounded-2xl p-5"><div className="text-[10px] tracking-widest uppercase text-slate-500">Charges fixes</div><div className="font-serif text-3xl mt-1">{money2(data.fixed_costs)} €</div></div>
             <div className="bg-white border border-slate-100 rounded-2xl p-5"><div className="text-[10px] tracking-widest uppercase text-slate-500">Marge nette</div><div className={`font-serif text-3xl mt-1 ${data.marge_nette >= 0 ? "" : "text-[#991B1B]"}`}>{money2(data.marge_nette)} €</div></div>
+          </div>
+
+          <div className="bg-white border border-slate-100 rounded-2xl p-5 flex items-center gap-4" data-testid="cb-fees-summary">
+            <div className="w-12 h-12 rounded-full bg-[#D4AF37]/10 flex items-center justify-center"><CreditCard className="w-5 h-5 text-[#C5A059]" /></div>
+            <div className="flex-1">
+              <div className="text-[10px] tracking-widest uppercase text-slate-500">Frais CB ce mois ({(data.cb_fee_rate * 100).toFixed(2).replace(".", ",")}%)</div>
+              <div className="text-xs text-slate-500 mt-0.5">{data.cb_count} transaction(s) CB · {money2(data.cb_amount)} € encaissés</div>
+            </div>
+            <div className="text-right">
+              <div className="font-serif text-2xl text-[#991B1B]">-{money2(data.cb_fees_total)} €</div>
+              <button onClick={() => setTab("cb")} className="text-[10px] uppercase tracking-widest text-[#1E3A8A] hover:underline" data-testid="cb-details-link">Détails cumul</button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -172,6 +211,73 @@ export default function Accounting() {
             <button onClick={() => resetMonth(yyyymm)} data-testid="reset-month-btn" className="px-6 py-3 rounded-full border border-red-200 text-[#991B1B] hover:bg-red-50 text-sm flex items-center gap-2"><RefreshCcw className="w-4 h-4" /> Remettre ce mois à 0</button>
           </div>
         </>
+      )}
+
+      {tab === "cb" && cbData && (
+        <div className="space-y-4" data-testid="cb-tab">
+          <div className="bg-white border border-slate-100 rounded-2xl p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 rounded-full bg-[#D4AF37]/10 flex items-center justify-center"><CreditCard className="w-5 h-5 text-[#C5A059]" /></div>
+              <div>
+                <div className="text-[10px] tracking-widest uppercase text-slate-500">Frais CB · Taux {(cbData.rate * 100).toFixed(2).replace(".", ",")}%</div>
+                <div className="font-serif text-xl">Commission bancaire prélevée</div>
+              </div>
+            </div>
+            <div className="flex gap-2 mb-5">
+              {[{ id: "day", l: "Jour" }, { id: "month", l: "Mois" }, { id: "year", l: "Année" }].map((p) => (
+                <button key={p.id} onClick={() => setCbPeriod(p.id)} data-testid={`cb-period-${p.id}`} className={`px-4 py-2 rounded-full text-sm ${cbPeriod === p.id ? "bg-[#0A192F] text-white" : "border border-slate-200 text-slate-600"}`}>{p.l}</button>
+              ))}
+            </div>
+            <div className="grid grid-cols-3 gap-3 mb-5">
+              <div className="bg-slate-50 rounded-xl p-4"><div className="text-[10px] uppercase tracking-widest text-slate-500">Transactions CB</div><div className="font-serif text-xl mt-1">{cbData.total_count}</div></div>
+              <div className="bg-slate-50 rounded-xl p-4"><div className="text-[10px] uppercase tracking-widest text-slate-500">Encaissé CB</div><div className="font-serif text-xl mt-1">{money2(cbData.total_amount)} €</div></div>
+              <div className="bg-red-50 rounded-xl p-4"><div className="text-[10px] uppercase tracking-widest text-[#991B1B]">Frais CB cumulés</div><div className="font-serif text-xl mt-1 text-[#991B1B]">-{money2(cbData.total_fees)} €</div></div>
+            </div>
+            {cbData.rows.length === 0 ? <div className="text-slate-400 text-sm">Aucune transaction CB.</div> :
+              <ul className="divide-y divide-slate-100">
+                {cbData.rows.map((r) => (
+                  <li key={r.key} className="py-3 grid grid-cols-4 gap-2 items-center text-sm" data-testid={`cb-row-${r.key}`}>
+                    <div className="font-medium">{r.key}</div>
+                    <div className="text-slate-500">{r.count} transaction(s)</div>
+                    <div className="text-slate-500">{money2(r.amount)} € encaissés</div>
+                    <div className="text-right font-medium text-[#991B1B]">-{money2(r.fees)} €</div>
+                  </li>
+                ))}
+              </ul>
+            }
+          </div>
+        </div>
+      )}
+
+      {tab === "reset" && (
+        <div className="space-y-4" data-testid="reset-tab">
+          <div className="bg-white border border-slate-100 rounded-2xl p-6">
+            <div className="text-[10px] tracking-widest uppercase text-slate-500 mb-3">Réinitialiser des mois</div>
+            <div className="text-sm text-slate-500 mb-5">Sélectionnez les mois à remettre à 0. Tous les RDV terminés de ces mois seront <strong>définitivement supprimés</strong>.</div>
+            {months.length === 0 ? <div className="text-slate-400 text-sm py-4">Aucun mois avec des données.</div> :
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-5">
+                {months.map((m) => {
+                  const checked = selectedReset.includes(m.month);
+                  return (
+                    <label key={m.month} data-testid={`reset-check-${m.month}`} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer ${checked ? "border-[#991B1B] bg-red-50" : "border-slate-200"}`}>
+                      <input type="checkbox" checked={checked} onChange={() => toggleResetMonth(m.month)} className="w-4 h-4 accent-[#991B1B]" />
+                      <div className="flex-1">
+                        <div className="font-medium capitalize">{fmtMonth(m.month)}</div>
+                        <div className="text-xs text-slate-500">{m.n_rdv} RDV · {money2(m.ca)} €</div>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            }
+            <div className="flex flex-wrap gap-2 items-center">
+              <button onClick={() => setSelectedReset(months.map((m) => m.month))} data-testid="reset-select-all" className="text-xs px-3 py-1.5 rounded-full border border-slate-200 hover:bg-slate-50">Tout cocher</button>
+              <button onClick={() => setSelectedReset([])} data-testid="reset-deselect" className="text-xs px-3 py-1.5 rounded-full border border-slate-200 hover:bg-slate-50">Tout décocher</button>
+              <div className="flex-1" />
+              <button onClick={resetMulti} disabled={selectedReset.length === 0} data-testid="reset-multi-btn" className="px-6 py-3 rounded-full bg-[#991B1B] text-white text-sm disabled:opacity-40 flex items-center gap-2"><RefreshCcw className="w-4 h-4" /> Réinitialiser {selectedReset.length > 0 ? `(${selectedReset.length})` : ""}</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {tab === "urssaf" && (
