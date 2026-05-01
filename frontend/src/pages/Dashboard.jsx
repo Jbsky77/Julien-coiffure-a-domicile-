@@ -145,7 +145,7 @@ export default function Dashboard() {
           <div className="text-[11px] text-slate-500 mt-0.5">après charges</div>
         </Widget>
         <Widget title="RDV à venir" tid="kpi-upcoming" actionLabel="Voir" onAction={() => navigate("/rdv")} color="blue">
-          <div className="font-serif text-xl text-blue-600">{d.upcoming_count}</div>
+          <div className="font-serif text-xl text-blue-600">{d.upcoming_count > 0 ? d.upcoming_count : "Aucun"}</div>
           <div className="text-[11px] text-slate-500 mt-0.5">{money(d.upcoming_amount)} prévus</div>
         </Widget>
         <Widget title="Panier moyen" tid="kpi-basket" color="pink">

@@ -42,7 +42,7 @@ export default function ClientStatus() {
   };
 
   return (
-    <div className="space-y-6" data-testid="client-status-page">
+    <div className="space-y-6" data-testid="clients-status-page">
       <div>
         <div className="text-[10px] tracking-[0.3em] uppercase text-slate-500 mb-2">Relance commerciale</div>
         <h1 className="font-serif text-3xl tracking-tight">Clients à risque</h1>
@@ -52,6 +52,7 @@ export default function ClientStatus() {
         {[
           { id: "at_risk", l: "À relancer" },
           { id: "actif", l: "Actifs" },
+          { id: "en_retard", l: "En retard" },
           { id: "presque_perdu", l: "Presque perdus" },
           { id: "perdu", l: "Perdus" },
           { id: "all", l: "Tous" },
