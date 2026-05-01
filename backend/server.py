@@ -334,6 +334,49 @@ async def clients_update(cid: str, payload: Dict[str, Any], user: User = Depends
     return doc
 
 
+@api.get("/clients/{cid}/photos")
+async def client_photos_list(cid: str, user: User = Depends(get_current_user)):
+    pairs = await db.client_photos.find({"client_id": cid}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return pairs
+
+
+@api.post("/clients/{cid}/photos")
+async def client_photos_create(cid: str, payload: Dict[str, Any], user: User = Depends(get_current_user)):
+    client = await db.clients.find_one({"id": cid}, {"_id": 0})
+    if not client:
+        raise HTTPException(404, "Client not found")
+    pair_id = f"ph_{uuid.uuid4().hex[:10]}"
+    doc = {
+        "id": pair_id,
+        "client_id": cid,
+        "before": payload.get("before"),  # data URL base64
+        "after": payload.get("after"),
+        "note": payload.get("note", ""),
+        "date": payload.get("date") or datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.client_photos.insert_one(doc)
+    return {k: v for k, v in doc.items() if k != "_id"}
+
+
+@api.put("/clients/{cid}/photos/{pid}")
+async def client_photos_update(cid: str, pid: str, payload: Dict[str, Any], user: User = Depends(get_current_user)):
+    update = {}
+    for k in ["before", "after", "note", "date"]:
+        if k in payload:
+            update[k] = payload[k]
+    if update:
+        await db.client_photos.update_one({"id": pid, "client_id": cid}, {"$set": update})
+    doc = await db.client_photos.find_one({"id": pid, "client_id": cid}, {"_id": 0})
+    return doc
+
+
+@api.delete("/clients/{cid}/photos/{pid}")
+async def client_photos_delete(cid: str, pid: str, user: User = Depends(get_current_user)):
+    await db.client_photos.delete_one({"id": pid, "client_id": cid})
+    return {"ok": True}
+
+
 @api.post("/clients/import")
 async def clients_import(payload: Dict[str, Any], user: User = Depends(get_current_user)):
     items = payload.get("clients", [])

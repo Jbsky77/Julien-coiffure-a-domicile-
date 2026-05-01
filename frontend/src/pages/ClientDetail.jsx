@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from "react-router-dom";
 import { api, money, money2, fmtDate, fmtTime, genderClasses, genderLabel, computeAge } from "@/lib/api";
 import { ArrowLeft, MapPin, Phone, Cake, Plus, Trash2, Save, Gift, Users as UsersIcon, Mail, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
+import ClientPhotos from "@/components/app/ClientPhotos";
 
 function LoyaltyRow({ count, label, price }) {
   const slots = Array.from({ length: 5 }, (_, i) => i < Math.min(count, 5));
@@ -142,7 +143,7 @@ export default function ClientDetail() {
       </div>
 
       <div className="flex gap-2 flex-wrap">
-        {[{ id: "infos", l: "Informations" }, { id: "loyalty", l: "Suivi Gratuité" }, { id: "history", l: "Historique" }, { id: "custom", l: "Champs personnalisés" }].map((t) => (
+        {[{ id: "infos", l: "Informations" }, { id: "loyalty", l: "Suivi Gratuité" }, { id: "history", l: "Historique" }, { id: "photos", l: "Photos" }, { id: "custom", l: "Champs personnalisés" }].map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)} data-testid={`tab-${t.id}`} className={`px-4 py-2 rounded-full text-sm ${tab === t.id ? "bg-[#0A192F] text-white" : "border border-slate-200 text-slate-600"}`}>{t.l}</button>
         ))}
       </div>
@@ -218,6 +219,10 @@ export default function ClientDetail() {
         </div>
       )}
 
+      {tab === "photos" && (
+        <ClientPhotos clientId={c.id} clientName={`${c.first_name} ${c.last_name}`.trim()} />
+      )}
+
       {tab === "custom" && (
         <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-premium">
           <div className="flex flex-col md:flex-row gap-3 mb-6">
@@ -239,3 +244,4 @@ export default function ClientDetail() {
     </div>
   );
 }
+
