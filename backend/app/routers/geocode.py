@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.dependencies import get_current_user
 from app.models.auth import User
-from app.services.geocoding import geocode_address
+from app.services.geocoding import geocode_address, stats as geocode_stats
 
 router = APIRouter()
 
@@ -16,3 +16,8 @@ async def geocode_endpoint(payload: Dict[str, Any], user: User = Depends(get_cur
         return await geocode_address(payload.get("address") or "")
     except ValueError as exc:
         raise HTTPException(400, str(exc))
+
+
+@router.get("/geocode/stats")
+async def geocode_stats_endpoint(user: User = Depends(get_current_user)):
+    return geocode_stats()

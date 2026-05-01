@@ -20,6 +20,18 @@ Julien Bouche — coiffeur indépendant auto-entrepreneur, mobile, passe d'un cl
 - Persistance MongoDB
 - Navigation cliquable partout
 
+## Implemented (v2.1 — 2026-05) — Stabilisation & qualité
+- **Refactor backend complet** : `server.py` 1525 → 9 lignes (thin shim). Nouvelle structure `app/` :
+  - `app/main.py` (FastAPI app + include routers), `app/db.py`, `app/dependencies.py`
+  - `app/models/` : auth, clients, services, appointments, stock, settings
+  - `app/routers/` : 14 routers thématiques (clients, photos, geocode, tour, slots, insights, appointments, accounting, analytics, calendar, stock, dashboard, services, auth, settings)
+  - `app/services/` : tour, slots, client_status, insights, goals, dashboard, accounting, analytics, appointments, geocoding, settings
+  - `app/utils/` : travel (haversine, km_to_minutes), dates (parse_iso, month_range), formatting (normalize_address)
+  - Critique : `/api/clients/status` reste déclaré AVANT `/api/clients/{cid}` dans le même router.
+- **Cache géocodage robuste** : normalisation des adresses (accents/casse/ponctuation), TTL 90 jours configurable via `GEOCODE_TTL_DAYS`, gestion fine des erreurs (timeout / rate-limited / not_found / exception), persistance MongoDB avec compteurs `hits`/`resolves`, stats process exposées via `GET /api/geocode/stats`. Réponse enrichie `{address, lat, lng, source, cached, error}`.
+- **Tests E2E Playwright** standalone (`yarn test:e2e`) : 5 tests × 2 projets (desktop-chrome + mobile Pixel 5) = 10 tests verts. Couvre smart-slots et générateur social Avant·Après. Helpers `tests/e2e/helpers.js` pour seed/cleanup via l'API publique. Doc `tests/e2e/README.md`.
+- **Fix iframe Maps** : tous les liens Google Maps (Tour + ClientDetail) passent en `<a target="_blank" rel="noopener noreferrer">` au lieu de `window.open` pour contourner `ERR_BLOCKED_BY_RESPONSE` dans la preview.
+
 ## Implemented (v2.0 — 2026-05) — Massive update "Assistant intelligent"
 - **Tournée du jour** (`/tour`) : itinéraire optimisé chronologique avec KPIs (RDV, CA prévu, durée, trajet), bouton "Itinéraire complet" ouvrant Google Maps avec waypoints, alertes conflit si trajet > marge entre RDV.
 - **Suggestions de créneaux intelligentes** : `POST /api/slots/suggest` calcule les meilleurs créneaux du jour selon position du client (lat/lng), durée prévue et tournée existante, retourne 5 suggestions scorées par "faible détour" / "proche de X" / "sans conflit".
@@ -50,14 +62,12 @@ Julien Bouche — coiffeur indépendant auto-entrepreneur, mobile, passe d'un cl
 - CRUD prestations/clients/RDV/stock, comptabilité URSSAF, dashboard, fidélité 5+1, gratuités.
 
 ## Test status
-- **Iteration 2 (2026-05)** : 20/20 tests pytest backend (100%) — couvre les 8 nouveaux modules + régression CRUD existant. Frontend ~80% (routes + testids OK ; 3 issues mineures corrigées : kpi-upcoming "Aucun" quand 0, testid `clients-status-page`, filtre "En retard" ajouté).
-- Bug critique trouvé & corrigé par testing agent : `Client` Pydantic model manquait `lat`/`lng` (POST /api/clients 500 si address). Fix : `lat: Optional[float] = None`, `lng: Optional[float] = None`.
-- Routing fix : `/api/clients/status` enregistré AVANT `/api/clients/{cid}` pour éviter le shadowing.
+- **v2.1 (2026-05)** : 25/25 pytest backend (100%) — 20 régression + 5 géocodage. 10/10 Playwright E2E (desktop + mobile). Refactor backend transparent : aucune route ni payload modifié, hot reload OK.
+- **v2.0 (2026-05)** : 20/20 backend, frontend ~80%. Bug `Client` Pydantic `lat`/`lng` corrigé. Routing `/api/clients/status` avant `{cid}`.
 
 ## P0/P1/P2 backlog
-- **P1** : Splitter `/app/backend/server.py` (~1525 lignes) en routers thématiques (clients, appointments, accounting, tour).
-- **P1** : Rate-limit / TTL sur cache Nominatim si volume d'adresses augmente.
-- **P2** : Tests E2E Playwright complets (smart-slots, social generator, démarrer ma journée).
-- **P2** : Mode story 9:16 avec template alternatif (overlay du visage flouté pour anonymat optionnel).
-- **P2** : Notifications push pour RDV imminents (intégration notifications navigateur déjà présente pour anniversaires).
-- **P2** : Synchronisation tournée avec services de routing réels (Google Maps Directions API) pour estimation précise vs Haversine ×1.3.
+- **P2** : Logo/branding image upload (actuellement seul `brand_name` est utilisé, le canvas social gère déjà brand_name).
+- **P2** : Notifications push pour RDV imminents.
+- **P2** : Synchronisation tournée avec Google Maps Directions API pour estimation précise.
+- **P3** : CI GitHub Actions pour Playwright (actuellement standalone local).
+- **P3** : Tests Playwright additionnels sur Tour, ClientStatus et Settings (couvrent les flows secondaires).
