@@ -1,0 +1,55 @@
+from pydantic import BaseModel, Field
+from typing import List, Optional, Dict, Any
+from datetime import datetime, timezone
+import uuid
+
+
+class AppointmentService(BaseModel):
+    service_id: str
+    name: str
+    price: float
+    category: str
+    is_gift: bool = False
+
+
+class Appointment(BaseModel):
+    id: str = Field(default_factory=lambda: f"rdv_{uuid.uuid4().hex[:10]}")
+    client_id: str
+    client_name: str = ""
+    date: str  # ISO datetime
+    services: List[AppointmentService] = []
+    kilometrage: float = 0
+    notes: str = ""
+    price_base: float = 0
+    fuel_supplement: float = 0
+    price_final: float = 0  # editable
+    payment_mode: Optional[str] = None
+    status: str = "scheduled"
+    family_pack_applied: bool = False
+    gift_applied: bool = False
+    duration_minutes: Optional[int] = None
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    finished_at: Optional[str] = None
+
+
+class AppointmentCreate(BaseModel):
+    client_id: str
+    date: str
+    services: List[Dict[str, Any]] = []  # list of {service_id, is_gift?}
+    kilometrage: float = 0
+    notes: str = ""
+    price_final_override: Optional[float] = None
+
+
+class AppointmentUpdate(BaseModel):
+    date: Optional[str] = None
+    services: Optional[List[Dict[str, Any]]] = None
+    kilometrage: Optional[float] = None
+    notes: Optional[str] = None
+    price_final_override: Optional[float] = None
+
+
+class FinishAppointment(BaseModel):
+    payment_mode: str
+    price_final: Optional[float] = None
+    duration_minutes: Optional[int] = None
