@@ -148,6 +148,15 @@ class Settings(BaseModel):
     fuel_supplement_tier_km: float = 10.0
     consumption_l_per_100km: float = 4.0
     cb_fee_rate: float = 0.0175
+    avg_speed_kmh: float = 40.0
+    default_duration_minutes: int = 45
+    goal_ca: float = 3000.0
+    goal_rdv: int = 60
+    goal_panier: float = 50.0
+    goal_relances: int = 10
+    brand_name: str = "Julien Bouche"
+    brand_color: str = "#D4AF37"
+    brand_logo: Optional[str] = None  # data URL
 
 
 # ============================================================
@@ -311,9 +320,34 @@ async def clients_list(user: User = Depends(get_current_user)):
     return items
 
 
+async def auto_geocode(address: str):
+    if not address:
+        return None, None
+    cached = await db.geocache.find_one({"address": address}, {"_id": 0})
+    if cached:
+        return cached.get("lat"), cached.get("lng")
+    try:
+        async with httpx.AsyncClient(timeout=8) as http:
+            r = await http.get(
+                "https://nominatim.openstreetmap.org/search",
+                params={"q": address, "format": "json", "limit": 1, "countrycodes": "fr"},
+                headers={"User-Agent": "JulienBoucheApp/1.0"},
+            )
+        data = r.json()
+        if not data:
+            return None, None
+        lat = float(data[0]["lat"]); lng = float(data[0]["lon"])
+        await db.geocache.insert_one({"address": address, "lat": lat, "lng": lng})
+        return lat, lng
+    except Exception:
+        return None, None
+
+
 @api.post("/clients")
 async def clients_create(payload: ClientCreate, user: User = Depends(get_current_user)):
     c = Client(**payload.model_dump())
+    if c.address:
+        c.lat, c.lng = await auto_geocode(c.address)
     await db.clients.insert_one(c.model_dump())
     return c.model_dump()
 
@@ -329,6 +363,12 @@ async def clients_get(cid: str, user: User = Depends(get_current_user)):
 
 @api.put("/clients/{cid}")
 async def clients_update(cid: str, payload: Dict[str, Any], user: User = Depends(get_current_user)):
+    if "address" in payload and payload["address"]:
+        existing = await db.clients.find_one({"id": cid}, {"_id": 0}) or {}
+        if existing.get("address") != payload["address"] or existing.get("lat") is None:
+            lat, lng = await auto_geocode(payload["address"])
+            payload["lat"] = lat
+            payload["lng"] = lng
     await db.clients.update_one({"id": cid}, {"$set": payload})
     doc = await db.clients.find_one({"id": cid}, {"_id": 0})
     return doc
@@ -375,6 +415,379 @@ async def client_photos_update(cid: str, pid: str, payload: Dict[str, Any], user
 async def client_photos_delete(cid: str, pid: str, user: User = Depends(get_current_user)):
     await db.client_photos.delete_one({"id": pid, "client_id": cid})
     return {"ok": True}
+
+
+@api.post("/geocode")
+async def geocode(payload: Dict[str, Any], user: User = Depends(get_current_user)):
+    addr = (payload.get("address") or "").strip()
+    if not addr:
+        raise HTTPException(400, "Address required")
+    cached = await db.geocache.find_one({"address": addr}, {"_id": 0})
+    if cached:
+        return cached
+    try:
+        async with httpx.AsyncClient(timeout=10) as http:
+            r = await http.get(
+                "https://nominatim.openstreetmap.org/search",
+                params={"q": addr, "format": "json", "limit": 1, "countrycodes": "fr"},
+                headers={"User-Agent": "JulienBoucheApp/1.0"},
+            )
+        data = r.json()
+        if not data:
+            return {"address": addr, "lat": None, "lng": None}
+        lat = float(data[0]["lat"])
+        lng = float(data[0]["lon"])
+        out = {"address": addr, "lat": lat, "lng": lng}
+        await db.geocache.insert_one(out)
+        return out
+    except Exception:
+        return {"address": addr, "lat": None, "lng": None}
+
+
+def haversine(lat1, lng1, lat2, lng2):
+    import math as _m
+    if None in (lat1, lng1, lat2, lng2):
+        return None
+    R = 6371.0
+    p1 = _m.radians(lat1); p2 = _m.radians(lat2)
+    dp = _m.radians(lat2 - lat1); dl = _m.radians(lng2 - lng1)
+    a = _m.sin(dp/2)**2 + _m.cos(p1)*_m.cos(p2)*_m.sin(dl/2)**2
+    return round(R * 2 * _m.atan2(_m.sqrt(a), _m.sqrt(1-a)) * 1.3, 2)  # 1.3x = road factor
+
+
+async def estimate_total_duration(services_input):
+    settings = await get_settings()
+    return max(settings.default_duration_minutes, len(services_input) * 30)
+
+
+@api.get("/tour/today")
+async def tour_today(date: Optional[str] = None, user: User = Depends(get_current_user)):
+    settings = await get_settings()
+    target_date = date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    rdvs = await db.appointments.find({"status": {"$in": ["scheduled", "done"]}}, {"_id": 0}).to_list(2000)
+    day_rdvs = []
+    for r in rdvs:
+        try:
+            dt = datetime.fromisoformat(r["date"].replace("Z", "+00:00"))
+            if dt.strftime("%Y-%m-%d") == target_date:
+                day_rdvs.append(r)
+        except Exception:
+            continue
+    day_rdvs.sort(key=lambda r: r["date"])
+    out = []
+    prev = None
+    total_km = 0.0
+    total_travel = 0
+    total_ca = 0.0
+    total_duration = 0
+    for r in day_rdvs:
+        client = await db.clients.find_one({"id": r["client_id"]}, {"_id": 0})
+        lat = client.get("lat") if client else None
+        lng = client.get("lng") if client else None
+        travel_km = None
+        travel_min = None
+        conflict = False
+        if prev and lat and lng and prev.get("lat") and prev.get("lng"):
+            travel_km = haversine(prev["lat"], prev["lng"], lat, lng)
+            if travel_km is not None:
+                travel_min = round((travel_km / settings.avg_speed_kmh) * 60)
+                # Check conflict
+                try:
+                    prev_end = datetime.fromisoformat(prev["date"].replace("Z", "+00:00")) + timedelta(minutes=prev.get("duration_minutes") or settings.default_duration_minutes)
+                    cur_start = datetime.fromisoformat(r["date"].replace("Z", "+00:00"))
+                    margin = (cur_start - prev_end).total_seconds() / 60
+                    if margin < travel_min:
+                        conflict = True
+                except Exception:
+                    pass
+                total_km += travel_km
+                total_travel += travel_min
+        duration = r.get("duration_minutes") or settings.default_duration_minutes
+        total_duration += duration
+        total_ca += r.get("price_final", 0)
+        out.append({
+            **r,
+            "address": client.get("address") if client else "",
+            "phone": client.get("phone") if client else "",
+            "gender": client.get("gender") if client else None,
+            "lat": lat, "lng": lng,
+            "travel_km": travel_km,
+            "travel_min": travel_min,
+            "conflict": conflict,
+            "duration_minutes": duration,
+        })
+        prev = {"lat": lat, "lng": lng, "date": r["date"], "duration_minutes": duration}
+    return {
+        "date": target_date,
+        "stops": out,
+        "total_km": round(total_km, 2),
+        "total_travel_min": total_travel,
+        "total_ca": round(total_ca, 2),
+        "total_duration_min": total_duration,
+    }
+
+
+@api.post("/slots/suggest")
+async def suggest_slots(payload: Dict[str, Any], user: User = Depends(get_current_user)):
+    settings = await get_settings()
+    date = payload.get("date")
+    duration = int(payload.get("duration_minutes") or settings.default_duration_minutes)
+    target_lat = payload.get("lat")
+    target_lng = payload.get("lng")
+    if not date:
+        raise HTTPException(400, "Date required")
+    # Get day's rdvs
+    rdvs = await db.appointments.find({"status": "scheduled"}, {"_id": 0}).to_list(2000)
+    day_rdvs = []
+    for r in rdvs:
+        try:
+            dt = datetime.fromisoformat(r["date"].replace("Z", "+00:00"))
+            if dt.strftime("%Y-%m-%d") == date:
+                day_rdvs.append((dt, r))
+        except Exception:
+            continue
+    day_rdvs.sort(key=lambda x: x[0])
+    # Hydrate locations
+    enriched = []
+    for dt, r in day_rdvs:
+        client = await db.clients.find_one({"id": r["client_id"]}, {"_id": 0}) or {}
+        d = r.get("duration_minutes") or settings.default_duration_minutes
+        enriched.append({"start": dt, "end": dt + timedelta(minutes=d), "lat": client.get("lat"), "lng": client.get("lng"), "name": r.get("client_name", "")})
+    # Generate candidate slots in working hours 9h-19h
+    suggestions = []
+    work_start = datetime.fromisoformat(date + "T09:00:00+00:00")
+    work_end = datetime.fromisoformat(date + "T19:00:00+00:00")
+    # Always candidate the gap before each rdv and after each
+    candidates = [work_start]
+    for e in enriched:
+        candidates.append(e["end"])
+    for c in candidates:
+        if c < work_start:
+            c = work_start
+        if c + timedelta(minutes=duration) > work_end:
+            continue
+        # Round up to next 15min
+        minute = (c.minute // 15 + (1 if c.minute % 15 else 0)) * 15
+        if minute >= 60:
+            c = c.replace(minute=0) + timedelta(hours=1)
+        else:
+            c = c.replace(minute=minute, second=0, microsecond=0)
+        slot_end = c + timedelta(minutes=duration)
+        # Check no overlap
+        overlap = False
+        prev_rdv = None
+        next_rdv = None
+        for e in enriched:
+            if c < e["end"] and slot_end > e["start"]:
+                overlap = True
+                break
+            if e["end"] <= c:
+                if prev_rdv is None or e["end"] > prev_rdv["end"]:
+                    prev_rdv = e
+            if e["start"] >= slot_end:
+                if next_rdv is None or e["start"] < next_rdv["start"]:
+                    next_rdv = e
+        if overlap:
+            continue
+        # Score: lower travel = better
+        score = 0
+        reasons = []
+        if prev_rdv and target_lat and prev_rdv["lat"]:
+            km = haversine(prev_rdv["lat"], prev_rdv["lng"], target_lat, target_lng)
+            if km is not None:
+                travel_min = round(km / settings.avg_speed_kmh * 60)
+                margin = (c - prev_rdv["end"]).total_seconds() / 60
+                if margin < travel_min:
+                    continue  # too tight
+                score -= km
+                if km < 5:
+                    reasons.append("Faible détour")
+                elif km < 15:
+                    reasons.append(f"Proche de {prev_rdv['name']}")
+        if next_rdv and target_lat and next_rdv["lat"]:
+            km = haversine(target_lat, target_lng, next_rdv["lat"], next_rdv["lng"])
+            if km is not None:
+                travel_min = round(km / settings.avg_speed_kmh * 60)
+                margin = (next_rdv["start"] - slot_end).total_seconds() / 60
+                if margin < travel_min:
+                    continue
+                score -= km
+        if not reasons:
+            reasons.append("S'insère sans conflit")
+        suggestions.append({
+            "datetime": c.isoformat(),
+            "label": c.strftime("%H:%M"),
+            "score": score,
+            "reasons": reasons,
+        })
+    suggestions.sort(key=lambda x: -x["score"])
+    return {"suggestions": suggestions[:5]}
+
+
+@api.get("/clients/status")
+async def clients_status_endpoint(user: User = Depends(get_current_user)):
+    """Compute client status: actif, à relancer, en retard, presque perdu, perdu"""
+    clients = await db.clients.find({}, {"_id": 0}).to_list(5000)
+    rdvs = await db.appointments.find({"status": "done"}, {"_id": 0}).to_list(20000)
+    now = datetime.now(timezone.utc)
+    by_client = {}
+    for r in rdvs:
+        cid = r["client_id"]
+        try:
+            dt = datetime.fromisoformat((r.get("finished_at") or r["date"]).replace("Z", "+00:00"))
+        except Exception:
+            continue
+        by_client.setdefault(cid, []).append(dt)
+    out = []
+    for c in clients:
+        history = sorted(by_client.get(c["id"], []), reverse=True)
+        if not history:
+            continue
+        last = history[0]
+        days_since = (now - last).days
+        # Compute average frequency
+        if len(history) >= 2:
+            gaps = [(history[i] - history[i+1]).days for i in range(len(history) - 1)]
+            avg_freq = max(7, sum(gaps) / len(gaps))
+        else:
+            avg_freq = 30
+        ratio = days_since / avg_freq
+        if ratio < 1.0:
+            status = "actif"
+        elif ratio < 1.5:
+            status = "a_relancer"
+        elif ratio < 2.0:
+            status = "en_retard"
+        elif ratio < 3.5:
+            status = "presque_perdu"
+        else:
+            status = "perdu"
+        # Average basket
+        prices = []
+        for r in rdvs:
+            if r["client_id"] == c["id"]:
+                prices.append(r["price_final"])
+        avg_basket = round(sum(prices) / len(prices), 2) if prices else 0
+        out.append({
+            "id": c["id"],
+            "first_name": c.get("first_name", ""),
+            "last_name": c.get("last_name", ""),
+            "gender": c.get("gender"),
+            "phone": c.get("phone", ""),
+            "last_visit": last.isoformat(),
+            "days_since": days_since,
+            "avg_frequency_days": round(avg_freq, 1),
+            "ratio": round(ratio, 2),
+            "status": status,
+            "n_rdv": len(history),
+            "avg_basket": avg_basket,
+        })
+    out.sort(key=lambda x: -x["ratio"])
+    return out
+
+
+@api.get("/insights")
+async def insights_endpoint(user: User = Depends(get_current_user)):
+    rdvs = await db.appointments.find({"status": "done"}, {"_id": 0}).to_list(20000)
+    if not rdvs:
+        return {"insights": []}
+    now = datetime.now(timezone.utc)
+    insights = []
+    # Best weekday
+    weekday_rev = [0.0] * 7
+    weekday_count = [0] * 7
+    morning_rev = 0.0
+    afternoon_rev = 0.0
+    morning_n = 0
+    afternoon_n = 0
+    far_margin = []
+    near_margin = []
+    cat_rev = {}
+    durations = []
+    total_min_month = 0
+    last_30 = 0
+    last_60 = 0
+    for r in rdvs:
+        try:
+            dt = datetime.fromisoformat((r.get("finished_at") or r["date"]).replace("Z", "+00:00"))
+        except Exception:
+            continue
+        wd = dt.weekday()
+        weekday_rev[wd] += r["price_final"]
+        weekday_count[wd] += 1
+        if dt.hour < 12:
+            morning_rev += r["price_final"]; morning_n += 1
+        else:
+            afternoon_rev += r["price_final"]; afternoon_n += 1
+        km = r.get("kilometrage", 0)
+        if km > 20:
+            far_margin.append(r["price_final"] - r.get("fuel_supplement", 0))
+        else:
+            near_margin.append(r["price_final"])
+        for s in r["services"]:
+            cat = s.get("category", "AUTRE")
+            cat_rev[cat] = cat_rev.get(cat, 0) + s.get("price", 0)
+        if r.get("duration_minutes"):
+            durations.append(r["duration_minutes"])
+        if (now - dt).days <= 30:
+            total_min_month += r.get("duration_minutes") or 0
+            last_30 += 1
+        if (now - dt).days <= 60:
+            last_60 += 1
+    # Best weekday
+    best_wd = max(range(7), key=lambda i: weekday_rev[i])
+    if weekday_count[best_wd] > 1:
+        names = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+        insights.append(f"Le {names[best_wd]} est votre jour le plus rentable")
+    # Morning vs afternoon
+    if morning_n >= 3 and afternoon_n >= 3:
+        morning_avg = morning_rev / morning_n
+        afternoon_avg = afternoon_rev / afternoon_n
+        if morning_avg > afternoon_avg * 1.1:
+            insights.append("Le matin est votre créneau le plus performant")
+        elif afternoon_avg > morning_avg * 1.1:
+            insights.append("L'après-midi génère un panier plus élevé")
+    # Distance margin
+    if len(far_margin) >= 3 and len(near_margin) >= 3:
+        if (sum(far_margin) / len(far_margin)) < (sum(near_margin) / len(near_margin)) * 0.85:
+            insights.append("Les rendez-vous à plus de 20 km ont une marge plus faible")
+    # Category dominance
+    if cat_rev:
+        top_cat = max(cat_rev, key=cat_rev.get)
+        cat_label = {"HOMME": "Homme", "FEMME": "Femme", "ENFANT": "Enfant", "AUTRE": "Diverses"}
+        insights.append(f"Les prestations {cat_label.get(top_cat, top_cat)} représentent la plus grande part du chiffre d'affaires")
+    # Avg duration
+    if durations:
+        avg_d = round(sum(durations) / len(durations))
+        insights.append(f"Le temps moyen passé par rendez-vous est de {avg_d} minutes")
+    # Total month duration
+    if total_min_month > 0:
+        hours = round(total_min_month / 60, 1)
+        insights.append(f"Votre durée totale de prestation ce mois-ci est de {hours} heures")
+    return {"insights": insights[:5]}
+
+
+@api.get("/goals/progress")
+async def goals_progress(user: User = Depends(get_current_user)):
+    settings = await get_settings()
+    now = datetime.now(timezone.utc)
+    yyyymm = f"{now.year:04d}-{now.month:02d}"
+    md = await accounting_month(yyyymm, user)
+    panier = round(md["ca_brut"] / md["n_rdv"], 2) if md["n_rdv"] else 0
+    return {
+        "month": yyyymm,
+        "ca": {"value": md["ca_brut"], "goal": settings.goal_ca, "pct": min(100, round(md["ca_brut"] / settings.goal_ca * 100, 1) if settings.goal_ca else 0)},
+        "rdv": {"value": md["n_rdv"], "goal": settings.goal_rdv, "pct": min(100, round(md["n_rdv"] / settings.goal_rdv * 100, 1) if settings.goal_rdv else 0)},
+        "panier": {"value": panier, "goal": settings.goal_panier, "pct": min(100, round(panier / settings.goal_panier * 100, 1) if settings.goal_panier else 0)},
+        "relances": {"value": 0, "goal": settings.goal_relances, "pct": 0},
+    }
+
+
+@api.post("/clients/{cid}/relance")
+async def log_relance(cid: str, user: User = Depends(get_current_user)):
+    now = datetime.now(timezone.utc).isoformat()
+    await db.relances.insert_one({"client_id": cid, "date": now})
+    return {"ok": True, "date": now}
 
 
 @api.post("/clients/import")
