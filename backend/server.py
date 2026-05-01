@@ -660,6 +660,26 @@ async def ical_feed(token: str):
     return FResponse("\r\n".join(lines), media_type="text/calendar")
 
 
+@api.put("/appointments/{rid}/payment")
+async def appointments_update_payment(rid: str, payload: Dict[str, Any], user: User = Depends(get_current_user)):
+    rdv = await db.appointments.find_one({"id": rid}, {"_id": 0})
+    if not rdv:
+        raise HTTPException(404, "Not found")
+    update = {}
+    if "payment_mode" in payload:
+        update["payment_mode"] = payload["payment_mode"]
+    if "price_final" in payload and payload["price_final"] is not None:
+        update["price_final"] = float(payload["price_final"])
+    if "duration_minutes" in payload:
+        update["duration_minutes"] = payload["duration_minutes"]
+    if "finished_at" in payload and payload["finished_at"]:
+        update["finished_at"] = payload["finished_at"]
+    if not update:
+        return rdv
+    await db.appointments.update_one({"id": rid}, {"$set": update})
+    return await db.appointments.find_one({"id": rid}, {"_id": 0})
+
+
 @api.delete("/appointments/{rid}")
 async def appointments_delete(rid: str, user: User = Depends(get_current_user)):
     await db.appointments.delete_one({"id": rid})

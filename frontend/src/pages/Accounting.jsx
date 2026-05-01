@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { api, money, money2, fmtMonth } from "@/lib/api";
 import { toast } from "sonner";
-import { ExternalLink, RefreshCcw, ChevronLeft, ChevronRight, Download, FileText, CreditCard } from "lucide-react";
+import { ExternalLink, RefreshCcw, ChevronLeft, ChevronRight, Download, FileText, CreditCard, Pencil, Save } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { PAYMENT_MODES } from "@/lib/api";
 
 function currentYYYYMM() {
   const d = new Date();
@@ -24,6 +25,18 @@ export default function Accounting() {
   const [cbPeriod, setCbPeriod] = useState("month");
   const [cbData, setCbData] = useState(null);
   const [selectedReset, setSelectedReset] = useState([]);
+  // Paiements tab
+  const [payments, setPayments] = useState([]);
+  const [payPeriod, setPayPeriod] = useState("month");
+  const [payDay, setPayDay] = useState(new Date().toISOString().slice(0, 10));
+  const [payMonth, setPayMonth] = useState(currentYYYYMM());
+  const [payYear, setPayYear] = useState(String(new Date().getFullYear()));
+  const [editingPay, setEditingPay] = useState(null);
+
+  const loadPayments = async () => {
+    const r = await api.get("/appointments");
+    setPayments(r.data.filter((x) => x.status === "done"));
+  };
 
   const load = async () => {
     const [r, m, cb] = await Promise.all([
@@ -36,6 +49,7 @@ export default function Accounting() {
     setCbData(cb.data);
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [yyyymm]);
+  useEffect(() => { loadPayments(); }, []);
   useEffect(() => {
     (async () => {
       const cb = await api.get(`/accounting/cb-fees?period=${cbPeriod}`);
@@ -68,6 +82,27 @@ export default function Accounting() {
     setSelectedReset([]);
     load();
   };
+
+  const savePayment = async (id, patch) => {
+    await api.put(`/appointments/${id}/payment`, patch);
+    toast.success("Paiement modifié");
+    setEditingPay(null);
+    loadPayments();
+    load();
+  };
+
+  // Filter payments by selected period
+  const filteredPayments = payments.filter((p) => {
+    const d = new Date(p.finished_at || p.date);
+    if (Number.isNaN(d.getTime())) return false;
+    if (payPeriod === "all") return true;
+    if (payPeriod === "day") return d.toISOString().slice(0, 10) === payDay;
+    if (payPeriod === "month") return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` === payMonth;
+    if (payPeriod === "year") return String(d.getFullYear()) === payYear;
+    return true;
+  }).sort((a, b) => new Date(b.finished_at || b.date) - new Date(a.finished_at || a.date));
+
+  const filteredTotal = filteredPayments.reduce((acc, p) => acc + p.price_final, 0);
 
   const exportCSV = () => {
     const rows = [
@@ -147,7 +182,7 @@ export default function Accounting() {
       </div>
 
       <div className="flex gap-2 flex-wrap">
-        {[{ id: "summary", l: "Mois en cours" }, { id: "cb", l: "Frais CB" }, { id: "urssaf", l: "URSSAF" }, { id: "reset", l: "Réinitialiser" }, { id: "all", l: "Historique" }].map((t) => (
+        {[{ id: "summary", l: "Mois en cours" }, { id: "payments", l: "Paiements" }, { id: "cb", l: "Frais CB" }, { id: "urssaf", l: "URSSAF" }, { id: "reset", l: "Réinitialiser" }, { id: "all", l: "Historique" }].map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)} data-testid={`tab-${t.id}`} className={`px-4 py-2 rounded-full text-sm ${tab === t.id ? "bg-[#0A192F] text-white" : "border border-slate-200 text-slate-600"}`}>{t.l}</button>
         ))}
       </div>
@@ -211,6 +246,78 @@ export default function Accounting() {
             <button onClick={() => resetMonth(yyyymm)} data-testid="reset-month-btn" className="px-6 py-3 rounded-full border border-red-200 text-[#991B1B] hover:bg-red-50 text-sm flex items-center gap-2"><RefreshCcw className="w-4 h-4" /> Remettre ce mois à 0</button>
           </div>
         </>
+      )}
+
+      {tab === "payments" && (
+        <div className="space-y-4" data-testid="payments-tab">
+          <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-premium space-y-4">
+            <div className="flex items-center gap-3">
+              <CreditCard className="w-5 h-5 text-[#1E3A8A]" />
+              <div className="font-serif text-xl">Paiements encaissés</div>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {[{ id: "day", l: "Jour" }, { id: "month", l: "Mois" }, { id: "year", l: "Année" }, { id: "all", l: "Tout" }].map((p) => (
+                <button key={p.id} onClick={() => setPayPeriod(p.id)} data-testid={`pay-period-${p.id}`} className={`px-4 py-2 rounded-full text-sm ${payPeriod === p.id ? "bg-[#0A192F] text-white" : "border border-slate-200 text-slate-600"}`}>{p.l}</button>
+              ))}
+            </div>
+            {payPeriod === "day" && <input type="date" value={payDay} onChange={(e) => setPayDay(e.target.value)} data-testid="pay-day-input" className="bg-transparent border-b border-slate-300 px-0 py-2 focus:border-[#0A192F] focus:outline-none" />}
+            {payPeriod === "month" && <input type="month" value={payMonth} onChange={(e) => setPayMonth(e.target.value)} data-testid="pay-month-input" className="bg-transparent border-b border-slate-300 px-0 py-2 focus:border-[#0A192F] focus:outline-none" />}
+            {payPeriod === "year" && <input type="number" min="2020" max="2099" value={payYear} onChange={(e) => setPayYear(e.target.value)} data-testid="pay-year-input" className="bg-transparent border-b border-slate-300 px-0 py-2 focus:border-[#0A192F] focus:outline-none w-32" />}
+            <div className="flex items-center justify-between bg-slate-50 rounded-xl p-3">
+              <div className="text-xs text-slate-500">{filteredPayments.length} paiement(s)</div>
+              <div className="font-serif text-2xl text-[#C5A059]">{money2(filteredTotal)} €</div>
+            </div>
+          </div>
+
+          {filteredPayments.length === 0 ? (
+            <div className="text-slate-400 text-sm py-10 text-center">Aucun paiement sur cette période.</div>
+          ) : (
+            <ul className="space-y-2">
+              {filteredPayments.map((p) => {
+                const isEditing = editingPay?.id === p.id;
+                const dt = new Date(p.finished_at || p.date);
+                const dateStr = dt.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
+                const timeStr = dt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+                if (isEditing) {
+                  return (
+                    <li key={p.id} className="bg-white border-2 border-[#1E3A8A] rounded-2xl p-4 space-y-3" data-testid={`pay-edit-${p.id}`}>
+                      <div className="font-medium">{p.client_name}</div>
+                      <div className="text-xs text-slate-500">{dateStr} · {timeStr}</div>
+                      <div>
+                        <label className="text-[10px] uppercase tracking-widest text-slate-500">Mode de règlement</label>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {PAYMENT_MODES.map((m) => (
+                            <button key={m.id} onClick={() => setEditingPay({ ...editingPay, payment_mode: m.id })} data-testid={`edit-pm-${m.id}`} className={`px-3 py-1.5 rounded-full text-xs ${editingPay.payment_mode === m.id ? "bg-[#0A192F] text-white" : "border border-slate-200 text-slate-600"}`}>{m.label}</button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[10px] uppercase tracking-widest text-slate-500">Montant (€)</label>
+                        <input type="number" step="0.01" value={editingPay.price_final} onChange={(e) => setEditingPay({ ...editingPay, price_final: parseFloat(e.target.value) || 0 })} data-testid="edit-pay-amount" className="w-full bg-transparent border-b border-slate-300 px-0 py-2 focus:border-[#0A192F] focus:outline-none" />
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => savePayment(p.id, { payment_mode: editingPay.payment_mode, price_final: editingPay.price_final })} data-testid="save-pay-btn" className="bg-[#0A192F] text-white rounded-full px-5 py-2 text-sm flex items-center gap-2"><Save className="w-3.5 h-3.5" /> Enregistrer</button>
+                        <button onClick={() => setEditingPay(null)} className="rounded-full border border-slate-200 px-5 py-2 text-sm">Annuler</button>
+                      </div>
+                    </li>
+                  );
+                }
+                const pmColor = p.payment_mode === "CB" ? "bg-blue-50 text-blue-700 border-blue-200" : p.payment_mode === "ESPECES" ? "bg-green-50 text-green-700 border-green-200" : p.payment_mode === "CHEQUE" ? "bg-purple-50 text-purple-700 border-purple-200" : "bg-slate-50 text-slate-700 border-slate-200";
+                return (
+                  <li key={p.id} className="bg-white border border-slate-100 rounded-2xl p-4 flex items-center gap-3 hover:shadow-premium transition-all" data-testid={`pay-row-${p.id}`}>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">{p.client_name}</div>
+                      <div className="text-xs text-slate-500">{dateStr} · {timeStr}</div>
+                    </div>
+                    <span className={`text-[9px] tracking-wider uppercase px-2 py-1 rounded-full border ${pmColor}`}>{p.payment_mode}</span>
+                    <div className="font-serif text-lg w-20 text-right">{money2(p.price_final)} €</div>
+                    <button onClick={() => setEditingPay({ id: p.id, payment_mode: p.payment_mode, price_final: p.price_final })} data-testid={`edit-pay-${p.id}`} className="rounded-full p-2 text-slate-500 hover:bg-slate-50 hover:text-[#0A192F]"><Pencil className="w-4 h-4" /></button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       )}
 
       {tab === "cb" && cbData && (
