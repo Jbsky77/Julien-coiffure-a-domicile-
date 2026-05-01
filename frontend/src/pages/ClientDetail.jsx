@@ -100,11 +100,6 @@ export default function ClientDetail() {
   const fb = "w-full bg-transparent border-b border-slate-300 rounded-none px-0 py-2 focus:border-[#0A192F] focus:outline-none text-base";
 
   const mapsUrl = c.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.address)}` : null;
-  const openMaps = () => {
-    if (!mapsUrl) return;
-    const w = window.open(mapsUrl, "_blank", "noopener,noreferrer");
-    if (!w) window.location.href = mapsUrl;
-  };
   const smsLink = c.phone ? `sms:${c.phone.replace(/\s/g, "")}?body=${encodeURIComponent(`Bonjour ${c.first_name || ""}, c'est Julien Bouche. `)}` : null;
   const mailLink = `mailto:?subject=${encodeURIComponent("Prendre rendez-vous")}&body=${encodeURIComponent(`Bonjour ${c.first_name || c.last_name},\n\nJ'espère que vous allez bien. Souhaitez-vous prendre un nouveau rendez-vous ?\n\nÀ bientôt,\nJulien Bouche`)}`;
 
@@ -122,7 +117,7 @@ export default function ClientDetail() {
           <div className="text-slate-500 mt-2 text-sm flex flex-wrap items-center gap-4">
             {c.phone && <span className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" /> {c.phone}</span>}
             {c.birthday && <span className="flex items-center gap-1.5"><Cake className="w-3.5 h-3.5" /> {new Date(c.birthday).toLocaleDateString("fr-FR")}{age !== null && <span className="ml-1">· {age} ans</span>}</span>}
-            {mapsUrl && <button onClick={openMaps} className="flex items-center gap-1.5 hover:text-[#0A192F]" data-testid="maps-link"><MapPin className="w-3.5 h-3.5" /> Voir sur Google Maps</button>}
+            {mapsUrl && <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-[#0A192F]" data-testid="maps-link"><MapPin className="w-3.5 h-3.5" /> Voir sur Google Maps</a>}
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">

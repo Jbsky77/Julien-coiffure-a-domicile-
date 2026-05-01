@@ -14,19 +14,17 @@ export default function Tour() {
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [date]);
 
-  const openItinerary = (addr) => {
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addr)}`;
-    window.open(url, "_blank", "noopener,noreferrer");
-  };
+  const buildItineraryUrl = (addr) => `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addr)}`;
 
-  const openFullTour = () => {
-    if (!data?.stops?.length) return;
+  const fullTourUrl = (() => {
+    if (!data?.stops?.length) return null;
     const waypoints = data.stops.slice(0, -1).map((s) => encodeURIComponent(s.address)).filter(Boolean).join("|");
     const dest = encodeURIComponent(data.stops[data.stops.length - 1].address || "");
+    if (!dest) return null;
     let url = `https://www.google.com/maps/dir/?api=1&destination=${dest}`;
     if (waypoints) url += `&waypoints=${waypoints}`;
-    window.open(url, "_blank", "noopener,noreferrer");
-  };
+    return url;
+  })();
 
   if (!data) return <div className="text-slate-500">Chargement…</div>;
 
@@ -48,8 +46,8 @@ export default function Tour() {
         <div className="bg-gradient-to-br from-green-50 to-white border border-green-100 rounded-2xl p-4"><div className="text-[10px] uppercase tracking-widest text-slate-500">Trajet</div><div className="font-serif text-2xl text-green-700">{data.total_travel_min} min</div><div className="text-[10px] text-slate-500">{money2(data.total_km)} km</div></div>
       </div>
 
-      {data.stops.length > 1 && (
-        <button onClick={openFullTour} data-testid="open-full-tour" className="w-full bg-gold-gradient text-white rounded-full px-6 py-3 font-medium flex items-center justify-center gap-2"><Route className="w-4 h-4" /> Itinéraire complet</button>
+      {fullTourUrl && (
+        <a href={fullTourUrl} target="_blank" rel="noopener noreferrer" data-testid="open-full-tour" className="w-full bg-gold-gradient text-white rounded-full px-6 py-3 font-medium flex items-center justify-center gap-2"><Route className="w-4 h-4" /> Itinéraire complet</a>
       )}
 
       {data.stops.length === 0 ? (
@@ -86,7 +84,7 @@ export default function Tour() {
                       <div className="flex items-center justify-between mt-3">
                         <div className="font-serif text-xl text-[#C5A059]">{money2(s.price_final)} €</div>
                         {s.address && (
-                          <button onClick={() => openItinerary(s.address)} data-testid={`itinerary-${i}`} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-[#0A192F] text-white"><Navigation className="w-3 h-3" /> Itinéraire</button>
+                          <a href={buildItineraryUrl(s.address)} target="_blank" rel="noopener noreferrer" data-testid={`itinerary-${i}`} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-[#0A192F] text-white"><Navigation className="w-3 h-3" /> Itinéraire</a>
                         )}
                       </div>
                     </div>
