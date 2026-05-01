@@ -59,6 +59,8 @@ class Client(BaseModel):
     loyalty_counters: Dict[str, int] = {}  # service_id -> count paid
     referrals: int = 0  # validated filleuls
     last_seen: Optional[str] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
@@ -352,6 +354,11 @@ async def clients_create(payload: ClientCreate, user: User = Depends(get_current
     return c.model_dump()
 
 
+@api.get("/clients/status")
+async def clients_status_route(user: User = Depends(get_current_user)):
+    return await clients_status_endpoint(user)
+
+
 @api.get("/clients/{cid}")
 async def clients_get(cid: str, user: User = Depends(get_current_user)):
     doc = await db.clients.find_one({"id": cid}, {"_id": 0})
@@ -624,7 +631,7 @@ async def suggest_slots(payload: Dict[str, Any], user: User = Depends(get_curren
     return {"suggestions": suggestions[:5]}
 
 
-@api.get("/clients/status")
+@api.get("/clients/status", include_in_schema=False)
 async def clients_status_endpoint(user: User = Depends(get_current_user)):
     """Compute client status: actif, à relancer, en retard, presque perdu, perdu"""
     clients = await db.clients.find({}, {"_id": 0}).to_list(5000)

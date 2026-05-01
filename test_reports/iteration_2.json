@@ -1,0 +1,67 @@
+{
+  "summary": "Completed backend + partial frontend testing of the massive update (8 modules). Backend: 20/20 pytest cases pass after fixing a critical Pydantic model bug (Client.lat/lng missing fields). Frontend: Dashboard, /tour, /reglages, /clients-status render; all Settings goal/brand testids present; clients/status route ordering is correct and returns array (not 404).",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/clients",
+        "issue": "FIXED by testing agent: raised 500 whenever an address was provided. Root cause: `Client` Pydantic model had no lat/lng fields but `clients_create` was doing `c.lat, c.lng = await auto_geocode(...)`, raising `ValueError: \"Client\" object has no field \"lat\"`. Added `lat: Optional[float] = None` and `lng: Optional[float] = None` to the Client model.",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Dashboard KPI",
+        "issue": "'RDV À VENIR' KPI displays '()' instead of the upcoming count. Likely a template rendering `({count})` with an empty value.",
+        "selector": "[data-testid=\"kpi-upcoming\"]",
+        "priority": "MEDIUM"
+      },
+      {
+        "component": "ClientStatus page",
+        "issue": "Missing `data-testid=\"clients-status-page\"` on the page root (review request expects it). Page renders correctly otherwise.",
+        "selector": "clients-status-page",
+        "priority": "LOW"
+      },
+      {
+        "component": "ClientStatus filters",
+        "issue": "Only 4 status filters visible ('À relancer', 'Actifs', 'Presque perdus', 'Perdus') + 'Tous'. The backend supports 5 statuses including 'en_retard' — there is no dedicated 'En retard' filter, so those clients only appear under 'Tous'.",
+        "selector": "n/a",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dashboard", "issues": ["Recharts warnings about width(-1)/height(-1) at initial render — cosmetic console noise, charts do render after layout."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Verify Dashboard 'RDV À VENIR' KPI rendering — value shows '()' instead of the count. Check the widget template in /app/frontend/src/pages/Dashboard.jsx (kpi-upcoming).",
+    "Add `data-testid=\"clients-status-page\"` to the root element of /app/frontend/src/pages/ClientStatus.jsx.",
+    "Consider adding an 'En retard' filter tab to ClientStatus to match the 5 backend statuses.",
+    "Self-test not performed for AppointmentForm smart-slots card, ClientPhotos social-square/story buttons, and Dashboard 'Démarrer ma journée' CTA (needs today's RDV with geocoded client). Main agent should spot-check these flows in-browser."
+  ],
+  "critical_code_review_comments": [
+    "Client Pydantic model (/app/backend/server.py) was missing lat/lng fields even though clients_create/update write them. Fixed.",
+    "server.py is ~1525 lines — getting large; consider splitting domains (clients, appointments, accounting, tour/slots) into separate routers.",
+    "mutable default `{}` used for `custom_fields` and `loyalty_counters` in Client model — safe in Pydantic v2 but flag as review item.",
+    "geocoding uses Nominatim without rate-limit backoff or caching TTL; acceptable given graceful fallback is in place.",
+    "/api/clients/status route ordering relies on being declared BEFORE /api/clients/{cid}. A passing regression test has been added (TestClientStatus.test_clients_status_returns_array_not_404)."
+  ],
+  "updated_files": [
+    "/app/backend/server.py (added lat/lng Optional fields to Client model)",
+    "/app/backend/tests/backend_test.py (rewritten as full pytest suite covering 8 modules + regression)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "~80% (routes+testids OK; 1 UI bug + 2 missing items)"},
+  "test_credentials": "None — auth disabled; backend returns hardcoded local-julien user.",
+  "seed_data_creation": "Tests create `TEST_Tour_*` client + 1 appointment today then delete in TestZCleanup. Settings are restored to defaults after run.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend is fully green (pytest /app/backend/tests/backend_test.py). For frontend, note: Settings route is /reglages (NOT /settings). All goal/brand testids exist at /reglages. Still to verify interactively: AppointmentForm smart-slots-card + suggest-slots-btn + slot-pick-0 flow; ClientPhotos social-square-{id}/social-story-{id} → social-preview-modal with social-dl-btn/social-share-btn; 'Démarrer ma journée' CTA appears only when an RDV exists today. Known minor UI issues to retest after fix: kpi-upcoming shows '()'; add clients-status-page testid; add 'En retard' filter tab.",
+  "rca of the issue": "POST /api/clients returned 500 whenever address was supplied: Pydantic v2 `__setattr__` rejects assignment to undefined fields → ValueError. Reproduction: `curl -X POST .../api/clients -d '{\"last_name\":\"X\",\"address\":\"1 rue de la Paix\"}'`. Mitigation: declared `lat: Optional[float] = None` / `lng: Optional[float] = None` in the Client BaseModel so auto_geocode results persist on the object. Validated via backend_test.py::TestSeedData::test_create_client (green)."
+}

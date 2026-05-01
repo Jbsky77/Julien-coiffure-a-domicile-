@@ -14,6 +14,8 @@ import Accounting from "@/pages/Accounting";
 import Stock from "@/pages/Stock";
 import Settings from "@/pages/Settings";
 import Analytics from "@/pages/Analytics";
+import Tour from "@/pages/Tour";
+import ClientStatus from "@/pages/ClientStatus";
 import Layout from "@/components/app/Layout";
 
 function Protected() {
@@ -39,6 +41,8 @@ function RootRouter() {
         <Route path="/stock" element={<Stock />} />
         <Route path="/reglages" element={<Settings />} />
         <Route path="/analytics" element={<Analytics />} />
+        <Route path="/tour" element={<Tour />} />
+        <Route path="/clients-status" element={<ClientStatus />} />
       </Route>
     </Routes>
   );

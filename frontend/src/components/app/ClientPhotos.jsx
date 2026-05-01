@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import { Camera, Upload, Trash2, Share2, Download, Mail, MessageSquare, X } from "lucide-react";
+import { Camera, Upload, Trash2, Share2, Download, Mail, MessageSquare, X, Image as ImageIcon, Smartphone, Square } from "lucide-react";
 import { toast } from "sonner";
 
 // Compress image to max 1280px width, JPEG ~0.85 quality, returns dataURL
@@ -44,12 +44,149 @@ function downloadDataUrl(dataUrl, name) {
   a.click();
 }
 
+function loadImg(src) {
+  return new Promise((res, rej) => {
+    if (!src) return res(null);
+    const i = new Image();
+    i.crossOrigin = "anonymous";
+    i.onload = () => res(i);
+    i.onerror = rej;
+    i.src = src;
+  });
+}
+
+// Cover-fit draw of img into rect (x,y,w,h)
+function drawCover(ctx, img, x, y, w, h) {
+  if (!img) {
+    ctx.fillStyle = "#1a2238";
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = "#475569";
+    ctx.font = "300 28px Georgia";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("—", x + w / 2, y + h / 2);
+    return;
+  }
+  const ir = img.width / img.height;
+  const tr = w / h;
+  let sx = 0, sy = 0, sw = img.width, sh = img.height;
+  if (ir > tr) {
+    sw = img.height * tr;
+    sx = (img.width - sw) / 2;
+  } else {
+    sh = img.width / tr;
+    sy = (img.height - sh) / 2;
+  }
+  ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+}
+
+// Generate social media image. format: "square" (1080x1080) | "story" (1080x1920)
+async function generateSocialImage(pair, brandName, format = "square") {
+  const W = 1080;
+  const H = format === "story" ? 1920 : 1080;
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+
+  // Background gradient (navy)
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, "#0A192F");
+  bg.addColorStop(1, "#1E3A8A");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Top label
+  ctx.fillStyle = "#D4AF37";
+  ctx.font = "300 22px 'Outfit', Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.fillText("AVANT  ·  APRÈS", W / 2, 60);
+
+  // Decorative line under title
+  ctx.strokeStyle = "#D4AF37";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(W / 2 - 60, 100);
+  ctx.lineTo(W / 2 + 60, 100);
+  ctx.stroke();
+
+  const [imgB, imgA] = await Promise.all([loadImg(pair.before), loadImg(pair.after)]);
+
+  const PAD = 40;
+  const FOOTER = 180;
+  const TOP = 140;
+  const usableH = H - TOP - FOOTER;
+
+  if (format === "story") {
+    // Stacked vertically with labels
+    const cellH = (usableH - PAD) / 2;
+    drawCover(ctx, imgB, PAD, TOP, W - PAD * 2, cellH);
+    drawCover(ctx, imgA, PAD, TOP + cellH + PAD, W - PAD * 2, cellH);
+    // Labels
+    ctx.fillStyle = "rgba(10,25,47,0.8)";
+    ctx.fillRect(PAD, TOP, 220, 60);
+    ctx.fillRect(PAD, TOP + cellH + PAD, 220, 60);
+    ctx.fillStyle = "#D4AF37";
+    ctx.font = "600 22px 'Outfit', Arial";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText("AVANT", PAD + 28, TOP + 30);
+    ctx.fillText("APRÈS", PAD + 28, TOP + cellH + PAD + 30);
+  } else {
+    // Side by side
+    const cellW = (W - PAD * 3) / 2;
+    drawCover(ctx, imgB, PAD, TOP, cellW, usableH);
+    drawCover(ctx, imgA, PAD * 2 + cellW, TOP, cellW, usableH);
+    // Labels
+    ctx.fillStyle = "rgba(10,25,47,0.8)";
+    ctx.fillRect(PAD, TOP, 200, 56);
+    ctx.fillRect(PAD * 2 + cellW, TOP, 200, 56);
+    ctx.fillStyle = "#D4AF37";
+    ctx.font = "600 22px 'Outfit', Arial";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText("AVANT", PAD + 24, TOP + 28);
+    ctx.fillText("APRÈS", PAD * 2 + cellW + 24, TOP + 28);
+  }
+
+  // Footer with brand
+  const footerY = H - FOOTER;
+  ctx.fillStyle = "rgba(10,25,47,0.92)";
+  ctx.fillRect(0, footerY, W, FOOTER);
+  // Gold separator line
+  ctx.strokeStyle = "#D4AF37";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, footerY);
+  ctx.lineTo(W, footerY);
+  ctx.stroke();
+
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#FFFFFF";
+  ctx.font = "italic 300 30px Georgia, serif";
+  ctx.textBaseline = "top";
+  ctx.fillText("Coiffure à domicile", W / 2, footerY + 42);
+
+  ctx.fillStyle = "#D4AF37";
+  ctx.font = "600 56px Georgia, serif";
+  ctx.fillText(brandName || "Julien", W / 2, footerY + 80);
+
+  return canvas.toDataURL("image/jpeg", 0.92);
+}
+
 export default function ClientPhotos({ clientId, clientName }) {
   const [pairs, setPairs] = useState([]);
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ before: null, after: null, note: "", date: new Date().toISOString().slice(0, 10) });
   const beforeRef = useRef(null);
   const afterRef = useRef(null);
+  const [brandName, setBrandName] = useState("Julien");
+  const [socialPreview, setSocialPreview] = useState(null); // { dataUrl, format, pairId }
+
+  useEffect(() => {
+    api.get("/settings").then((r) => setBrandName(r.data.brand_name || "Julien")).catch(() => {});
+  }, []);
 
   const load = async () => {
     const r = await api.get(`/clients/${clientId}/photos`);
@@ -105,8 +242,31 @@ export default function ClientPhotos({ clientId, clientName }) {
 
   const shareEmail = (pair) => {
     const subject = encodeURIComponent(`Avant / Après — ${clientName}`);
-    const body = encodeURIComponent(`Bonjour,\n\nVoici votre transformation avant/après.${pair.note ? "\n\n" + pair.note : ""}\n\nÀ très vite,\nJulien Bouche`);
+    const body = encodeURIComponent(`Bonjour,\n\nVoici votre transformation avant/après.${pair.note ? "\n\n" + pair.note : ""}\n\nÀ très vite,\n${brandName}`);
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
+  };
+
+  const buildSocial = async (pair, format) => {
+    if (!pair.before && !pair.after) return toast.error("Pas de photo");
+    try {
+      const dataUrl = await generateSocialImage(pair, brandName, format);
+      setSocialPreview({ dataUrl, format, pairId: pair.id });
+    } catch (e) {
+      toast.error("Erreur de génération");
+    }
+  };
+
+  const shareSocial = async () => {
+    if (!socialPreview) return;
+    try {
+      const blob = dataUrlToBlob(socialPreview.dataUrl);
+      const file = new File([blob], `avant-apres-${socialPreview.pairId}.jpg`, { type: "image/jpeg" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: "Avant / Après", text: `Avant·Après — ${brandName}` });
+        return;
+      }
+      toast.message("Partage natif indisponible — utilisez Télécharger.");
+    } catch {}
   };
 
   return (
@@ -170,6 +330,8 @@ export default function ClientPhotos({ clientId, clientName }) {
             {p.note && <div className="text-sm italic text-slate-600">{p.note}</div>}
             <div className="flex flex-wrap gap-2 pt-1">
               <button onClick={() => sharePair(p)} data-testid={`share-pair-${p.id}`} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#0A192F] text-white text-xs"><Share2 className="w-3.5 h-3.5" /> Partager</button>
+              <button onClick={() => buildSocial(p, "square")} data-testid={`social-square-${p.id}`} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gold-gradient text-white text-xs"><Square className="w-3.5 h-3.5" /> Insta post</button>
+              <button onClick={() => buildSocial(p, "story")} data-testid={`social-story-${p.id}`} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gold-gradient text-white text-xs"><Smartphone className="w-3.5 h-3.5" /> Story</button>
               <button onClick={() => shareWhatsApp(p)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-500 text-white text-xs"><MessageSquare className="w-3.5 h-3.5" /> WhatsApp</button>
               <button onClick={() => shareEmail(p)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 text-slate-700 text-xs"><Mail className="w-3.5 h-3.5" /> Email</button>
               {p.before && <button onClick={() => downloadDataUrl(p.before, `avant-${p.id}.jpg`)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 text-slate-700 text-xs"><Download className="w-3.5 h-3.5" /> Avant</button>}
@@ -178,6 +340,25 @@ export default function ClientPhotos({ clientId, clientName }) {
           </div>
         ))}
       </div>
+
+      {socialPreview && (
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" data-testid="social-preview-modal" onClick={() => setSocialPreview(null)}>
+          <div className="bg-white rounded-3xl p-4 max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <div className="text-[10px] tracking-[0.25em] uppercase text-slate-500">Visuel {socialPreview.format === "story" ? "Story" : "Post Instagram"}</div>
+                <div className="font-serif text-xl">Avant · Après</div>
+              </div>
+              <button onClick={() => setSocialPreview(null)} className="p-2 rounded-full hover:bg-slate-100" data-testid="social-close"><X className="w-4 h-4" /></button>
+            </div>
+            <img src={socialPreview.dataUrl} alt="Visuel social" className="w-full rounded-xl" />
+            <div className="flex flex-wrap gap-2 mt-3">
+              <button onClick={shareSocial} data-testid="social-share-btn" className="flex-1 bg-[#0A192F] text-white rounded-full px-4 py-2.5 text-sm flex items-center justify-center gap-2"><Share2 className="w-4 h-4" /> Partager</button>
+              <button onClick={() => downloadDataUrl(socialPreview.dataUrl, `avant-apres-${socialPreview.format}-${socialPreview.pairId}.jpg`)} data-testid="social-dl-btn" className="flex-1 bg-gold-gradient text-white rounded-full px-4 py-2.5 text-sm flex items-center justify-center gap-2"><Download className="w-4 h-4" /> Télécharger</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

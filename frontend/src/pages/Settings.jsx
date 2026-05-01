@@ -96,6 +96,27 @@ export default function Settings() {
         <button onClick={saveSettings} data-testid="save-settings-btn" className="mt-6 bg-[#0A192F] text-white rounded-full px-6 py-3 font-medium flex items-center gap-2"><Save className="w-4 h-4" /> Enregistrer</button>
       </section>
 
+      <section className="bg-white border border-slate-100 rounded-2xl p-6 shadow-premium" data-testid="goals-section">
+        <div className="text-[10px] tracking-widest uppercase text-slate-500 mb-5">Objectifs mensuels</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div><label className="text-[10px] uppercase tracking-widest text-slate-500">Objectif CA mensuel (€)</label><input type="number" step="50" className={fb} data-testid="set-goal-ca" value={settings.goal_ca || 0} onChange={(e) => setSettings({ ...settings, goal_ca: parseFloat(e.target.value) || 0 })} /></div>
+          <div><label className="text-[10px] uppercase tracking-widest text-slate-500">Objectif RDV mensuel</label><input type="number" step="1" className={fb} data-testid="set-goal-rdv" value={settings.goal_rdv || 0} onChange={(e) => setSettings({ ...settings, goal_rdv: parseInt(e.target.value) || 0 })} /></div>
+          <div><label className="text-[10px] uppercase tracking-widest text-slate-500">Objectif panier moyen (€)</label><input type="number" step="1" className={fb} data-testid="set-goal-panier" value={settings.goal_panier || 0} onChange={(e) => setSettings({ ...settings, goal_panier: parseFloat(e.target.value) || 0 })} /></div>
+          <div><label className="text-[10px] uppercase tracking-widest text-slate-500">Objectif relances</label><input type="number" step="1" className={fb} data-testid="set-goal-relances" value={settings.goal_relances || 0} onChange={(e) => setSettings({ ...settings, goal_relances: parseInt(e.target.value) || 0 })} /></div>
+        </div>
+        <button onClick={saveSettings} data-testid="save-goals-btn" className="mt-6 bg-[#0A192F] text-white rounded-full px-6 py-3 font-medium flex items-center gap-2"><Save className="w-4 h-4" /> Enregistrer</button>
+      </section>
+
+      <section className="bg-white border border-slate-100 rounded-2xl p-6 shadow-premium" data-testid="branding-section">
+        <div className="text-[10px] tracking-widest uppercase text-slate-500 mb-5">Identité (signature & visuels)</div>
+        <div>
+          <label className="text-[10px] uppercase tracking-widest text-slate-500">Prénom (signature SMS / visuels Avant·Après)</label>
+          <input className={fb} data-testid="set-brand-name" value={settings.brand_name || ""} onChange={(e) => setSettings({ ...settings, brand_name: e.target.value })} placeholder="Julien" />
+          <div className="text-[10px] text-slate-500 mt-2">Apparaît dans la signature des SMS de relance et sur les visuels Avant·Après partagés.</div>
+        </div>
+        <button onClick={saveSettings} data-testid="save-brand-btn" className="mt-6 bg-[#0A192F] text-white rounded-full px-6 py-3 font-medium flex items-center gap-2"><Save className="w-4 h-4" /> Enregistrer</button>
+      </section>
+
       <section className="bg-white border border-slate-100 rounded-2xl p-6 shadow-premium">
         <div className="flex items-center justify-between mb-5">
           <div className="text-[10px] tracking-widest uppercase text-slate-500">Prestations & tarifs</div>

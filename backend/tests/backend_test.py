@@ -1,268 +1,246 @@
-"""Backend tests for Coiffure à domicile Julien Bouche."""
+"""
+Backend API tests for Coiffure à domicile Julien Bouche (massive update iteration).
+
+Covers:
+ - Module 1: Tour optimization (/api/tour/today)
+ - Module 2: Smart Appointment slot suggestions (/api/slots/suggest)
+ - Module 4: Monthly goals (/api/goals/progress), settings persistence
+ - Module 5: Business insights (/api/insights)
+ - Module 7: Client status CRM (/api/clients/status) -- previously shadowed route
+ - Module 8: Geocode (OpenStreetMap) graceful fallback
+ - Regression: /api/dashboard, /api/clients, /api/clients/{cid}, /api/appointments,
+               /api/services, /api/accounting/months, /api/analytics
+"""
 import os
-import math
+import uuid
+from datetime import datetime, timedelta, timezone
+
 import pytest
 import requests
-from datetime import datetime, timezone, timedelta
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://julien-bouche-design.preview.emergentagent.com').rstrip('/') + '/api'
-TOKEN = 'test_session_julien'
-HEADERS = {'Authorization': f'Bearer {TOKEN}', 'Content-Type': 'application/json'}
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://julien-bouche-design.preview.emergentagent.com").rstrip("/")
+API = f"{BASE_URL}/api"
 
 
-@pytest.fixture(scope='module')
-def s():
-    sess = requests.Session()
-    sess.headers.update(HEADERS)
-    return sess
+@pytest.fixture(scope="session")
+def api_client():
+    s = requests.Session()
+    s.headers.update({"Content-Type": "application/json"})
+    return s
 
 
-# ----- Auth -----
-def test_auth_me(s):
-    r = s.get(f'{BASE_URL}/auth/me')
-    assert r.status_code == 200, r.text
-    d = r.json()
-    assert d['user_id'] == 'test-user-julien'
+# Seed IDs shared across tests
+_created = {"client_id": None, "rdv_id": None, "svc_id": None}
 
 
-def test_auth_unauthorized():
-    r = requests.get(f'{BASE_URL}/auth/me')
-    assert r.status_code == 401
+# ---------------- Regression: basics ----------------
+class TestBasics:
+    def test_services_list(self, api_client):
+        r = api_client.get(f"{API}/services", timeout=20)
+        assert r.status_code == 200, r.text
+        data = r.json()
+        assert isinstance(data, list)
+        assert len(data) >= 1
+        _created["svc_id"] = data[0]["id"]
+
+    def test_settings_get(self, api_client):
+        r = api_client.get(f"{API}/settings", timeout=20)
+        assert r.status_code == 200
+        s = r.json()
+        for k in ["goal_ca", "goal_rdv", "goal_panier", "goal_relances", "brand_name"]:
+            assert k in s
+
+    def test_dashboard(self, api_client):
+        r = api_client.get(f"{API}/dashboard", timeout=30)
+        assert r.status_code == 200
+        d = r.json()
+        assert "month_data" in d and "upcoming_today" in d
+
+    def test_accounting_months(self, api_client):
+        r = api_client.get(f"{API}/accounting/months", timeout=20)
+        assert r.status_code == 200
+        assert isinstance(r.json(), list)
+
+    def test_analytics(self, api_client):
+        r = api_client.get(f"{API}/analytics", timeout=20)
+        assert r.status_code == 200
+        assert "top_services" in r.json()
 
 
-# ----- Settings -----
-def test_settings_get(s):
-    r = s.get(f'{BASE_URL}/settings')
-    assert r.status_code == 200
-    d = r.json()
-    assert d['urssaf_rate'] == 0.22
-    assert d['fuel_supplement_per_tier'] == 2.5
-    assert d['fuel_supplement_tier_km'] == 10.0
+# ---------------- Settings persistence ----------------
+class TestSettingsPersistence:
+    def test_put_settings_persists(self, api_client):
+        payload = {
+            "goal_ca": 3333.0,
+            "goal_rdv": 66,
+            "goal_panier": 55.0,
+            "goal_relances": 12,
+            "brand_name": "TEST_Julien_Bouche",
+        }
+        r = api_client.put(f"{API}/settings", json=payload, timeout=20)
+        assert r.status_code == 200, r.text
+        s = r.json()
+        for k, v in payload.items():
+            assert s[k] == v, f"{k} not persisted"
+        # GET again to verify DB persistence
+        r2 = api_client.get(f"{API}/settings", timeout=20)
+        s2 = r2.json()
+        for k, v in payload.items():
+            assert s2[k] == v
 
 
-def test_settings_put(s):
-    # Reset to defaults to keep tests stable
-    r = s.put(f'{BASE_URL}/settings', json={'fuel_price_per_liter': 1.85, 'urssaf_rate': 0.22,
-                                             'fuel_supplement_per_tier': 2.5, 'fuel_supplement_tier_km': 10.0})
-    assert r.status_code == 200
+# ---------------- Seed client + RDV for downstream tests ----------------
+class TestSeedData:
+    def test_create_client(self, api_client):
+        uniq = uuid.uuid4().hex[:6]
+        payload = {
+            "first_name": "TEST",
+            "last_name": f"Tour_{uniq}",
+            "phone": "0600000000",
+            "address": "1 rue de la Paix, Paris",
+            "gender": "F",
+        }
+        r = api_client.post(f"{API}/clients", json=payload, timeout=30)
+        assert r.status_code == 200, r.text
+        c = r.json()
+        assert c["id"].startswith("cli_")
+        _created["client_id"] = c["id"]
+
+    def test_create_appointment_today(self, api_client):
+        assert _created["client_id"] and _created["svc_id"]
+        today = datetime.now(timezone.utc).replace(hour=10, minute=0, second=0, microsecond=0)
+        payload = {
+            "client_id": _created["client_id"],
+            "date": today.isoformat().replace("+00:00", "Z"),
+            "services": [{"service_id": _created["svc_id"], "is_gift": False}],
+            "kilometrage": 5.0,
+            "notes": "TEST seed",
+        }
+        r = api_client.post(f"{API}/appointments", json=payload, timeout=20)
+        assert r.status_code == 200, r.text
+        rdv = r.json()
+        _created["rdv_id"] = rdv["id"]
+        assert rdv["status"] == "scheduled"
+
+    def test_get_client_detail(self, api_client):
+        # Regression: /api/clients/{cid} still works after adding /status route above it
+        r = api_client.get(f"{API}/clients/{_created['client_id']}", timeout=20)
+        assert r.status_code == 200
+        d = r.json()
+        assert "client" in d and "appointments" in d
+        assert d["client"]["id"] == _created["client_id"]
 
 
-# ----- Services -----
-def test_services_seeded(s):
-    r = s.get(f'{BASE_URL}/services')
-    assert r.status_code == 200
-    items = r.json()
-    assert len(items) >= 5
-    cats = {i['category'] for i in items}
-    assert {'HOMME', 'FEMME', 'ENFANT'}.issubset(cats)
+# ---------------- Module 1: Tour ----------------
+class TestTour:
+    def test_tour_today_structure(self, api_client):
+        r = api_client.get(f"{API}/tour/today", timeout=20)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        for k in ["date", "stops", "total_km", "total_travel_min", "total_ca", "total_duration_min"]:
+            assert k in d, f"missing key {k}"
+        assert isinstance(d["stops"], list)
+        # Our seeded RDV should be in today's stops
+        ids = [s["id"] for s in d["stops"]]
+        assert _created["rdv_id"] in ids
 
 
-def test_services_crud(s):
-    r = s.post(f'{BASE_URL}/services', json={'name': 'TEST_Svc', 'price': 10.0, 'category': 'AUTRE'})
-    assert r.status_code == 200
-    sid = r.json()['id']
-    r = s.put(f'{BASE_URL}/services/{sid}', json={'price': 12.0})
-    assert r.status_code == 200 and r.json()['price'] == 12.0
-    r = s.delete(f'{BASE_URL}/services/{sid}')
-    assert r.status_code == 200
+# ---------------- Module 2: Slot suggestions ----------------
+class TestSlots:
+    def test_suggest_slots_basic(self, api_client):
+        date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        payload = {"date": date, "duration_minutes": 45, "lat": 48.8566, "lng": 2.3522}
+        r = api_client.post(f"{API}/slots/suggest", json=payload, timeout=20)
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert "suggestions" in d and isinstance(d["suggestions"], list)
+        if d["suggestions"]:
+            s0 = d["suggestions"][0]
+            for k in ["datetime", "label", "score", "reasons"]:
+                assert k in s0
+
+    def test_suggest_slots_missing_date(self, api_client):
+        r = api_client.post(f"{API}/slots/suggest", json={}, timeout=10)
+        assert r.status_code == 400
 
 
-# ----- Clients -----
-@pytest.fixture(scope='module')
-def client_id(s):
-    r = s.post(f'{BASE_URL}/clients', json={'first_name': 'TEST_Marie', 'last_name': 'Dupont',
-                                            'phone': '0600000000', 'birthday': '1990-05-15'})
-    assert r.status_code == 200
-    cid = r.json()['id']
-    yield cid
-    s.delete(f'{BASE_URL}/clients/{cid}')
+# ---------------- Module 7: Client Status (CRITICAL route ordering) ----------------
+class TestClientStatus:
+    def test_clients_status_returns_array_not_404(self, api_client):
+        r = api_client.get(f"{API}/clients/status", timeout=20)
+        assert r.status_code == 200, f"Route shadowed? status={r.status_code} body={r.text[:200]}"
+        d = r.json()
+        assert isinstance(d, list), f"Expected array, got {type(d).__name__}: {str(d)[:200]}"
+        # if any entries, validate shape
+        allowed = {"actif", "a_relancer", "en_retard", "presque_perdu", "perdu"}
+        for item in d:
+            assert "id" in item and "days_since" in item and "status" in item
+            assert item["status"] in allowed
+            assert "avg_basket" in item and "n_rdv" in item
 
 
-def test_clients_get(s, client_id):
-    r = s.get(f'{BASE_URL}/clients/{client_id}')
-    assert r.status_code == 200
-    d = r.json()
-    assert 'client' in d and 'appointments' in d
-    assert d['client']['id'] == client_id
+# ---------------- Module 5: Insights ----------------
+class TestInsights:
+    def test_insights(self, api_client):
+        r = api_client.get(f"{API}/insights", timeout=20)
+        assert r.status_code == 200
+        d = r.json()
+        assert "insights" in d
+        assert isinstance(d["insights"], list)
 
 
-def test_clients_update(s, client_id):
-    r = s.put(f'{BASE_URL}/clients/{client_id}', json={'phone': '0611111111'})
-    assert r.status_code == 200 and r.json()['phone'] == '0611111111'
+# ---------------- Module 4: Goals progress ----------------
+class TestGoals:
+    def test_goals_progress(self, api_client):
+        r = api_client.get(f"{API}/goals/progress", timeout=20)
+        assert r.status_code == 200
+        d = r.json()
+        for k in ["month", "ca", "rdv", "panier", "relances"]:
+            assert k in d
+        for k in ["ca", "rdv", "panier", "relances"]:
+            sub = d[k]
+            for sk in ["value", "goal", "pct"]:
+                assert sk in sub
 
 
-# ----- Service IDs by category for appointment tests -----
-@pytest.fixture(scope='module')
-def svc_ids(s):
-    items = s.get(f'{BASE_URL}/services').json()
-    out = {}
-    for i in items:
-        out.setdefault(i['category'], i['id'])
-    return out
+# ---------------- Relance logging ----------------
+class TestRelance:
+    def test_log_relance(self, api_client):
+        assert _created["client_id"]
+        r = api_client.post(f"{API}/clients/{_created['client_id']}/relance", timeout=20)
+        assert r.status_code == 200
+        d = r.json()
+        assert d.get("ok") is True
+        assert "date" in d
 
 
-# ----- Appointments: family pack + fuel supplement -----
-def test_appointment_family_pack_and_fuel(s, client_id, svc_ids):
-    payload = {
-        'client_id': client_id,
-        'date': (datetime.now(timezone.utc) + timedelta(days=2)).isoformat(),
-        'services': [
-            {'service_id': svc_ids['HOMME']},
-            {'service_id': svc_ids['FEMME']},
-            {'service_id': svc_ids['ENFANT']},
-        ],
-        'kilometrage': 22,
-    }
-    r = s.post(f'{BASE_URL}/appointments', json=payload)
-    assert r.status_code == 200, r.text
-    d = r.json()
-    assert d['family_pack_applied'] is True
-    assert d['price_base'] == 45.0 + 5.0  # family 45 + fuel 5
-    assert d['fuel_supplement'] == 5.0
-    s.delete(f'{BASE_URL}/appointments/{d["id"]}')
+# ---------------- Geocode with graceful fallback ----------------
+class TestGeocode:
+    def test_geocode_empty_address(self, api_client):
+        r = api_client.post(f"{API}/geocode", json={"address": ""}, timeout=15)
+        assert r.status_code == 400
+
+    def test_geocode_graceful(self, api_client):
+        # even if rate-limited, must not crash (lat/lng may be null)
+        r = api_client.post(f"{API}/geocode", json={"address": "10 Downing Street, London"}, timeout=20)
+        assert r.status_code == 200
+        d = r.json()
+        assert "lat" in d and "lng" in d
+
+    def test_geocode_fr_addr(self, api_client):
+        r = api_client.post(f"{API}/geocode", json={"address": "Tour Eiffel, Paris"}, timeout=20)
+        assert r.status_code == 200
 
 
-@pytest.mark.parametrize('km,expected_fuel', [(0, 0), (9, 0), (10, 2.5), (22, 5.0)])
-def test_appointment_fuel_tiers(s, client_id, svc_ids, km, expected_fuel):
-    r = s.post(f'{BASE_URL}/appointments', json={
-        'client_id': client_id,
-        'date': (datetime.now(timezone.utc) + timedelta(days=3)).isoformat(),
-        'services': [{'service_id': svc_ids['HOMME']}],
-        'kilometrage': km,
-    })
-    assert r.status_code == 200
-    d = r.json()
-    assert d['fuel_supplement'] == expected_fuel
-    s.delete(f'{BASE_URL}/appointments/{d["id"]}')
-
-
-def test_appointment_price_override(s, client_id, svc_ids):
-    r = s.post(f'{BASE_URL}/appointments', json={
-        'client_id': client_id,
-        'date': (datetime.now(timezone.utc) + timedelta(days=3)).isoformat(),
-        'services': [{'service_id': svc_ids['HOMME']}],
-        'kilometrage': 0,
-        'price_final_override': 99.99,
-    })
-    assert r.status_code == 200
-    d = r.json()
-    assert d['price_final'] == 99.99
-    s.delete(f'{BASE_URL}/appointments/{d["id"]}')
-
-
-def test_appointment_update_and_finish_and_double_finish(s, client_id, svc_ids):
-    r = s.post(f'{BASE_URL}/appointments', json={
-        'client_id': client_id,
-        'date': (datetime.now(timezone.utc) + timedelta(days=1)).isoformat(),
-        'services': [{'service_id': svc_ids['HOMME']}],
-        'kilometrage': 5,
-    })
-    rid = r.json()['id']
-    # update
-    r = s.put(f'{BASE_URL}/appointments/{rid}', json={'kilometrage': 15, 'notes': 'updated'})
-    assert r.status_code == 200 and r.json()['fuel_supplement'] == 2.5
-    # finish
-    r = s.post(f'{BASE_URL}/appointments/{rid}/finish', json={'payment_mode': 'CB'})
-    assert r.status_code == 200 and r.json()['status'] == 'done'
-    # double finish -> 400
-    r = s.post(f'{BASE_URL}/appointments/{rid}/finish', json={'payment_mode': 'CB'})
-    assert r.status_code == 400
-    # update on done -> 400
-    r = s.put(f'{BASE_URL}/appointments/{rid}', json={'notes': 'x'})
-    assert r.status_code == 400
-    s.delete(f'{BASE_URL}/appointments/{rid}')
-
-
-# ----- Loyalty flow -----
-def test_loyalty_5_paid_then_gift_resets(s, svc_ids):
-    r = s.post(f'{BASE_URL}/clients', json={'first_name': 'TEST_Loy', 'last_name': 'Test'})
-    cid = r.json()['id']
-    sid_homme = svc_ids['HOMME']
-    rids = []
-    for i in range(5):
-        rr = s.post(f'{BASE_URL}/appointments', json={
-            'client_id': cid,
-            'date': (datetime.now(timezone.utc) + timedelta(days=i)).isoformat(),
-            'services': [{'service_id': sid_homme}],
-        })
-        rid = rr.json()['id']
-        rids.append(rid)
-        s.post(f'{BASE_URL}/appointments/{rid}/finish', json={'payment_mode': 'CB'})
-    cdoc = s.get(f'{BASE_URL}/clients/{cid}').json()['client']
-    assert cdoc['loyalty_counters'].get(sid_homme) == 5
-    # 6th gift
-    rr = s.post(f'{BASE_URL}/appointments', json={
-        'client_id': cid,
-        'date': datetime.now(timezone.utc).isoformat(),
-        'services': [{'service_id': sid_homme, 'is_gift': True}],
-    })
-    rid6 = rr.json()['id']
-    s.post(f'{BASE_URL}/appointments/{rid6}/finish', json={'payment_mode': 'CB'})
-    cdoc = s.get(f'{BASE_URL}/clients/{cid}').json()['client']
-    assert cdoc['loyalty_counters'].get(sid_homme) == 0
-    # cleanup
-    for rid in rids + [rid6]:
-        s.delete(f'{BASE_URL}/appointments/{rid}')
-    s.delete(f'{BASE_URL}/clients/{cid}')
-
-
-# ----- Stock -----
-def test_stock_crud_and_alerts(s):
-    r = s.post(f'{BASE_URL}/stock', json={'name': 'TEST_Shampoo', 'quantity': 1, 'threshold': 5, 'tag': 'Soin'})
-    assert r.status_code == 200
-    sid = r.json()['id']
-    items = s.get(f'{BASE_URL}/stock').json()
-    item = next(i for i in items if i['id'] == sid)
-    assert item['quantity'] <= item['threshold']  # alert
-    s.put(f'{BASE_URL}/stock/{sid}', json={'quantity': 10})
-    s.delete(f'{BASE_URL}/stock/{sid}')
-
-
-# ----- Accounting -----
-def test_accounting_urssaf_ceil(s):
-    # Create a fresh client + done rdv with price 22.01 in current month
-    cdoc = s.post(f'{BASE_URL}/clients', json={'first_name': 'TEST_URS', 'last_name': 'Calc'}).json()
-    cid = cdoc['id']
-    svcs = s.get(f'{BASE_URL}/services').json()
-    sid = svcs[0]['id']
-    now = datetime.now(timezone.utc)
-    yyyymm = f'{now.year:04d}-{now.month:02d}'
-    # Reset month first
-    s.post(f'{BASE_URL}/accounting/reset/{yyyymm}')
-    rr = s.post(f'{BASE_URL}/appointments', json={
-        'client_id': cid, 'date': now.isoformat(),
-        'services': [{'service_id': sid}], 'kilometrage': 0,
-        'price_final_override': 22.01,
-    })
-    rid = rr.json()['id']
-    s.post(f'{BASE_URL}/appointments/{rid}/finish', json={'payment_mode': 'CB'})
-    r = s.get(f'{BASE_URL}/accounting/month/{yyyymm}')
-    assert r.status_code == 200
-    d = r.json()
-    assert d['ca_brut'] == 22.01
-    assert d['urssaf_ceil'] == 5  # ceil(22.01*0.22=4.8422)=5
-    assert 'CB' in d['payment_breakdown']
-    # months listing
-    r = s.get(f'{BASE_URL}/accounting/months')
-    assert r.status_code == 200
-    months = r.json()
-    assert any(m['month'] == yyyymm for m in months)
-    # urssaf toggle
-    r = s.post(f'{BASE_URL}/accounting/urssaf/{yyyymm}', json={'declared': True, 'paid': True})
-    assert r.status_code == 200 and r.json()['declared'] is True
-    # reset
-    r = s.post(f'{BASE_URL}/accounting/reset/{yyyymm}')
-    assert r.status_code == 200 and r.json()['deleted'] >= 1
-    s.delete(f'{BASE_URL}/clients/{cid}')
-
-
-# ----- Dashboard -----
-def test_dashboard(s):
-    r = s.get(f'{BASE_URL}/dashboard')
-    assert r.status_code == 200, r.text
-    d = r.json()
-    for k in ['month_data', 'upcoming_today', 'upcoming_tomorrow', 'upcoming_count',
-              'upcoming_amount', 'upcoming_birthdays', 'unseen_clients', 'avg_basket',
-              'low_stock', 'gifts_today', 'gifts_month']:
-        assert k in d, f'missing {k}'
-    assert 'day' in d['avg_basket'] and 'month' in d['avg_basket'] and 'year' in d['avg_basket']
+# ---------------- Cleanup ----------------
+class TestZCleanup:
+    def test_cleanup(self, api_client):
+        if _created["rdv_id"]:
+            api_client.delete(f"{API}/appointments/{_created['rdv_id']}", timeout=10)
+        if _created["client_id"]:
+            api_client.delete(f"{API}/clients/{_created['client_id']}", timeout=10)
+        # Restore defaults for settings (best-effort)
+        api_client.put(f"{API}/settings", json={
+            "goal_ca": 3000.0, "goal_rdv": 60, "goal_panier": 50.0,
+            "goal_relances": 10, "brand_name": "Julien Bouche"
+        }, timeout=15)

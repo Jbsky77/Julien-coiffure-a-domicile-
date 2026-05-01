@@ -1,6 +1,6 @@
 import React from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { LayoutDashboard, CalendarClock, Users, Receipt, Package, Settings as SettingsIcon, Scissors, TrendingUp } from "lucide-react";
+import { LayoutDashboard, CalendarClock, Users, Receipt, Package, Settings as SettingsIcon, Scissors, TrendingUp, Route, AlertCircle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 const NAV = [
@@ -12,6 +12,8 @@ const NAV = [
 ];
 
 const MORE = [
+  { to: "/tour", label: "Tournée", icon: Route, tid: "nav-tour" },
+  { to: "/clients-status", label: "Risque", icon: AlertCircle, tid: "nav-clients-status" },
   { to: "/stock", label: "Stock", icon: Package, tid: "nav-stock" },
   { to: "/reglages", label: "Réglages", icon: SettingsIcon, tid: "nav-settings" },
 ];

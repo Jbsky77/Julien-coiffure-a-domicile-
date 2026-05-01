@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, money, fmtDate, fmtTime, fmtMonth, money2 } from "@/lib/api";
-import { CalendarClock, Cake, Gift, Gauge, TrendingUp, Package, Users, Wallet, Bell, Plus } from "lucide-react";
+import { CalendarClock, Cake, Gift, Gauge, TrendingUp, Package, Users, Wallet, Bell, Plus, Navigation, Lightbulb, Target, AlertCircle } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 
 const PIE_COLORS = ["#0A192F", "#1E3A8A", "#D4AF37", "#94A3B8", "#CBD5E1", "#64748B"];
@@ -33,12 +33,27 @@ function Widget({ title, children, actionLabel, onAction, tid, color }) {
 export default function Dashboard() {
   const [d, setD] = useState(null);
   const [months, setMonths] = useState([]);
+  const [tour, setTour] = useState(null);
+  const [goals, setGoals] = useState(null);
+  const [insights, setInsights] = useState([]);
+  const [atRisk, setAtRisk] = useState(0);
   const navigate = useNavigate();
 
   const load = async () => {
-    const [r, m] = await Promise.all([api.get("/dashboard"), api.get("/accounting/months")]);
+    const [r, m, t, g, ins, st] = await Promise.all([
+      api.get("/dashboard"),
+      api.get("/accounting/months"),
+      api.get("/tour/today").catch(() => ({ data: null })),
+      api.get("/goals/progress").catch(() => ({ data: null })),
+      api.get("/insights").catch(() => ({ data: { insights: [] } })),
+      api.get("/clients/status").catch(() => ({ data: [] })),
+    ]);
     setD(r.data);
     setMonths(m.data);
+    setTour(t.data);
+    setGoals(g.data);
+    setInsights(ins.data?.insights || []);
+    setAtRisk((st.data || []).filter((c) => ["a_relancer", "en_retard", "presque_perdu"].includes(c.status)).length);
   };
 
   useEffect(() => { load(); }, []);
@@ -99,6 +114,26 @@ export default function Dashboard() {
         </button>
       </div>
 
+      {/* Démarrer ma journée — hero CTA */}
+      {tour && tour.stops.length > 0 && (
+        <button
+          onClick={() => navigate("/tour")}
+          data-testid="start-day-cta"
+          className="w-full text-left bg-[#0A192F] text-white rounded-3xl p-6 shadow-premium hover:bg-[#1E3A8A] transition-colors flex items-center justify-between gap-4"
+        >
+          <div>
+            <div className="text-[10px] tracking-[0.3em] uppercase text-white/60 mb-2">Aujourd'hui</div>
+            <div className="font-serif text-2xl">Démarrer ma journée</div>
+            <div className="text-xs text-white/70 mt-1">
+              {tour.stops.length} RDV · {money2(tour.total_ca)} € · {tour.total_travel_min} min de route
+            </div>
+          </div>
+          <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gold-gradient flex items-center justify-center">
+            <Navigation className="w-5 h-5 text-white" />
+          </div>
+        </button>
+      )}
+
       {/* Top KPIs */}
       <div className="grid grid-cols-2 gap-3">
         <Widget title="Chiffre d'affaires" tid="kpi-ca" color="gold">
@@ -117,6 +152,57 @@ export default function Dashboard() {
           <div className="font-serif text-xl text-pink-600">{money2(d.avg_basket.month)} €</div>
           <div className="text-[11px] text-slate-500 mt-0.5">j {money2(d.avg_basket.day)}€ · an {money2(d.avg_basket.year)}€</div>
         </Widget>
+      </div>
+
+      {/* Objectifs du mois */}
+      {goals && (
+        <Widget title="Objectifs du mois" tid="widget-goals" actionLabel="Modifier" onAction={() => navigate("/reglages")} color="gold">
+          <div className="grid grid-cols-2 gap-4">
+            {[
+              { k: "ca", label: "CA", suffix: "€", v: goals.ca },
+              { k: "rdv", label: "RDV", suffix: "", v: goals.rdv },
+              { k: "panier", label: "Panier moyen", suffix: "€", v: goals.panier },
+              { k: "relances", label: "Relances", suffix: "", v: goals.relances },
+            ].map((g) => (
+              <div key={g.k} data-testid={`goal-${g.k}`}>
+                <div className="flex items-baseline justify-between text-xs mb-1.5">
+                  <span className="text-slate-500">{g.label}</span>
+                  <span className="text-slate-700"><span className="font-medium">{money2(g.v.value)}</span>{g.suffix} <span className="text-slate-400">/ {money2(g.v.goal)}{g.suffix}</span></span>
+                </div>
+                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-gold-gradient rounded-full transition-all" style={{ width: `${Math.min(100, g.v.pct)}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </Widget>
+      )}
+
+      {/* Insights + At-risk clients */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {insights.length > 0 && (
+          <Widget title="Insights automatiques" tid="widget-insights">
+            <ul className="space-y-2">
+              {insights.map((txt, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
+                  <Lightbulb className="w-4 h-4 text-[#D4AF37] mt-0.5 flex-shrink-0" />
+                  <span>{txt}</span>
+                </li>
+              ))}
+            </ul>
+          </Widget>
+        )}
+        {atRisk > 0 && (
+          <Widget title="Clients à risque" tid="widget-atrisk" actionLabel="Voir tous" onAction={() => navigate("/clients-status")} color="rose">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-8 h-8 text-rose-500" />
+              <div>
+                <div className="font-serif text-3xl">{atRisk}</div>
+                <div className="text-xs text-slate-500">à relancer / presque perdus</div>
+              </div>
+            </div>
+          </Widget>
+        )}
       </div>
 
       {/* Row: today / tomorrow / birthdays */}

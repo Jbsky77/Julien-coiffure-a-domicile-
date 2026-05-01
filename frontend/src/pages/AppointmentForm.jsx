@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, money, money2, PAYMENT_MODES, fmtDate, fmtTime } from "@/lib/api";
 import { toast } from "sonner";
-import { ArrowLeft, Gift, Send, Trash2, CheckCircle2, Pencil } from "lucide-react";
+import { ArrowLeft, Gift, Send, Trash2, CheckCircle2, Pencil, Sparkles, Clock } from "lucide-react";
 
 export default function AppointmentForm() {
   const { id } = useParams();
@@ -25,6 +25,8 @@ export default function AppointmentForm() {
   const [duration, setDuration] = useState("");
   const [editMode, setEditMode] = useState(!id);
   const [preview, setPreview] = useState({ base: 0, fuel: 0, final: 0, family: false });
+  const [suggestions, setSuggestions] = useState([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
 
   const isDone = rdv?.status === "done";
 
@@ -137,6 +139,41 @@ export default function AppointmentForm() {
     navigate("/rdv");
   };
 
+  const fetchSlots = async () => {
+    if (!form.client_id || !form.date) {
+      toast.error("Choisissez un client et une date.");
+      return;
+    }
+    setLoadingSlots(true);
+    try {
+      const dateOnly = form.date.slice(0, 10);
+      const cli = await api.get(`/clients/${form.client_id}`);
+      const c = cli.data.client;
+      const r = await api.post("/slots/suggest", {
+        date: dateOnly,
+        duration_minutes: parseInt(duration) || 45,
+        lat: c.lat || null,
+        lng: c.lng || null,
+      });
+      setSuggestions(r.data.suggestions || []);
+      if ((r.data.suggestions || []).length === 0) toast.info("Aucun créneau disponible ce jour.");
+    } catch (e) {
+      toast.error("Erreur de suggestion");
+    } finally {
+      setLoadingSlots(false);
+    }
+  };
+
+  const pickSlot = (iso) => {
+    // Convert ISO to local datetime-local format YYYY-MM-DDTHH:MM
+    const dt = new Date(iso);
+    const tz = dt.getTimezoneOffset();
+    const local = new Date(dt.getTime() - tz * 60000);
+    setForm((f) => ({ ...f, date: local.toISOString().slice(0, 16) }));
+    setSuggestions([]);
+    toast.success("Créneau sélectionné");
+  };
+
   const cancel = async () => {
     if (!window.confirm("Marquer ce rendez-vous comme annulé (no-show) ?")) return;
     await api.post(`/appointments/${id}/cancel`);
@@ -214,6 +251,44 @@ export default function AppointmentForm() {
           <input disabled={readOnly} type="datetime-local" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className={fieldBase} data-testid="rdv-date-input" />
         </div>
       </div>
+
+      {!readOnly && form.client_id && (
+        <div className="bg-gradient-to-br from-[#D4AF37]/5 to-white border border-[#D4AF37]/30 rounded-2xl p-4 space-y-3" data-testid="smart-slots-card">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-[10px] tracking-[0.25em] uppercase text-slate-500 mb-0.5 flex items-center gap-1.5"><Sparkles className="w-3 h-3 text-[#D4AF37]" /> Suggestions intelligentes</div>
+              <div className="text-xs text-slate-600">Trouve les meilleurs créneaux selon la tournée et le trajet.</div>
+            </div>
+            <button
+              type="button"
+              onClick={fetchSlots}
+              disabled={loadingSlots}
+              data-testid="suggest-slots-btn"
+              className="bg-[#0A192F] text-white text-xs px-4 py-2 rounded-full whitespace-nowrap hover:bg-[#1E3A8A] disabled:opacity-50"
+            >
+              {loadingSlots ? "…" : "Suggérer"}
+            </button>
+          </div>
+          {suggestions.length > 0 && (
+            <div className="flex flex-wrap gap-2 pt-1">
+              {suggestions.map((s, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => pickSlot(s.datetime)}
+                  data-testid={`slot-pick-${i}`}
+                  className="group flex flex-col items-start gap-0.5 px-3 py-2 rounded-xl bg-white border border-slate-200 hover:border-[#D4AF37] transition-colors text-left"
+                >
+                  <div className="flex items-center gap-1.5 font-medium text-sm">
+                    <Clock className="w-3 h-3 text-[#1E3A8A]" /> {s.label}
+                  </div>
+                  <div className="text-[10px] text-slate-500">{s.reasons[0]}</div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div>
         <label className="text-[10px] tracking-widest uppercase text-slate-500">Prestations</label>

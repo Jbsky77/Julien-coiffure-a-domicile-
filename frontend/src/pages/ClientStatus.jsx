@@ -14,11 +14,16 @@ const STATUS_META = {
 export default function ClientStatus() {
   const [list, setList] = useState([]);
   const [filter, setFilter] = useState("at_risk");
+  const [brandName, setBrandName] = useState("Julien");
 
   useEffect(() => {
     (async () => {
       const r = await api.get("/clients/status");
       setList(r.data);
+      try {
+        const s = await api.get("/settings");
+        setBrandName(s.data.brand_name || "Julien");
+      } catch {}
     })();
   }, []);
 
@@ -29,7 +34,7 @@ export default function ClientStatus() {
   });
 
   const sendSMS = (c) => {
-    const msg = `Bonjour ${c.first_name}, c'est Julien votre coiffeur. Cela fait quelque temps que je ne vous ai pas vu(e), souhaitez-vous reprendre rendez-vous ?`;
+    const msg = `Bonjour ${c.first_name}, c'est ${brandName} votre coiffeur. Cela fait quelque temps que je ne vous ai pas vu(e), souhaitez-vous reprendre rendez-vous ?`;
     const phone = c.phone?.replace(/\s/g, "") || "";
     if (!phone) return;
     api.post(`/clients/${c.id}/relance`).catch(() => {});
