@@ -151,7 +151,7 @@ export default function AppointmentForm() {
       const c = cli.data.client;
       const r = await api.post("/slots/suggest", {
         date: dateOnly,
-        duration_minutes: parseInt(duration) || 45,
+        service_ids: form.services.map((s) => s.service_id),
         lat: c.lat || null,
         lng: c.lng || null,
       });
@@ -257,7 +257,17 @@ export default function AppointmentForm() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="text-[10px] tracking-[0.25em] uppercase text-slate-500 mb-0.5 flex items-center gap-1.5"><Sparkles className="w-3 h-3 text-[#D4AF37]" /> Suggestions intelligentes</div>
-              <div className="text-xs text-slate-600">Trouve les meilleurs créneaux selon la tournée et le trajet.</div>
+              <div className="text-xs text-slate-600">
+                Trouve les meilleurs créneaux selon la tournée et le trajet.
+                {(() => {
+                  const total = form.services.reduce((acc, fs) => {
+                    const svc = services.find((s) => s.id === fs.service_id);
+                    return acc + (svc?.duration_minutes || 0);
+                  }, 0);
+                  if (total > 0) return <span className="ml-1 text-[#C5A059]">Durée prévue : {total} min.</span>;
+                  return <span className="ml-1 italic text-slate-400">Sélectionnez des prestations pour préciser la durée.</span>;
+                })()}
+              </div>
             </div>
             <button
               type="button"

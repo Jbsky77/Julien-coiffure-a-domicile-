@@ -15,10 +15,12 @@ async def slots_suggest(payload: Dict[str, Any], user: User = Depends(get_curren
     date = payload.get("date")
     if not date:
         raise HTTPException(400, "Date required")
+    service_ids = payload.get("service_ids") or []
     suggestions = await suggest_slots(
         date=date,
-        duration_minutes=int(payload.get("duration_minutes") or 0),
+        duration_minutes=payload.get("duration_minutes"),
         target_lat=payload.get("lat"),
         target_lng=payload.get("lng"),
+        service_ids=service_ids,
     )
     return {"suggestions": suggestions}

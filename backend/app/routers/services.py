@@ -1,4 +1,4 @@
-"""Services / prestations CRUD."""
+"""Services / prestations CRUD + duration migration."""
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends
@@ -11,12 +11,33 @@ from app.models.services import Service, ServiceCreate
 router = APIRouter()
 
 
+# Durée théorique par défaut (en minutes), utilisée pour le moteur de suggestion.
+# Ces valeurs sont "métier" (durée moyenne d'une prestation), pas le temps réel.
+DEFAULT_DURATIONS = {
+    "Coupe Homme": 30,
+    "Coupe + Barbe": 45,
+    "Coupe Femme": 45,
+    "Forfait Femme complet": 90,
+    "Brush": 30,
+    "Coupe Enfant": 25,
+    "Couleur Femme": 75,
+    "Balayage court brush": 90,
+    "Balayage mi-long brush": 105,
+    "Balayage long brush": 120,
+    "Patine": 20,
+    "Coupe couleur brush": 90,
+    "Coupe couleur mi-long brush": 105,
+    "Coupe couleur long brush": 120,
+    "Couleur racines": 60,
+}
+
+
 DEFAULT_SERVICES = [
-    {"name": "Coupe Homme", "price": 15.0, "category": "HOMME"},
-    {"name": "Coupe + Barbe", "price": 22.0, "category": "HOMME"},
-    {"name": "Coupe Femme", "price": 22.0, "category": "FEMME"},
-    {"name": "Forfait Femme complet", "price": 45.0, "category": "FEMME"},
-    {"name": "Coupe Enfant", "price": 12.0, "category": "ENFANT"},
+    {"name": "Coupe Homme", "price": 15.0, "category": "HOMME", "duration_minutes": 30},
+    {"name": "Coupe + Barbe", "price": 22.0, "category": "HOMME", "duration_minutes": 45},
+    {"name": "Coupe Femme", "price": 22.0, "category": "FEMME", "duration_minutes": 45},
+    {"name": "Forfait Femme complet", "price": 45.0, "category": "FEMME", "duration_minutes": 90},
+    {"name": "Coupe Enfant", "price": 12.0, "category": "ENFANT", "duration_minutes": 25},
 ]
 
 
@@ -24,8 +45,45 @@ async def ensure_default_services():
     count = await db.services.count_documents({})
     if count == 0:
         for s in DEFAULT_SERVICES:
-            doc = Service(**s).model_dump()
-            await db.services.insert_one(doc)
+            await db.services.insert_one(Service(**s).model_dump())
+
+
+async def migrate_service_durations():
+    """Backfill `duration_minutes` for existing services. Idempotent.
+
+    Runs once per database lifetime: a marker doc in `app_meta` records that the
+    backfill has been applied, so user customisations after that day are never
+    overwritten.
+
+    For every service without a `duration_minutes` field (or with 0), the mapping
+    DEFAULT_DURATIONS is consulted using a whitespace-normalised, case-insensitive
+    name lookup. Unknown services fall back to 45 min.
+    """
+    marker = await db.app_meta.find_one({"_id": "service_duration_backfill_v1"}, {"_id": 0})
+
+    norm_map = {" ".join(k.split()).lower(): v for k, v in DEFAULT_DURATIONS.items()}
+    cursor = db.services.find({}, {"_id": 0})
+    async for svc in cursor:
+        sid = svc["id"]
+        current = svc.get("duration_minutes")
+        normalized = " ".join((svc.get("name") or "").split()).lower()
+        target = norm_map.get(normalized, 45)
+
+        if current is None or current == 0:
+            # Always fill missing/zero values.
+            await db.services.update_one({"id": sid}, {"$set": {"duration_minutes": target}})
+            continue
+        # If first run and the name maps to a known duration, also override the
+        # legacy default 45 (created before this migration existed).
+        if not marker and current == 45 and target != 45:
+            await db.services.update_one({"id": sid}, {"$set": {"duration_minutes": target}})
+
+    if not marker:
+        await db.app_meta.update_one(
+            {"_id": "service_duration_backfill_v1"},
+            {"$set": {"_id": "service_duration_backfill_v1", "applied_at": "auto"}},
+            upsert=True,
+        )
 
 
 @router.get("/services")

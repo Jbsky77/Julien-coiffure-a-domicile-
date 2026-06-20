@@ -32,7 +32,7 @@ const CATS = ["HOMME", "FEMME", "ENFANT", "AUTRE"];
 export default function Settings() {
   const [settings, setSettings] = useState(null);
   const [services, setServices] = useState([]);
-  const [addForm, setAddForm] = useState({ name: "", price: 0, category: "HOMME" });
+  const [addForm, setAddForm] = useState({ name: "", price: 0, category: "HOMME", duration_minutes: 30 });
 
   const load = async () => {
     const [s, sv] = await Promise.all([api.get("/settings"), api.get("/services")]);
@@ -50,7 +50,7 @@ export default function Settings() {
     if (!addForm.name) return toast.error("Nom requis");
     await api.post("/services", addForm);
     toast.success("Prestation ajoutée");
-    setAddForm({ name: "", price: 0, category: "HOMME" });
+    setAddForm({ name: "", price: 0, category: "HOMME", duration_minutes: 30 });
     load();
   };
 
@@ -131,10 +131,12 @@ export default function Settings() {
               <label className="text-[10px] uppercase tracking-widest text-slate-500">Prix (€)</label>
               <input data-testid="svc-add-price" type="number" step="0.5" className={fb} value={addForm.price} onChange={(e) => setAddForm({ ...addForm, price: parseFloat(e.target.value) || 0 })} />
             </div>
-            <div className="flex items-end">
-              <div className="text-[10px] text-slate-500">{addForm.category === "HOMME" ? "Apparaîtra dans les fiches M." : addForm.category === "FEMME" ? "Apparaîtra dans les fiches Mme" : addForm.category === "ENFANT" ? "Apparaîtra dans les fiches < 18 ans" : "Apparaîtra dans toutes les fiches"}</div>
+            <div>
+              <label className="text-[10px] uppercase tracking-widest text-slate-500">Durée moyenne (min)</label>
+              <input data-testid="svc-add-duration" type="number" step="5" min="5" className={fb} value={addForm.duration_minutes} onChange={(e) => setAddForm({ ...addForm, duration_minutes: parseInt(e.target.value) || 0 })} />
             </div>
           </div>
+          <div className="text-[10px] text-slate-500 -mt-2">{addForm.category === "HOMME" ? "Apparaîtra dans les fiches M." : addForm.category === "FEMME" ? "Apparaîtra dans les fiches Mme" : addForm.category === "ENFANT" ? "Apparaîtra dans les fiches < 18 ans" : "Apparaîtra dans toutes les fiches"}</div>
           <div>
             <label className="text-[10px] uppercase tracking-widest text-slate-500">Pour qui ?</label>
             <div className="flex flex-wrap gap-2 mt-2">
@@ -169,15 +171,27 @@ export default function Settings() {
           {services.map((s) => {
             const catColor = s.category === "HOMME" ? "bg-blue-100 text-blue-700" : s.category === "FEMME" ? "bg-pink-100 text-pink-700" : s.category === "ENFANT" ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-700";
             return (
-              <li key={s.id} className="py-3 flex items-center gap-3" data-testid={`svc-row-${s.id}`}>
-                <span className={`text-[9px] tracking-wider uppercase px-2 py-0.5 rounded-full ${catColor}`}>{s.category}</span>
-                <input className="flex-1 bg-transparent border-b border-slate-200 py-1 focus:border-[#0A192F] focus:outline-none" defaultValue={s.name} onBlur={(e) => e.target.value !== s.name && updateService(s.id, { name: e.target.value })} />
-                <input type="number" step="0.5" className="w-20 text-right bg-transparent border-b border-slate-200 py-1 focus:border-[#0A192F] focus:outline-none" defaultValue={s.price} onBlur={(e) => parseFloat(e.target.value) !== s.price && updateService(s.id, { price: parseFloat(e.target.value) || 0 })} />
-                <span className="text-xs text-slate-400">€</span>
-                <select className="text-xs bg-transparent border-b border-slate-200 py-1 focus:border-[#0A192F] focus:outline-none" defaultValue={s.category} onChange={(e) => updateService(s.id, { category: e.target.value })}>
-                  {CATS.map((c) => <option key={c}>{c}</option>)}
-                </select>
-                <button onClick={() => deleteService(s.id)} className="text-[#991B1B] hover:bg-red-50 p-2 rounded-full" data-testid={`svc-del-${s.id}`}><Trash2 className="w-4 h-4" /></button>
+              <li key={s.id} className="py-3" data-testid={`svc-row-${s.id}`}>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`text-[9px] tracking-wider uppercase px-2 py-0.5 rounded-full ${catColor}`}>{s.category}</span>
+                  <input className="flex-1 min-w-[140px] bg-transparent border-b border-slate-200 py-1 focus:border-[#0A192F] focus:outline-none" defaultValue={s.name} onBlur={(e) => e.target.value !== s.name && updateService(s.id, { name: e.target.value })} />
+                  <select className="text-xs bg-transparent border-b border-slate-200 py-1 focus:border-[#0A192F] focus:outline-none" defaultValue={s.category} onChange={(e) => updateService(s.id, { category: e.target.value })}>
+                    {CATS.map((c) => <option key={c}>{c}</option>)}
+                  </select>
+                  <button onClick={() => deleteService(s.id)} className="text-[#991B1B] hover:bg-red-50 p-2 rounded-full" data-testid={`svc-del-${s.id}`}><Trash2 className="w-4 h-4" /></button>
+                </div>
+                <div className="mt-2 flex items-center gap-4 text-xs text-slate-500 pl-1">
+                  <label className="flex items-center gap-1">
+                    Prix
+                    <input data-testid={`svc-price-${s.id}`} type="number" step="0.5" className="w-20 text-right bg-transparent border-b border-slate-200 py-0.5 focus:border-[#0A192F] focus:outline-none" defaultValue={s.price} onBlur={(e) => parseFloat(e.target.value) !== s.price && updateService(s.id, { price: parseFloat(e.target.value) || 0 })} />
+                    <span>€</span>
+                  </label>
+                  <label className="flex items-center gap-1">
+                    Durée
+                    <input data-testid={`svc-duration-${s.id}`} type="number" step="5" min="5" className="w-16 text-right bg-transparent border-b border-slate-200 py-0.5 focus:border-[#0A192F] focus:outline-none" defaultValue={s.duration_minutes ?? 45} onBlur={(e) => { const v = parseInt(e.target.value) || 0; if (v !== s.duration_minutes) updateService(s.id, { duration_minutes: v }); }} />
+                    <span>min</span>
+                  </label>
+                </div>
               </li>
             );
           })}

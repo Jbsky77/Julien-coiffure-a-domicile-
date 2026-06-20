@@ -22,7 +22,7 @@ from app.routers import (
     stock,
     tour,
 )
-from app.routers.services import ensure_default_services
+from app.routers.services import ensure_default_services, migrate_service_durations
 from app.services.settings import get_settings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -63,6 +63,7 @@ app.add_middleware(
 @app.on_event("startup")
 async def on_startup():
     await ensure_default_services()
+    await migrate_service_durations()
     await get_settings()
 
 
