@@ -20,6 +20,15 @@ Julien Bouche — coiffeur indépendant auto-entrepreneur, mobile, passe d'un cl
 - Persistance MongoDB
 - Navigation cliquable partout
 
+## Implemented (v2.2 — 2026-06) — Logique durées théoriques pour suggestions
+- **Modèle Service enrichi** : nouveau champ `duration_minutes` (durée théorique métier).
+- **Migration idempotente** (`app_meta.service_duration_backfill_v1`) : backfill des 14 prestations existantes (Coupe Homme 30min, Coupe + Barbe 45min, Couleur Femme 75min, Balayage long 120min, etc.).
+- **Catalogue enrichi** : 14 nouvelles prestations ajoutées via API → total **28 prestations** (8 Homme · 18 Femme · 2 Enfant).
+- **Moteur `/api/slots/suggest` corrigé** : utilise désormais la somme des durées théoriques des `service_ids` envoyés (jamais le `duration_minutes` réel sauvé sur les anciens RDV). Helper `app/services/duration.py` centralise la règle.
+- **Frontend AppointmentForm** : envoie `service_ids` au lieu d'une durée arbitraire + affiche la durée totale prévue dans la carte Smart Slots.
+- **Frontend Settings** : champ Durée moyenne dans le formulaire d'ajout + édition inline de la durée pour chaque prestation existante.
+- **Tests** : 25/25 pytest backend, 7/7 Playwright (smart-slots + social-generator + settings-prestations).
+
 ## Implemented (v2.1 — 2026-05) — Stabilisation & qualité
 - **Refactor backend complet** : `server.py` 1525 → 9 lignes (thin shim). Nouvelle structure `app/` :
   - `app/main.py` (FastAPI app + include routers), `app/db.py`, `app/dependencies.py`
