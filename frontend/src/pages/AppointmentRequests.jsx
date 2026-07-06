@@ -23,6 +23,10 @@ const STATUS_LABELS = {
 export default function AppointmentRequests() {
   const [requests, setRequests] = useState([]);
   const [filter, setFilter] = useState("open"); // "open" | "all" | status name
+  const [counterFor, setCounterFor] = useState(null);
+  const [counterDate, setCounterDate] = useState("");
+  const [counterNote, setCounterNote] = useState("");
+  const [rejectFor, setRejectFor] = useState(null);
 
   const load = async () => {
     const [r, _] = await Promise.all([
@@ -48,6 +52,8 @@ export default function AppointmentRequests() {
         : action === "reject" ? "Demande refusée"
         : "Contre-proposition envoyée"
       );
+      setCounterFor(null);
+      setRejectFor(null);
       load();
     } catch (e) {
       toast.error(e.response?.data?.detail || "Erreur");
@@ -103,30 +109,77 @@ export default function AppointmentRequests() {
                   <span className={`text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap ${status.color}`}>{status.label}</span>
                 </div>
                 {editable && (
-                  <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
-                    <button onClick={() => act(r.id, "accept")} data-testid={`accept-${r.id}`} className="flex-1 bg-[#0A192F] text-white rounded-full px-4 py-2 text-xs flex items-center justify-center gap-1.5 hover:bg-[#1E3A8A]"><Check className="w-3.5 h-3.5" /> Accepter</button>
-                    <button
-                      onClick={() => {
-                        const d = window.prompt("Nouveau créneau (YYYY-MM-DDTHH:MM)", (shownDate || "").slice(0, 16));
-                        if (!d) return;
-                        const note = window.prompt("Message pour le client (facultatif)", "") || "";
-                        act(r.id, "counter", new Date(d).toISOString(), note);
-                      }}
-                      data-testid={`counter-${r.id}`}
-                      className="flex-1 border border-blue-200 text-blue-700 rounded-full px-4 py-2 text-xs flex items-center justify-center gap-1.5 hover:bg-blue-50"
-                    >
-                      <Clock className="w-3.5 h-3.5" /> Proposer autre
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (!window.confirm("Refuser cette demande ?")) return;
-                        act(r.id, "reject");
-                      }}
-                      data-testid={`reject-${r.id}`}
-                      className="flex-1 border border-red-200 text-red-700 rounded-full px-4 py-2 text-xs flex items-center justify-center gap-1.5 hover:bg-red-50"
-                    >
-                      <X className="w-3.5 h-3.5" /> Refuser
-                    </button>
+                  <div className="pt-2 border-t border-slate-100 space-y-3">
+                    <div className="flex flex-wrap gap-2">
+                      <button onClick={() => act(r.id, "accept")} data-testid={`accept-${r.id}`} className="flex-1 bg-[#0A192F] text-white rounded-full px-4 py-2 text-xs flex items-center justify-center gap-1.5 hover:bg-[#1E3A8A]"><Check className="w-3.5 h-3.5" /> Accepter</button>
+                      <button
+                        onClick={() => {
+                          setRejectFor(null);
+                          setCounterFor(counterFor === r.id ? null : r.id);
+                          setCounterDate((shownDate || "").slice(0, 16));
+                          setCounterNote("");
+                        }}
+                        data-testid={`counter-${r.id}`}
+                        className="flex-1 border border-blue-200 text-blue-700 rounded-full px-4 py-2 text-xs flex items-center justify-center gap-1.5 hover:bg-blue-50"
+                      >
+                        <Clock className="w-3.5 h-3.5" /> Proposer autre
+                      </button>
+                      <button
+                        onClick={() => { setCounterFor(null); setRejectFor(rejectFor === r.id ? null : r.id); }}
+                        data-testid={`reject-${r.id}`}
+                        className="flex-1 border border-red-200 text-red-700 rounded-full px-4 py-2 text-xs flex items-center justify-center gap-1.5 hover:bg-red-50"
+                      >
+                        <X className="w-3.5 h-3.5" /> Refuser
+                      </button>
+                    </div>
+
+                    {counterFor === r.id && (
+                      <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-4 space-y-3" data-testid={`counter-form-${r.id}`}>
+                        <div>
+                          <label className="text-[10px] tracking-widest uppercase text-slate-500">Nouveau créneau proposé</label>
+                          <input
+                            type="datetime-local"
+                            data-testid="counter-date-input"
+                            value={counterDate}
+                            onChange={(e) => setCounterDate(e.target.value)}
+                            className="w-full bg-transparent border-b border-slate-300 py-2 focus:border-[#0A192F] focus:outline-none text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] tracking-widest uppercase text-slate-500">Message pour le client (facultatif)</label>
+                          <input
+                            data-testid="counter-note-input"
+                            value={counterNote}
+                            onChange={(e) => setCounterNote(e.target.value)}
+                            placeholder="Ex : Je suis déjà pris à cette heure-là"
+                            className="w-full bg-transparent border-b border-slate-300 py-2 focus:border-[#0A192F] focus:outline-none text-sm"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              if (!counterDate) return toast.error("Choisissez un créneau");
+                              act(r.id, "counter", new Date(counterDate).toISOString(), counterNote);
+                            }}
+                            data-testid="counter-send-btn"
+                            className="flex-1 bg-blue-600 text-white rounded-full px-4 py-2 text-xs flex items-center justify-center gap-1.5"
+                          >
+                            <Check className="w-3.5 h-3.5" /> Envoyer la proposition
+                          </button>
+                          <button onClick={() => setCounterFor(null)} data-testid="counter-cancel-btn" className="px-4 py-2 rounded-full border border-slate-200 text-xs text-slate-600">Annuler</button>
+                        </div>
+                      </div>
+                    )}
+
+                    {rejectFor === r.id && (
+                      <div className="bg-red-50/60 border border-red-100 rounded-xl p-4 space-y-3" data-testid={`reject-confirm-${r.id}`}>
+                        <div className="text-sm text-red-800">Refuser cette demande ? Le client sera notifié.</div>
+                        <div className="flex gap-2">
+                          <button onClick={() => act(r.id, "reject")} data-testid="reject-confirm-btn" className="flex-1 bg-red-600 text-white rounded-full px-4 py-2 text-xs flex items-center justify-center gap-1.5"><X className="w-3.5 h-3.5" /> Oui, refuser</button>
+                          <button onClick={() => setRejectFor(null)} data-testid="reject-cancel-btn" className="px-4 py-2 rounded-full border border-slate-200 text-xs text-slate-600">Annuler</button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </li>

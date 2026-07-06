@@ -23,7 +23,7 @@ async def clients_list(user: User = Depends(get_current_user)):
 @router.post("/clients")
 async def clients_create(payload: ClientCreate, user: User = Depends(get_current_user)):
     c = Client(**payload.model_dump())
-    if c.address:
+    if c.lat is None and c.address:
         c.lat, c.lng = await auto_geocode(c.address)
     await db.clients.insert_one(c.model_dump())
     return c.model_dump()
@@ -67,7 +67,8 @@ async def clients_get(cid: str, user: User = Depends(get_current_user)):
 
 @router.put("/clients/{cid}")
 async def clients_update(cid: str, payload: Dict[str, Any], user: User = Depends(get_current_user)):
-    if "address" in payload and payload["address"]:
+    has_coords = payload.get("lat") is not None and payload.get("lng") is not None
+    if "address" in payload and payload["address"] and not has_coords:
         existing = await db.clients.find_one({"id": cid}, {"_id": 0}) or {}
         if existing.get("address") != payload["address"] or existing.get("lat") is None:
             lat, lng = await auto_geocode(payload["address"])

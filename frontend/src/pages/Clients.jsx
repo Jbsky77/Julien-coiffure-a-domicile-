@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api, genderClasses, genderLabel, computeAge } from "@/lib/api";
 import { Plus, Search, Upload } from "lucide-react";
 import { toast } from "sonner";
+import { AddressAutocomplete, composeAddress, emptyParts } from "@/components/app/AddressAutocomplete";
 
 // Parse CSV: header row with first_name,last_name,phone,address,birthday,comment
 function parseCSV(txt) {
@@ -56,6 +57,8 @@ export default function Clients() {
   const [q, setQ] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ first_name: "", last_name: "", phone: "", address: "", comment: "", birthday: "" });
+  const [addressParts, setAddressParts] = useState(emptyParts);
+  const [addressCoords, setAddressCoords] = useState(null);
   const fileRef = useRef(null);
 
   const load = async () => {
@@ -66,10 +69,18 @@ export default function Clients() {
 
   const create = async () => {
     if (!form.last_name) return toast.error("Nom obligatoire");
-    const r = await api.post("/clients", form);
+    const payload = {
+      ...form,
+      address: composeAddress(addressParts),
+      address_parts: addressParts,
+      ...(addressCoords || {}),
+    };
+    await api.post("/clients", payload);
     toast.success("Client créé");
     setShowAdd(false);
     setForm({ first_name: "", last_name: "", gender: "", phone: "", address: "", comment: "", birthday: "" });
+    setAddressParts(emptyParts);
+    setAddressCoords(null);
     load();
   };
 
@@ -122,7 +133,12 @@ export default function Clients() {
           <div><label className="text-[10px] tracking-widest uppercase text-slate-500">Prénom</label><input data-testid="new-first-name" className={fb} value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} /></div>
           <div><label className="text-[10px] tracking-widest uppercase text-slate-500">Nom *</label><input data-testid="new-last-name" className={fb} value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} /></div>
           <div><label className="text-[10px] tracking-widest uppercase text-slate-500">Téléphone</label><input data-testid="new-phone" className={fb} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
-          <div className="md:col-span-2"><label className="text-[10px] tracking-widest uppercase text-slate-500">Adresse</label><input data-testid="new-address" className={fb} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
+          <div className="md:col-span-2">
+            <AddressAutocomplete
+              value={addressParts}
+              onChange={(parts, coords) => { setAddressParts(parts); setAddressCoords(coords); }}
+            />
+          </div>
           <div className="md:col-span-2"><label className="text-[10px] tracking-widest uppercase text-slate-500">Commentaire</label><input data-testid="new-comment" className={fb} value={form.comment} onChange={(e) => setForm({ ...form, comment: e.target.value })} /></div>
           <div className="md:col-span-2"><button onClick={create} data-testid="create-client-btn" className="bg-[#0A192F] text-white rounded-full px-6 py-3 font-medium">Créer le client</button></div>
         </div>

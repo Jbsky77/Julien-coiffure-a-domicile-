@@ -1,0 +1,34 @@
+{
+  "summary": "Tested (1) PWA bug fix for /demandes counter+reject and client-space alt-date inline panels — all 3 flows use inline panels (no window.prompt/confirm) and update backend correctly. (2) New AddressAutocomplete: BAN suggestions fill parts + lat/lng without Nominatim geocoding; manual postcode 49800 triggers city-select from geo.api.gouv.fr (3 cities). Also fixed a critical missing import in Clients.jsx (AddressAutocomplete/composeAddress/emptyParts were referenced but never imported — would crash at runtime on /clients when opening 'Nouveau').",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "ClientDetail Infos tab", "issues": ["'Adresse actuelle: ...' n'apparaît pas pour Sophie car c.address est vide (elle n'a que lat/lng). Conditionnel by design — mais peut confondre l'utilisateur. Envisager d'afficher aussi les lat/lng ou un texte 'Aucune adresse enregistrée' quand address est vide."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_client_address.py",
+    "/app/test_reports/pytest/pytest_addr.xml"
+  ],
+  "action_items": [
+    "None blocking. (Optional) Consider fallback message when c.address is empty in ClientDetail Infos tab."
+  ],
+  "critical_code_review_comments": [
+    "FIXED by testing agent: /app/frontend/src/pages/Clients.jsx was missing the import of AddressAutocomplete, composeAddress, emptyParts from @/components/app/AddressAutocomplete — the 'Nouveau client' modal would have thrown ReferenceError on open. Added the import.",
+    "AddressAutocomplete.jsx: setPart passes coords=null to onChange, so any manual edit after picking a BAN suggestion in Clients.jsx will reset addressCoords to null (payload will omit lat/lng, triggering Nominatim fallback on backend). This is by design but worth noting — if user tweaks the street/number after picking, the BAN-provided coords are lost.",
+    "backend/app/routers/clients.py clients_create: only geocodes when c.lat is None AND c.address is set. Correct. But if address_parts is provided without composed address + no coords, no geocoding occurs. Frontend Clients.jsx composes address before POST so OK.",
+    "clients_update: re-geocodes only when address changed OR existing lat is None. Correct behaviour matches spec."
+  ],
+  "updated_files": [
+    "/app/frontend/src/pages/Clients.jsx (added missing import)",
+    "/app/backend/tests/test_client_address.py (new pytest file, 10 tests)"
+  ],
+  "success_rate": {"backend": "100% (10/10)", "frontend": "100% (all 6 UI flows verified)"},
+  "test_credentials": "PIN 123456; Sophie cli_e998044705 / token _V-HRjKzLbQYJU0pPRHlad_44GARhDU0",
+  "seed_data_creation": "Created 5 TEST_ clients + 1 TestBAN client + 3 appointment_requests → all cleaned up in teardown/finally blocks. Sophie coords not modified (never saved).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Bug fixes for PWA prompt/confirm and BAN address feature are fully green. One import bug in Clients.jsx was fixed. Sophie has no c.address string (only lat/lng 47.46/-0.59) so 'Adresse actuelle' block is not rendered — main agent may want to handle this UX case."
+}

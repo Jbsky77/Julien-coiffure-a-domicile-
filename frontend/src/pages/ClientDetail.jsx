@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { api, money, money2, fmtDate, fmtTime, genderClasses, genderLabel, computeAge } from "@/lib/api";
+import { AddressAutocomplete, composeAddress, emptyParts } from "@/components/app/AddressAutocomplete";
 import { ArrowLeft, MapPin, Phone, Cake, Plus, Trash2, Save, Gift, Users as UsersIcon, Mail, MessageSquare, Star, CreditCard, Copy, ExternalLink, CalendarClock, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import ClientPhotos from "@/components/app/ClientPhotos";
@@ -35,6 +36,7 @@ export default function ClientDetail() {
   const [tab, setTab] = useState("infos");
   const [cf, setCf] = useState({ key: "", value: "" });
   const [editing, setEditing] = useState({});
+  const [editCoords, setEditCoords] = useState(null);
 
   const load = async () => {
     const [r, s, st] = await Promise.all([api.get(`/clients/${id}`), api.get("/services"), api.get("/settings")]);
@@ -63,7 +65,11 @@ export default function ClientDetail() {
   const age = computeAge(c.birthday);
 
   const save = async () => {
-    await api.put(`/clients/${id}`, editing);
+    const composed = composeAddress(editing.address_parts);
+    const payload = { ...editing, address: composed || editing.address };
+    if (editCoords) { payload.lat = editCoords.lat; payload.lng = editCoords.lng; }
+    await api.put(`/clients/${id}`, payload);
+    setEditCoords(null);
     toast.success("Enregistré");
     load();
   };
@@ -243,7 +249,13 @@ export default function ClientDetail() {
             <input type="date" className={fb} value={editing.birthday} onChange={(e) => setEditing({ ...editing, birthday: e.target.value })} />
             {computeAge(editing.birthday) !== null && <div className="text-xs text-slate-500 mt-1">{computeAge(editing.birthday)} ans</div>}
           </div>
-          <div className="md:col-span-2"><label className="text-[10px] tracking-widest uppercase text-slate-500">Adresse</label><input className={fb} value={editing.address} onChange={(e) => setEditing({ ...editing, address: e.target.value })} /></div>
+          <div className="md:col-span-2">
+            {c.address && <div className="text-xs text-slate-500 mb-3">Adresse actuelle : <span className="text-slate-700">{c.address}</span></div>}
+            <AddressAutocomplete
+              value={editing.address_parts}
+              onChange={(parts, coords) => { setEditing({ ...editing, address_parts: parts }); setEditCoords(coords); }}
+            />
+          </div>
           <div className="md:col-span-2"><label className="text-[10px] tracking-widest uppercase text-slate-500">Commentaire permanent</label><textarea rows={3} className={`${fb} resize-none`} value={editing.comment} onChange={(e) => setEditing({ ...editing, comment: e.target.value })} /></div>
           <div>
             <label className="text-[10px] tracking-widest uppercase text-slate-500">Filleuls validés</label>

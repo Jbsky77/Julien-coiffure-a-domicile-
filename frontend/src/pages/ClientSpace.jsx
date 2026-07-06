@@ -26,6 +26,8 @@ export default function ClientSpace() {
   const [form, setForm] = useState({ requested_date: "", service_ids: [], comment: "" });
   const [availableSvc, setAvailableSvc] = useState([]);
   const [sending, setSending] = useState(false);
+  const [altOpen, setAltOpen] = useState(false);
+  const [altDate, setAltDate] = useState("");
 
   const load = async () => {
     try {
@@ -157,11 +159,34 @@ export default function ClientSpace() {
             {activeCounter.admin_note && <div className="text-sm text-slate-600 italic">« {activeCounter.admin_note} »</div>}
             <div className="flex gap-2 mt-4">
               <button onClick={() => respondCounter(activeCounter.id, "accept")} data-testid="accept-counter-btn" className="flex-1 bg-[#0A192F] text-white rounded-full px-4 py-2.5 text-sm flex items-center justify-center gap-2 hover:bg-[#1E3A8A]"><Check className="w-4 h-4" /> Accepter</button>
-              <button onClick={() => {
-                const d = window.prompt("Autre date souhaitée (format YYYY-MM-DDTHH:MM)");
-                if (d) respondCounter(activeCounter.id, "reject", d);
-              }} data-testid="reject-counter-btn" className="flex-1 border border-slate-200 rounded-full px-4 py-2.5 text-sm flex items-center justify-center gap-2 text-slate-600 hover:bg-slate-50"><X className="w-4 h-4" /> Autre date</button>
+              <button onClick={() => setAltOpen((v) => !v)} data-testid="reject-counter-btn" className="flex-1 border border-slate-200 rounded-full px-4 py-2.5 text-sm flex items-center justify-center gap-2 text-slate-600 hover:bg-slate-50"><X className="w-4 h-4" /> Autre date</button>
             </div>
+            {altOpen && (
+              <div className="mt-3 bg-white border border-slate-100 rounded-xl p-4 space-y-3" data-testid="alt-date-form">
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-slate-500">Quelle date vous conviendrait ?</label>
+                  <input
+                    type="datetime-local"
+                    data-testid="alt-date-input"
+                    value={altDate}
+                    onChange={(e) => setAltDate(e.target.value)}
+                    className="w-full bg-transparent border-b border-slate-200 py-2 focus:border-[#0A192F] focus:outline-none"
+                  />
+                </div>
+                <button
+                  onClick={() => {
+                    if (!altDate) return toast.error("Choisissez une date");
+                    respondCounter(activeCounter.id, "reject", altDate);
+                    setAltOpen(false);
+                    setAltDate("");
+                  }}
+                  data-testid="alt-date-send-btn"
+                  className="w-full bg-[#0A192F] text-white rounded-full px-4 py-2.5 text-sm"
+                >
+                  Envoyer ma proposition
+                </button>
+              </div>
+            )}
           </section>
         )}
 

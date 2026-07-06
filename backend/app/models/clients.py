@@ -17,6 +17,7 @@ class Client(BaseModel):
     gender: Optional[str] = None  # "H" | "F" | None
     phone: str = ""
     address: str = ""
+    address_parts: Optional[Dict[str, str]] = None
     comment: str = ""
     birthday: Optional[str] = None  # YYYY-MM-DD
     custom_fields: Dict[str, str] = {}
@@ -37,6 +38,9 @@ class ClientCreate(BaseModel):
     gender: Optional[str] = None
     phone: str = ""
     address: str = ""
+    address_parts: Optional[Dict[str, str]] = None
     comment: str = ""
     birthday: Optional[str] = None
     custom_fields: Dict[str, str] = {}
+    lat: Optional[float] = None
+    lng: Optional[float] = None
