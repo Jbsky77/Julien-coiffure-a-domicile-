@@ -142,6 +142,7 @@ export default function AppointmentForm() {
         payment_mode: paymentMode,
         price_final: form.price_final_override ?? preview.final,
         duration_minutes: duration === "" ? null : parseInt(duration),
+        stylists: Object.fromEntries(form.services.map((fs) => [fs.service_id, stylists[fs.service_id] || "Julien"])),
       };
       await api.post(`/appointments/${id}/finish`, payload);
       toast.success("Paiement confirmé. Rendez-vous terminé.");

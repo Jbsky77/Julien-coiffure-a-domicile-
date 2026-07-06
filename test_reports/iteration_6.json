@@ -1,0 +1,22 @@
+{
+  "summary": "Targeted retest of the stylists-in-finish-payload fix (AppointmentForm.jsx l.145). E2E scenario replayed: PIN unlock 123456 -> POST /api/appointments with 2 services (svc_9bb2d107ea Coupe Homme + svc_bcc9764308) -> navigate to /rdv/<id> -> click stylist-svc_9bb2d107ea-Marley -> pm-CB -> finish-rdv-btn -> navigate to /rdv. Verification via GET /api/appointments: services[svc_9bb2d107ea].stylist='Marley', services[svc_bcc9764308].stylist='Julien', invoice_number='F-2026-0005'. Client space /c/_V-HRjKzLbQYJU0pPRHlad_44GARhDU0 tab-factures: F-2026-0005 is rendered with 'Coupe Homme par Marley' + 'Coupe + Barbe par Julien'. rdv_037b0f8120 / F-2026-0001 reference untouched. Test RDV rdv_0af3537789 deleted at the end (cleanup 200).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_5.json", "/app/backend/tests/test_invoice_stylists.py"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Fix at AppointmentForm.jsx:145 is minimal and correct: `stylists: Object.fromEntries(form.services.map((fs) => [fs.service_id, stylists[fs.service_id] || 'Julien']))`. Consider also propagating stylists on PUT /appointments (compute_appointment_totals rebuilds services from scratch on scheduled RDVs and would reset partial stylist choices) — non-blocking today because the UI only exposes stylist selection in the finish section, but the underlying data-loss path noted in iteration_5 remains."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested (skipped per request)", "frontend": "100% on target scenario"},
+  "test_credentials": "PIN 123456; Sophie token _V-HRjKzLbQYJU0pPRHlad_44GARhDU0 (cli_e998044705); reference invoice rdv_037b0f8120=F-2026-0001",
+  "seed_data_creation": "Created 1 temporary RDV (rdv_0af3537789), used by finish flow (consumed F-2026-0005), then deleted. Invoice counter now at 5 (next = F-2026-0006). rdv_037b0f8120 / F-2026-0001 untouched as instructed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Stylist bug fully closed. Full app flow (create -> finish with per-service stylist -> invoice generation -> client space display) is stable. Invoice sequence counter is at 5. If anything else needs testing, the same fixture pattern (POST /api/pin/unlock with 123456 -> localStorage jb_pin_token) still works.",
+  "rca of the issue": "Fix applied at AppointmentForm.jsx:145 adds the stylists field to the finish() POST payload, verified end-to-end. Marley is now persisted on the target service and appears as 'par Marley' in the client-facing invoice list. No regression observed on the other 4 legacy invoices in Sophie's space."
+}
