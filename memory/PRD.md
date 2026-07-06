@@ -20,6 +20,16 @@ Julien Bouche — coiffeur indépendant auto-entrepreneur, mobile, passe d'un cl
 - Persistance MongoDB
 - Navigation cliquable partout
 
+## Implemented (v2.4 — 2026-06) — Prospection, RDV recommandé & Backup JSON
+- **Export/Backup JSON** (P0 rattrapé) : `GET /api/backup/export` (protégé PIN) exporte les 10 collections (settings, services, clients, appointments, appointment_requests, stock, notifications, relances, client_photos, urssaf_status) avec `counts` + `exported_at`. Bouton de téléchargement dans Réglages (`backup-section`).
+- **Prochain RDV recommandé** : `app/services/next_visit.py` calcule la fréquence moyenne (min 7j, null si <2 RDV done), `next_recommended_date`, `days_until` et les 2 prestations habituelles. Exposé dans `GET /api/clients/{cid}` (admin) ET `GET /api/public/client/{token}` (espace client). UI : carte compte à rebours gold dans l'Espace Client avec bouton "Réserver ce créneau" (pré-remplit date à 10h + prestations habituelles dans l'onglet Nouveau RDV) + bandeau `next-visit-admin` sur la fiche client avec bouton "Planifier".
+- **Zone de prospection** (Carte) : toggle Clients / Zone de prospection sur `/carte`. Clic sur la carte = centre, slider rayon 1-20 km, `POST /api/prospection/analyze` → population estimée (communes geo.api.gouv.fr, cache Mongo `communes_cache` 90j par département), taux de pénétration /1000 hab, top 3 communes à prospecter (score population/(clients+1), pop ≥300, rayon ×1.5). Markers gold + clients de la zone surlignés + KPIs + classement.
+- **Fix carte** : `key={center}` sur MapContainer pour recentrer sur le barycentre clients après chargement.
+- **Tests** : agent de test — backend 7/7 pytest (`tests/test_new_features.py`) + 100% flows frontend (backup, next-visit admin/public/prefill, prospection E2E, régressions carte/espace client/PIN OK).
+
+## Implemented (v2.3 — 2026-06) — Espace Client & demandes de RDV
+- Portail client par magic link `/c/{access_token}` : fidélité, historique, avis Google, demandes de RDV (pending → counter_proposed → accepted/rejected) avec notifications in-app côté client et admin. Page admin `/demandes`.
+
 ## Implemented (v2.2 — 2026-06) — Logique durées théoriques pour suggestions
 - **Modèle Service enrichi** : nouveau champ `duration_minutes` (durée théorique métier).
 - **Migration idempotente** (`app_meta.service_duration_backfill_v1`) : backfill des 14 prestations existantes (Coupe Homme 30min, Coupe + Barbe 45min, Couleur Femme 75min, Balayage long 120min, etc.).
@@ -75,6 +85,9 @@ Julien Bouche — coiffeur indépendant auto-entrepreneur, mobile, passe d'un cl
 - **v2.0 (2026-05)** : 20/20 backend, frontend ~80%. Bug `Client` Pydantic `lat`/`lng` corrigé. Routing `/api/clients/status` avant `{cid}`.
 
 ## P0/P1/P2 backlog
+- **P1** : Rappels SMS automatiques 24h avant un RDV.
+- **P1** : RDV récurrents (ex : toutes les 4-6 semaines) en un clic.
+- **P2** : Suivi no-show / acomptes (clients qui annulent à la dernière minute).
 - **P2** : Logo/branding image upload (actuellement seul `brand_name` est utilisé, le canvas social gère déjà brand_name).
 - **P2** : Notifications push pour RDV imminents.
 - **P2** : Synchronisation tournée avec Google Maps Directions API pour estimation précise.

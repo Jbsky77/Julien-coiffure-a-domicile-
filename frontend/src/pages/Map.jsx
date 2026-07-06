@@ -151,6 +151,7 @@ export default function MapPage() {
 
       <div className="rounded-2xl overflow-hidden shadow-premium border border-slate-100" style={{ height: mode === "prospection" ? "50vh" : "70vh" }} data-testid="map-container">
         <MapContainer
+          key={center.join(",")}
           center={center}
           zoom={geocoded.length ? 10 : 6}
           scrollWheelZoom
