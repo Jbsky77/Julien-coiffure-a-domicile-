@@ -103,7 +103,7 @@ export default function ClientDetail() {
   const smsLink = c.phone ? `sms:${c.phone.replace(/\s/g, "")}?body=${encodeURIComponent(`Bonjour ${c.first_name || ""}, c'est Julien Bouche. `)}` : null;
   const mailLink = `mailto:?subject=${encodeURIComponent("Prendre rendez-vous")}&body=${encodeURIComponent(`Bonjour ${c.first_name || c.last_name},\n\nJ'espère que vous allez bien. Souhaitez-vous prendre un nouveau rendez-vous ?\n\nÀ bientôt,\nJulien Bouche`)}`;
 
-  const reviewUrl = (settings.google_review_url || "").trim();
+  const reviewUrl = (settings.google_review_url_short || settings.google_review_url || "").trim();
   const reviewSmsHref = (() => {
     if (!c.phone || !reviewUrl) return null;
     const template = settings.review_sms_template || "Bonjour {first_name}, merci pour votre confiance ! Donnez votre avis sur votre coiffeur ici : {url} — {brand_name}";

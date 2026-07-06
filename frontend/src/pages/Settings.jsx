@@ -128,6 +128,22 @@ export default function Settings() {
             <label className="text-[10px] uppercase tracking-widest text-slate-500">Lien d'avis Google</label>
             <input className={fb} data-testid="set-review-url" value={settings.google_review_url || ""} onChange={(e) => setSettings({ ...settings, google_review_url: e.target.value })} placeholder="https://g.page/r/CXXXXXX/review" />
           </div>
+          {settings.google_review_url_short && settings.google_review_url_short !== settings.google_review_url && (
+            <div className="bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-xl p-3 flex items-center gap-2" data-testid="review-short-block">
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] tracking-widest uppercase text-[#8A6A1F] mb-1">Lien court utilisé dans le SMS</div>
+                <div className="font-mono text-sm text-slate-800 truncate" data-testid="review-short-url">{settings.google_review_url_short}</div>
+              </div>
+              <button
+                type="button"
+                onClick={async () => { await navigator.clipboard.writeText(settings.google_review_url_short); toast.success("Copié"); }}
+                className="text-[#8A6A1F] hover:bg-[#D4AF37]/20 p-2 rounded-full flex-shrink-0"
+                data-testid="review-short-copy"
+              >
+                <Copy className="w-4 h-4" />
+              </button>
+            </div>
+          )}
           <div>
             <label className="text-[10px] uppercase tracking-widest text-slate-500">Message SMS envoyé au client</label>
             <textarea rows={3} className={fb + " leading-relaxed"} data-testid="set-review-template" value={settings.review_sms_template || ""} onChange={(e) => setSettings({ ...settings, review_sms_template: e.target.value })} placeholder="Bonjour {first_name}, ..." />

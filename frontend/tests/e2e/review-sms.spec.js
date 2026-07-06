@@ -3,14 +3,17 @@ const { test, expect } = require('@playwright/test');
 const axios = require('axios');
 const { API } = require('./helpers');
 
-const REVIEW_URL = 'https://g.page/r/E2E_REVIEW_TEST/review';
+const REVIEW_URL = 'https://www.google.com/search?q=this+is+a+very+long+placeholder+url+for+e2e';
 
 test.describe('Fiche client — Demander un avis Google', () => {
   let clientId;
+  let expectedUrlInSms;
 
   test.beforeAll(async () => {
-    // Set the Google review URL
-    await axios.put(API + '/settings', { google_review_url: REVIEW_URL });
+    // Set the Google review URL (backend will auto-shorten it)
+    const updated = (await axios.put(API + '/settings', { google_review_url: REVIEW_URL })).data;
+    // The SMS should contain either the short or the long URL depending on shortener availability.
+    expectedUrlInSms = updated.google_review_url_short || updated.google_review_url;
     // Create a test client WITH a phone
     const c = (await axios.post(API + '/clients', {
       first_name: 'AvisTest',
@@ -38,8 +41,8 @@ test.describe('Fiche client — Demander un avis Google', () => {
     expect(href.startsWith('sms:')).toBe(true);
     // Number is included
     expect(href).toContain('0600000099');
-    // URL is embedded in the encoded body
-    expect(decodeURIComponent(href)).toContain(REVIEW_URL);
+    // URL is embedded in the encoded body (short or long)
+    expect(decodeURIComponent(href)).toContain(expectedUrlInSms);
     expect(decodeURIComponent(href)).toContain('AvisTest');
   });
 

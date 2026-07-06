@@ -21,4 +21,5 @@ class Settings(BaseModel):
     brand_color: str = "#D4AF37"
     brand_logo: Optional[str] = None  # data URL
     google_review_url: str = ""
+    google_review_url_short: str = ""
     review_sms_template: str = "Bonjour {first_name}, merci pour votre confiance ! Donnez votre avis sur votre coiffeur ici : {url} — {brand_name}"
