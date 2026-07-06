@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { api, money, money2, fmtDate, fmtTime, genderClasses, genderLabel, computeAge } from "@/lib/api";
-import { ArrowLeft, MapPin, Phone, Cake, Plus, Trash2, Save, Gift, Users as UsersIcon, Mail, MessageSquare, Star, CreditCard, Copy, ExternalLink, CalendarClock } from "lucide-react";
+import { ArrowLeft, MapPin, Phone, Cake, Plus, Trash2, Save, Gift, Users as UsersIcon, Mail, MessageSquare, Star, CreditCard, Copy, ExternalLink, CalendarClock, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import ClientPhotos from "@/components/app/ClientPhotos";
 
@@ -50,6 +50,8 @@ export default function ClientDetail() {
       comment: r.data.client.comment,
       birthday: r.data.client.birthday || "",
       referrals: r.data.client.referrals || 0,
+      deposit_required: r.data.client.deposit_required || false,
+      deposit_note: r.data.client.deposit_note || "",
     });
   };
 
@@ -88,6 +90,7 @@ export default function ClientDetail() {
   };
 
   const done = data.appointments.filter((a) => a.status === "done");
+  const cancelledCount = data.appointments.filter((a) => a.status === "cancelled").length;
   const avg = done.length ? done.reduce((a, b) => a + b.price_final, 0) / done.length : 0;
   const total = done.reduce((a, b) => a + b.price_final, 0);
   const cbFeeRate = settings.cb_fee_rate || 0.0175;
@@ -203,12 +206,17 @@ export default function ClientDetail() {
       )}
 
       {/* Stats strip */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         <div className="bg-white border border-blue-100 rounded-2xl p-5"><div className="text-[10px] tracking-widest uppercase text-slate-500">RDV terminés</div><div className="font-serif text-2xl text-blue-600">{done.length}</div></div>
         <div className="bg-white border border-[#D4AF37]/30 rounded-2xl p-5"><div className="text-[10px] tracking-widest uppercase text-slate-500">Panier moyen</div><div className="font-serif text-2xl text-[#C5A059]">{money2(avg)} €</div></div>
         <div className="bg-white border border-green-100 rounded-2xl p-5"><div className="text-[10px] tracking-widest uppercase text-slate-500">Total encaissé</div><div className="font-serif text-2xl text-green-700">{money2(total)} €</div></div>
         <div className="bg-white border border-pink-100 rounded-2xl p-5" data-testid="client-avg-duration"><div className="text-[10px] tracking-widest uppercase text-slate-500">Temps moyen</div><div className="font-serif text-2xl text-pink-600">{avgDuration} <span className="text-sm">min</span></div><div className="text-[10px] text-slate-500 mt-0.5">Total : {totalDuration} min</div></div>
         <div className="bg-white border border-red-100 rounded-2xl p-5" data-testid="client-cb-fees"><div className="text-[10px] tracking-widest uppercase text-slate-500">Frais CB ({(cbFeeRate * 100).toFixed(2).replace(".", ",")}%)</div><div className="font-serif text-2xl text-[#991B1B]">-{money2(cbFees)} €</div><div className="text-[10px] text-slate-500 mt-0.5">Net: {money2(netReceived)} €</div></div>
+        <div className={`bg-white rounded-2xl p-5 ${cancelledCount > 0 || c.deposit_required ? "border-2 border-orange-300" : "border border-slate-100"}`} data-testid="client-noshow-card">
+          <div className="text-[10px] tracking-widest uppercase text-slate-500">Annulations</div>
+          <div className={`font-serif text-2xl ${cancelledCount > 0 ? "text-orange-600" : "text-slate-400"}`}>{cancelledCount}</div>
+          {c.deposit_required && <div className="text-[10px] text-orange-700 mt-0.5 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Acompte requis</div>}
+        </div>
       </div>
 
       <div className="flex gap-2 flex-wrap">
@@ -241,6 +249,25 @@ export default function ClientDetail() {
             <label className="text-[10px] tracking-widest uppercase text-slate-500">Filleuls validés</label>
             <input type="number" className={fb} value={editing.referrals} onChange={(e) => setEditing({ ...editing, referrals: parseInt(e.target.value) || 0 })} />
             {editing.referrals >= 2 && <div className="text-xs text-[#C5A059] mt-1 flex items-center gap-1"><UsersIcon className="w-3 h-3" /> Prochaine prestation OFFERTE (parrainage)</div>}
+          </div>
+          <div className="md:col-span-2 bg-orange-50/50 border border-orange-100 rounded-xl p-4 space-y-3">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={editing.deposit_required || false}
+                onChange={(e) => setEditing({ ...editing, deposit_required: e.target.checked })}
+                data-testid="deposit-required-toggle"
+                className="w-4 h-4 accent-orange-600"
+              />
+              <span className="text-sm font-medium text-orange-900 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> Acompte requis pour ce client</span>
+            </label>
+            {editing.deposit_required && (
+              <div>
+                <label className="text-[10px] tracking-widest uppercase text-slate-500">Note acompte (montant, versé ou non…)</label>
+                <input className={fb} data-testid="deposit-note-input" value={editing.deposit_note || ""} onChange={(e) => setEditing({ ...editing, deposit_note: e.target.value })} placeholder="Ex : 10€ demandés, versés le 12/06" />
+              </div>
+            )}
+            {cancelledCount > 0 && <div className="text-xs text-orange-700">{cancelledCount} annulation{cancelledCount > 1 ? "s" : ""} (no-show) enregistrée{cancelledCount > 1 ? "s" : ""} pour ce client.</div>}
           </div>
           <div className="md:col-span-2"><button onClick={save} data-testid="save-client-btn" className="bg-[#0A192F] text-white rounded-full px-6 py-3 font-medium flex items-center gap-2"><Save className="w-4 h-4" /> Enregistrer</button></div>
         </div>

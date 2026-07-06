@@ -22,6 +22,8 @@ class Client(BaseModel):
     custom_fields: Dict[str, str] = {}
     loyalty_counters: Dict[str, int] = {}  # service_id -> count paid
     referrals: int = 0  # validated filleuls
+    deposit_required: bool = False
+    deposit_note: str = ""
     last_seen: Optional[str] = None
     lat: Optional[float] = None
     lng: Optional[float] = None

@@ -1,5 +1,5 @@
-"""Appointments CRUD + finish/cancel + payment update."""
-from datetime import datetime, timezone
+"""Appointments CRUD + finish/cancel + payment update + recurrence."""
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -15,6 +15,7 @@ from app.models.appointments import (
 )
 from app.models.auth import User
 from app.services.appointments import compute_appointment_totals
+from app.utils.dates import parse_iso
 
 router = APIRouter()
 
@@ -113,6 +114,42 @@ async def appointments_finish(rid: str, payload: FinishAppointment, user: User =
             {"$set": {"loyalty_counters": counters, "last_seen": datetime.now(timezone.utc).isoformat()}},
         )
     return await db.appointments.find_one({"id": rid}, {"_id": 0})
+
+
+@router.post("/appointments/{rid}/schedule-next")
+async def appointments_schedule_next(rid: str, payload: Dict[str, Any], user: User = Depends(get_current_user)):
+    """Create the next recurring appointment: same client/services/time, +N weeks."""
+    rdv = await db.appointments.find_one({"id": rid}, {"_id": 0})
+    if not rdv:
+        raise HTTPException(404, "Not found")
+    try:
+        weeks = int(payload.get("weeks") or 5)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "weeks invalide")
+    weeks = min(26, max(1, weeks))
+    base_dt = parse_iso(rdv["date"])
+    if base_dt is None:
+        raise HTTPException(400, "Date du RDV source invalide")
+    new_date = (base_dt + timedelta(weeks=weeks)).isoformat()
+    services_input = [{"service_id": s["service_id"], "is_gift": False} for s in rdv.get("services") or []]
+    svc_objs, _, fuel, base, final, family, gift = await compute_appointment_totals(
+        services_input, rdv.get("kilometrage", 0), None
+    )
+    new_rdv = Appointment(
+        client_id=rdv["client_id"],
+        client_name=rdv.get("client_name", ""),
+        date=new_date,
+        services=[AppointmentService(**x) for x in svc_objs],
+        kilometrage=rdv.get("kilometrage", 0),
+        notes="",
+        price_base=base,
+        fuel_supplement=fuel,
+        price_final=final,
+        family_pack_applied=family,
+        gift_applied=gift,
+    )
+    await db.appointments.insert_one(new_rdv.model_dump())
+    return new_rdv.model_dump()
 
 
 @router.post("/appointments/{rid}/cancel")

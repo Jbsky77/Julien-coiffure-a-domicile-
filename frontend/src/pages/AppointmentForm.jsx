@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, money, money2, PAYMENT_MODES, fmtDate, fmtTime } from "@/lib/api";
 import { toast } from "sonner";
-import { ArrowLeft, Gift, Send, Trash2, CheckCircle2, Pencil, Sparkles, Clock } from "lucide-react";
+import { ArrowLeft, Gift, Send, Trash2, CheckCircle2, Pencil, Sparkles, Clock, Repeat, AlertTriangle } from "lucide-react";
 
 export default function AppointmentForm() {
   const { id } = useParams();
@@ -21,12 +21,14 @@ export default function AppointmentForm() {
   });
   const [rdv, setRdv] = useState(null);
   const [clientLoyalty, setClientLoyalty] = useState({});
+  const [clientRisk, setClientRisk] = useState(null);
   const [paymentMode, setPaymentMode] = useState("CB");
   const [duration, setDuration] = useState("");
   const [editMode, setEditMode] = useState(!id);
   const [preview, setPreview] = useState({ base: 0, fuel: 0, final: 0, family: false });
   const [suggestions, setSuggestions] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const [recurWeeks, setRecurWeeks] = useState(5);
 
   const isDone = rdv?.status === "done";
 
@@ -62,8 +64,16 @@ export default function AppointmentForm() {
         try {
           const r = await api.get(`/clients/${form.client_id}`);
           setClientLoyalty(r.data.client.loyalty_counters || {});
+          const cancelled = (r.data.appointments || []).filter((a) => a.status === "cancelled").length;
+          setClientRisk({
+            cancelled,
+            deposit_required: !!r.data.client.deposit_required,
+            deposit_note: r.data.client.deposit_note || "",
+          });
         } catch (e) {}
       })();
+    } else {
+      setClientRisk(null);
     }
   }, [form.client_id]);
 
@@ -181,6 +191,17 @@ export default function AppointmentForm() {
     navigate("/rdv");
   };
 
+  const scheduleNext = async () => {
+    try {
+      const r = await api.post(`/appointments/${id}/schedule-next`, { weeks: recurWeeks });
+      const d = new Date(r.data.date);
+      toast.success(`Prochain RDV créé le ${d.toLocaleDateString("fr-FR")} à ${d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`);
+      navigate(`/rdv/${r.data.id}`);
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Erreur");
+    }
+  };
+
   // Build the RDV confirmation message (SMS/Email)
   const buildRdvMessage = () => {
     const client = clients.find((c) => c.id === form.client_id);
@@ -251,6 +272,17 @@ export default function AppointmentForm() {
           <input disabled={readOnly} type="datetime-local" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className={fieldBase} data-testid="rdv-date-input" />
         </div>
       </div>
+
+      {/* Client risk warning: no-shows / deposit */}
+      {form.client_id && clientRisk && (clientRisk.cancelled > 0 || clientRisk.deposit_required) && (
+        <div className="bg-orange-50 border border-orange-200 rounded-2xl px-5 py-3 text-sm text-orange-800 flex items-start gap-2.5" data-testid="client-risk-banner">
+          <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          <div>
+            {clientRisk.cancelled > 0 && <div>{clientRisk.cancelled} annulation{clientRisk.cancelled > 1 ? "s" : ""} (no-show) au compteur.</div>}
+            {clientRisk.deposit_required && <div className="font-medium">Acompte requis pour ce client{clientRisk.deposit_note ? ` — ${clientRisk.deposit_note}` : ""}.</div>}
+          </div>
+        </div>
+      )}
 
       {!readOnly && form.client_id && (
         <div className="bg-gradient-to-br from-[#D4AF37]/5 to-white border border-[#D4AF37]/30 rounded-2xl p-4 space-y-3" data-testid="smart-slots-card">
@@ -393,6 +425,46 @@ export default function AppointmentForm() {
           </div>
           <button onClick={finish} data-testid="finish-rdv-btn" className="w-full bg-gold-gradient text-white rounded-full px-8 py-4 font-medium flex items-center justify-center gap-2">
             <CheckCircle2 className="w-4 h-4" /> Valider le paiement & terminer
+          </button>
+        </div>
+      )}
+
+      {/* Recurrence: schedule the next appointment */}
+      {id && rdv && rdv.status !== "cancelled" && (
+        <div className="bg-gradient-to-br from-[#D4AF37]/5 to-white border border-[#D4AF37]/30 rounded-2xl p-6 space-y-4" data-testid="recurrence-section">
+          <div>
+            <div className="text-[10px] tracking-widest uppercase text-slate-500 flex items-center gap-1.5"><Repeat className="w-3.5 h-3.5 text-[#D4AF37]" /> Programmer le prochain RDV</div>
+            <div className="text-xs text-slate-500 mt-1">Même client, mêmes prestations, même heure — dans :</div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {[4, 5, 6].map((w) => (
+              <button
+                key={w}
+                type="button"
+                onClick={() => setRecurWeeks(w)}
+                data-testid={`recur-weeks-${w}`}
+                className={`px-4 py-2 rounded-full text-sm ${recurWeeks === w ? "bg-[#0A192F] text-white" : "border border-slate-200 text-slate-600"}`}
+              >
+                {w} semaines
+              </button>
+            ))}
+            <label className="flex items-center gap-1.5 text-sm text-slate-600 ml-1">
+              <input
+                type="number" min="1" max="26"
+                value={recurWeeks}
+                onChange={(e) => setRecurWeeks(Math.min(26, Math.max(1, parseInt(e.target.value) || 1)))}
+                data-testid="recur-weeks-input"
+                className="w-14 text-center bg-transparent border-b border-slate-300 py-1 focus:border-[#0A192F] focus:outline-none"
+              />
+              sem.
+            </label>
+          </div>
+          <button onClick={scheduleNext} data-testid="recur-create-btn" className="w-full border border-[#D4AF37] text-[#8A6A1F] rounded-full px-6 py-3 text-sm font-medium flex items-center justify-center gap-2 hover:bg-[#D4AF37]/10">
+            <Repeat className="w-4 h-4" /> Créer le RDV du {(() => {
+              const base = form.date ? new Date(form.date) : new Date();
+              const next = new Date(base.getTime() + recurWeeks * 7 * 86400000);
+              return next.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+            })()}
           </button>
         </div>
       )}

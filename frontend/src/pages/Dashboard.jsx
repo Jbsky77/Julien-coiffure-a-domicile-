@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, money, fmtDate, fmtTime, fmtMonth, money2 } from "@/lib/api";
-import { CalendarClock, Cake, Gift, Gauge, TrendingUp, Package, Users, Wallet, Bell, Plus, Navigation, Lightbulb, Target, AlertCircle } from "lucide-react";
+import { CalendarClock, Cake, Gift, Gauge, TrendingUp, Package, Users, Wallet, Bell, Plus, Navigation, Lightbulb, Target, AlertCircle, MessageSquare, Check } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 
 const PIE_COLORS = ["#0A192F", "#1E3A8A", "#D4AF37", "#94A3B8", "#CBD5E1", "#64748B"];
@@ -38,10 +38,11 @@ export default function Dashboard() {
   const [insights, setInsights] = useState([]);
   const [atRisk, setAtRisk] = useState(0);
   const [pendingReqs, setPendingReqs] = useState([]);
+  const [reminders, setReminders] = useState([]);
   const navigate = useNavigate();
 
   const load = async () => {
-    const [r, m, t, g, ins, st, reqs] = await Promise.all([
+    const [r, m, t, g, ins, st, reqs, rem] = await Promise.all([
       api.get("/dashboard"),
       api.get("/accounting/months"),
       api.get("/tour/today").catch(() => ({ data: null })),
@@ -49,6 +50,7 @@ export default function Dashboard() {
       api.get("/insights").catch(() => ({ data: { insights: [] } })),
       api.get("/clients/status").catch(() => ({ data: [] })),
       api.get("/appointment-requests").catch(() => ({ data: [] })),
+      api.get("/reminders/tomorrow").catch(() => ({ data: { reminders: [] } })),
     ]);
     setD(r.data);
     setMonths(m.data);
@@ -57,6 +59,14 @@ export default function Dashboard() {
     setInsights(ins.data?.insights || []);
     setAtRisk((st.data || []).filter((c) => ["a_relancer", "en_retard", "presque_perdu"].includes(c.status)).length);
     setPendingReqs((reqs.data || []).filter((r) => r.status === "pending" || r.status === "counter_proposed").slice(0, 4));
+    setReminders(rem.data?.reminders || []);
+  };
+
+  const markReminderSent = async (aid) => {
+    try {
+      await api.post(`/reminders/${aid}/sent`);
+      setReminders((prev) => prev.map((r) => (r.appointment_id === aid ? { ...r, sent: true } : r)));
+    } catch {}
   };
 
   useEffect(() => { load(); }, []);
@@ -207,6 +217,36 @@ export default function Dashboard() {
           </Widget>
         )}
       </div>
+
+      {/* Reminders: SMS 24h before tomorrow's appointments */}
+      {reminders.length > 0 && (
+        <Widget title="Rappels SMS — RDV de demain" tid="widget-reminders" color="blue">
+          <ul className="space-y-2.5">
+            {reminders.map((r) => (
+              <li key={r.appointment_id} className="flex items-center justify-between gap-3" data-testid={`reminder-${r.appointment_id}`}>
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate">{r.client_name}</div>
+                  <div className="text-xs text-slate-500 truncate">{r.time}{r.services ? ` · ${r.services}` : ""}</div>
+                </div>
+                {r.sent ? (
+                  <span className="text-[10px] px-2.5 py-1 rounded-full bg-green-100 text-green-700 flex items-center gap-1 whitespace-nowrap" data-testid={`reminder-sent-${r.appointment_id}`}><Check className="w-3 h-3" /> Envoyé</span>
+                ) : r.phone ? (
+                  <a
+                    href={`sms:${r.phone.replace(/\s/g, "")}?body=${encodeURIComponent(r.message)}`}
+                    onClick={() => markReminderSent(r.appointment_id)}
+                    data-testid={`reminder-sms-${r.appointment_id}`}
+                    className="text-xs px-3.5 py-1.5 rounded-full bg-[#0A192F] text-white flex items-center gap-1.5 whitespace-nowrap hover:bg-[#1E3A8A]"
+                  >
+                    <MessageSquare className="w-3 h-3" /> Envoyer le rappel
+                  </a>
+                ) : (
+                  <span className="text-[10px] px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 whitespace-nowrap">Pas de téléphone</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Widget>
+      )}
 
       {/* Pending appointment requests widget */}
       {pendingReqs.length > 0 && (

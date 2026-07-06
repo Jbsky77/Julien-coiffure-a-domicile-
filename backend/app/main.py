@@ -22,6 +22,7 @@ from app.routers import (
     pin,
     prospection,
     public,
+    reminders,
     services as services_router,
     settings as settings_router,
     slots,
@@ -60,6 +61,7 @@ ROUTERS = [
     appointment_requests.router,
     prospection.router,
     backup.router,
+    reminders.router,
 ]
 for r in ROUTERS:
     app.include_router(r, prefix="/api")

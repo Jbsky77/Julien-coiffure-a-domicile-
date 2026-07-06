@@ -182,6 +182,19 @@ export default function Settings() {
         <button onClick={saveSettings} data-testid="save-review-btn" className="mt-6 bg-[#0A192F] text-white rounded-full px-6 py-3 font-medium flex items-center gap-2"><Save className="w-4 h-4" /> Enregistrer</button>
       </section>
 
+      <section className="bg-white border border-slate-100 rounded-2xl p-6 shadow-premium" data-testid="reminder-section">
+        <div className="text-[10px] tracking-widest uppercase text-slate-500 mb-2">Rappel de RDV (SMS 24h avant)</div>
+        <div className="text-xs text-slate-500 mb-4 leading-relaxed">
+          Chaque jour, le tableau de bord liste les RDV du lendemain avec un bouton <span className="font-medium text-[#1E3A8A]">« Envoyer le rappel »</span> qui ouvre votre app SMS avec ce message pré-rempli.
+        </div>
+        <div>
+          <label className="text-[10px] uppercase tracking-widest text-slate-500">Message de rappel</label>
+          <textarea rows={3} className={fb + " leading-relaxed"} data-testid="set-reminder-template" value={settings.reminder_sms_template || ""} onChange={(e) => setSettings({ ...settings, reminder_sms_template: e.target.value })} placeholder="Bonjour {first_name}, ..." />
+          <div className="text-[10px] text-slate-500 mt-2">Variables : <span className="font-mono">{"{first_name}"}</span> · <span className="font-mono">{"{time}"}</span> · <span className="font-mono">{"{date}"}</span> · <span className="font-mono">{"{services}"}</span> · <span className="font-mono">{"{brand_name}"}</span></div>
+        </div>
+        <button onClick={saveSettings} data-testid="save-reminder-btn" className="mt-6 bg-[#0A192F] text-white rounded-full px-6 py-3 font-medium flex items-center gap-2"><Save className="w-4 h-4" /> Enregistrer</button>
+      </section>
+
       <section className="bg-white border border-slate-100 rounded-2xl p-6 shadow-premium">
         <div className="flex items-center justify-between mb-5">
           <div className="text-[10px] tracking-widest uppercase text-slate-500">Prestations & tarifs</div>

@@ -1,0 +1,44 @@
+{
+  "summary": "Session 3 (reminders, recurrence, no-show/deposit) tested. Backend 11/11 new + 27 regression = 38/38 pytest PASS. Frontend: dashboard widget-reminders + sent badge + sms: link + click-to-mark-sent OK; recurrence-section + recur-weeks-4/5/6 + input + create-btn OK; recurrence hidden on cancelled RDV OK; client-risk-banner shown for Sophie (Acompte requis 10€ demandés) + hidden for safe/plain client OK; client-noshow-card + 6 stat cards + deposit toggle checked + deposit note '10€ demandés' + save-client-btn OK; reminder-section + template textarea + save-reminder-btn OK; backup-section + next-visit-admin regression OK. CRITICAL frontend bug found and fixed inline (2 missing useState declarations in AppointmentForm.jsx).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/appointments/{rid}/schedule-next", "issue": "weeks=0 in payload is coerced to default 5 (via `payload.get('weeks') or 5`) instead of being clamped to 1. Fix: use `payload.get('weeks', 5) if payload.get('weeks') is not None else 5` or handle 0 explicitly before the clamp."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "AppointmentForm", "issue": "Missing useState declarations for `clientRisk`/`setClientRisk` and `recurWeeks`/`setRecurWeeks` — Uncaught ReferenceError: setClientRisk is not defined, then recurWeeks is not defined. The entire /rdv/* page (edit and create) crashed to the runtime error overlay, no testids rendered. Fixed inline by adding both useState hooks so remaining tests could proceed.", "selector": "/rdv/:id and /rdv/nouveau", "priority": "CRITICAL"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_session3_features.py",
+    "/app/backend/tests/test_new_features.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/session3.xml"
+  ],
+  "action_items": [
+    "Confirm keep of the two useState fixes in /app/frontend/src/pages/AppointmentForm.jsx (added: `const [clientRisk, setClientRisk] = useState(null);` after clientLoyalty; `const [recurWeeks, setRecurWeeks] = useState(5);` after loadingSlots).",
+    "Optional (minor): fix weeks=0 fallback in POST /appointments/{rid}/schedule-next so it clamps to 1 (currently returns +5w via truthy-fallback).",
+    "Optional cosmetic: reminder SMS pre-filled message can render `()` empty parentheses when services list on the appointment is empty for a fresh RDV — cosmetic only; happens because {services} template resolves to empty string."
+  ],
+  "critical_code_review_comments": [
+    "AppointmentForm.jsx shipped without the useState hooks that its own useEffect and JSX rely on — indicates the recurrence + risk banner features were never actually opened during dev. Recommend a smoke render test.",
+    "PUT /api/clients/{cid} accepts arbitrary Dict[str, Any] and $set's it verbatim — no allow-list, so any key (including internal fields like access_token or lat/lng) could be overwritten by clients. Consider a ClientUpdate Pydantic model.",
+    "Recurrence: schedule-next re-uses source RDV `client_name` snapshot instead of re-reading the client doc — will silently drift if client is renamed between the two RDVs.",
+    "reminders/tomorrow query loads all scheduled appointments (up to 5000) then filters in Python; consider a Mongo range query on `date` for scale."
+  ],
+  "updated_files": [
+    "/app/frontend/src/pages/AppointmentForm.jsx",
+    "/app/backend/tests/test_session3_features.py"
+  ],
+  "success_rate": {"backend": "100% (38/38)", "frontend": "100% after AppointmentForm hotfix (was 0% on /rdv/* pages before)"},
+  "test_credentials": "PIN 123456; Sophie cli_e998044705; existing tomorrow RDV rdv_a67c9cf136.",
+  "seed_data_creation": "Temporary RDVs created + deleted (test_new_tomorrow_rdv_sent_false_then_marked + 3 recurrence RDVs cleaned by test_zz_cleanup; UI test created rdv_21dcca3f6b and deleted it).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "AppointmentForm.jsx was missing two useState hooks (clientRisk, recurWeeks). I added them so the page renders. If main agent restructures state, keep these two hooks. Backend clamp bug for weeks=0 is documented but unfixed (test uses weeks=-1 to hit lower bound).",
+  "rca of the issue": "AppointmentForm.jsx used setClientRisk() inside a useEffect (l.66/74) and recurWeeks inside the Recurrence JSX block (l.442-465) but the corresponding useState declarations were absent, causing an uncaught ReferenceError that crashed the entire form as soon as /rdv/:id or /rdv/nouveau was opened. Repro before fix: navigate to /rdv/rdv_a67c9cf136 → runtime error overlay 'setClientRisk is not defined'. Mitigation: added `const [clientRisk, setClientRisk] = useState(null);` (after `clientLoyalty`) and `const [recurWeeks, setRecurWeeks] = useState(5);` (after `loadingSlots`). After fix, all recurrence + client-risk-banner flows verified working end-to-end."
+}
