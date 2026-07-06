@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { LayoutDashboard, CalendarClock, Users, Receipt, Package, Settings as SettingsIcon, Scissors, TrendingUp, Route, AlertCircle, Search, Lock, Map as MapIcon } from "lucide-react";
+import { LayoutDashboard, CalendarClock, Users, Receipt, Package, Settings as SettingsIcon, Scissors, TrendingUp, Route, AlertCircle, Search, Lock, Map as MapIcon, Bell } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { pinStorage } from "@/lib/api";
+import { api, pinStorage } from "@/lib/api";
 import GlobalSearch from "@/components/app/GlobalSearch";
 
 const NAV = [
@@ -14,6 +14,7 @@ const NAV = [
 ];
 
 const MORE = [
+  { to: "/demandes", label: "Demandes", icon: Bell, tid: "nav-demandes", badge: true },
   { to: "/tour", label: "Tournée", icon: Route, tid: "nav-tour" },
   { to: "/carte", label: "Carte", icon: MapIcon, tid: "nav-map" },
   { to: "/clients-status", label: "Risque", icon: AlertCircle, tid: "nav-clients-status" },
@@ -24,6 +25,20 @@ const MORE = [
 export default function Layout({ children }) {
   const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  // Poll pending appointment requests every 60s
+  useEffect(() => {
+    let alive = true;
+    const load = () => {
+      api.get("/appointment-requests/pending-count")
+        .then((r) => { if (alive) setPendingCount(r.data?.count || 0); })
+        .catch(() => {});
+    };
+    load();
+    const iv = setInterval(load, 60_000);
+    return () => { alive = false; clearInterval(iv); };
+  }, []);
 
   // Global keyboard shortcut: "/" opens search
   useEffect(() => {
@@ -60,8 +75,11 @@ export default function Layout({ children }) {
               <Search className="w-4 h-4" strokeWidth={1.5} />
             </button>
             {MORE.map((n) => (
-              <NavLink key={n.to} to={n.to} data-testid={n.tid} className={({isActive}) => `p-2 rounded-full ${isActive ? "bg-[#0A192F] text-white" : "text-slate-500 hover:bg-slate-50"}`}>
+              <NavLink key={n.to} to={n.to} data-testid={n.tid} className={({isActive}) => `relative p-2 rounded-full ${isActive ? "bg-[#0A192F] text-white" : "text-slate-500 hover:bg-slate-50"}`}>
                 <n.icon className="w-4 h-4" strokeWidth={1.5} />
+                {n.badge && pendingCount > 0 && (
+                  <span data-testid="pending-badge" className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">{pendingCount > 9 ? "9+" : pendingCount}</span>
+                )}
               </NavLink>
             ))}
             <button onClick={lockNow} data-testid="topbar-lock" className="p-2 rounded-full text-slate-500 hover:bg-slate-50" title="Verrouiller l'app">

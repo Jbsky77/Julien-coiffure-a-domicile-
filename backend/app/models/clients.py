@@ -1,7 +1,13 @@
+import secrets
+
 from pydantic import BaseModel, Field
 from typing import Optional, Dict
 from datetime import datetime, timezone
 import uuid
+
+
+def _gen_access_token() -> str:
+    return secrets.token_urlsafe(24)
 
 
 class Client(BaseModel):
@@ -19,6 +25,7 @@ class Client(BaseModel):
     last_seen: Optional[str] = None
     lat: Optional[float] = None
     lng: Optional[float] = None
+    access_token: str = Field(default_factory=_gen_access_token)
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 

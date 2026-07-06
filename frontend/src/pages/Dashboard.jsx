@@ -37,16 +37,18 @@ export default function Dashboard() {
   const [goals, setGoals] = useState(null);
   const [insights, setInsights] = useState([]);
   const [atRisk, setAtRisk] = useState(0);
+  const [pendingReqs, setPendingReqs] = useState([]);
   const navigate = useNavigate();
 
   const load = async () => {
-    const [r, m, t, g, ins, st] = await Promise.all([
+    const [r, m, t, g, ins, st, reqs] = await Promise.all([
       api.get("/dashboard"),
       api.get("/accounting/months"),
       api.get("/tour/today").catch(() => ({ data: null })),
       api.get("/goals/progress").catch(() => ({ data: null })),
       api.get("/insights").catch(() => ({ data: { insights: [] } })),
       api.get("/clients/status").catch(() => ({ data: [] })),
+      api.get("/appointment-requests").catch(() => ({ data: [] })),
     ]);
     setD(r.data);
     setMonths(m.data);
@@ -54,6 +56,7 @@ export default function Dashboard() {
     setGoals(g.data);
     setInsights(ins.data?.insights || []);
     setAtRisk((st.data || []).filter((c) => ["a_relancer", "en_retard", "presque_perdu"].includes(c.status)).length);
+    setPendingReqs((reqs.data || []).filter((r) => r.status === "pending" || r.status === "counter_proposed").slice(0, 4));
   };
 
   useEffect(() => { load(); }, []);
@@ -204,6 +207,28 @@ export default function Dashboard() {
           </Widget>
         )}
       </div>
+
+      {/* Pending appointment requests widget */}
+      {pendingReqs.length > 0 && (
+        <Widget title="Demandes de RDV clients" tid="widget-pending-requests" actionLabel="Tout voir" onAction={() => navigate("/demandes")} color="gold">
+          <ul className="space-y-2.5">
+            {pendingReqs.map((r) => (
+              <li key={r.id} className="flex items-center justify-between gap-3" data-testid={`dash-req-${r.id}`}>
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate">{r.client_name}</div>
+                  <div className="text-xs text-slate-500">
+                    {fmtDate(r.status === "counter_proposed" ? r.counter_proposed_date : r.requested_date)}
+                    · {r.services.map((s) => s.name).slice(0, 2).join(", ")}
+                  </div>
+                </div>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap ${r.status === "pending" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>
+                  {r.status === "pending" ? "En attente" : "Contre-prop."}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Widget>
+      )}
 
       {/* Row: today / tomorrow / birthdays */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

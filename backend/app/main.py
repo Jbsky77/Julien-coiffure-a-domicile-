@@ -9,6 +9,7 @@ from app.db import client
 from app.routers import (
     accounting,
     analytics,
+    appointment_requests,
     appointments,
     auth,
     calendar,
@@ -18,6 +19,7 @@ from app.routers import (
     insights,
     photos,
     pin,
+    public,
     services as services_router,
     settings as settings_router,
     slots,
@@ -26,6 +28,7 @@ from app.routers import (
 )
 from app.routers.pin import _token_is_valid, _read_security
 from app.routers.services import ensure_default_services, migrate_service_durations
+from app.services.migrations import backfill_client_access_tokens
 from app.services.settings import get_settings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -51,6 +54,8 @@ ROUTERS = [
     calendar.router,
     stock.router,
     dashboard.router,
+    public.router,
+    appointment_requests.router,
 ]
 for r in ROUTERS:
     app.include_router(r, prefix="/api")
@@ -71,8 +76,8 @@ _OPEN_PATHS = {
 async def pin_guard(request: Request, call_next):
     path = request.url.path
     if path.startswith("/api/") and not any(path == p or path.startswith(p + "/") for p in _OPEN_PATHS):
-        # iCal feed is guarded by its own session token — bypass here.
-        if not path.startswith("/api/calendar/"):
+        # iCal feed & public client space are guarded by their own tokens.
+        if not path.startswith("/api/calendar/") and not path.startswith("/api/public/"):
             sec = await _read_security()
             if sec.get("hash"):
                 token = request.headers.get("x-pin-token")
@@ -94,6 +99,7 @@ app.add_middleware(
 async def on_startup():
     await ensure_default_services()
     await migrate_service_durations()
+    await backfill_client_access_tokens()
     await get_settings()
 
 

@@ -17,6 +17,8 @@ import Analytics from "@/pages/Analytics";
 import Tour from "@/pages/Tour";
 import ClientStatus from "@/pages/ClientStatus";
 import MapPage from "@/pages/Map";
+import ClientSpace from "@/pages/ClientSpace";
+import AppointmentRequests from "@/pages/AppointmentRequests";
 import Layout from "@/components/app/Layout";
 import PinGate from "@/components/app/PinGate";
 
@@ -46,7 +48,25 @@ function RootRouter() {
         <Route path="/tour" element={<Tour />} />
         <Route path="/clients-status" element={<ClientStatus />} />
         <Route path="/carte" element={<MapPage />} />
+        <Route path="/demandes" element={<AppointmentRequests />} />
       </Route>
+    </Routes>
+  );
+}
+
+// Router: separates the public client space (no PIN required) from the admin app.
+function AppRouter() {
+  return (
+    <Routes>
+      <Route path="/c/:token" element={<ClientSpace />} />
+      <Route
+        path="*"
+        element={
+          <PinGate>
+            <RootRouter />
+          </PinGate>
+        }
+      />
     </Routes>
   );
 }
@@ -55,9 +75,7 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <PinGate>
-          <RootRouter />
-        </PinGate>
+        <AppRouter />
         <Toaster position="top-right" richColors closeButton />
       </BrowserRouter>
     </AuthProvider>

@@ -9,7 +9,6 @@ const API = (process.env.PLAYWRIGHT_BASE_URL || process.env.REACT_APP_BACKEND_UR
 // default (123456). The returned token is injected in every axios call.
 let _pinToken = null;
 async function ensureUnlocked() {
-  if (_pinToken) return _pinToken;
   try {
     const status = (await axios.get(API + '/pin/status')).data;
     if (status.configured) {
@@ -20,6 +19,23 @@ async function ensureUnlocked() {
   } catch (_) { /* ignore */ }
   return _pinToken;
 }
+
+// Refresh the token on 401 automatically.
+axios.interceptors.response.use(
+  (r) => r,
+  async (err) => {
+    if (err.response?.status === 401 && !err.config?.__retried) {
+      _pinToken = null;
+      delete axios.defaults.headers.common['X-Pin-Token'];
+      await ensureUnlocked();
+      err.config.__retried = true;
+      err.config.headers['X-Pin-Token'] = _pinToken;
+      return axios.request(err.config);
+    }
+    return Promise.reject(err);
+  }
+);
+
 // Auto-run at module load so `axios.get/post(...)` in tests are pre-authenticated.
 ensureUnlocked();
 

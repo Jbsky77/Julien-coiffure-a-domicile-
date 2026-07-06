@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { api, money, money2, fmtDate, fmtTime, genderClasses, genderLabel, computeAge } from "@/lib/api";
-import { ArrowLeft, MapPin, Phone, Cake, Plus, Trash2, Save, Gift, Users as UsersIcon, Mail, MessageSquare, Star } from "lucide-react";
+import { ArrowLeft, MapPin, Phone, Cake, Plus, Trash2, Save, Gift, Users as UsersIcon, Mail, MessageSquare, Star, CreditCard, Copy, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import ClientPhotos from "@/components/app/ClientPhotos";
 
@@ -116,6 +116,20 @@ export default function ClientDetail() {
   })();
   const reviewDisabledReason = !c.phone ? "Ajoutez un téléphone à la fiche client" : !reviewUrl ? "Configurez votre lien d'avis dans Réglages" : null;
 
+  const spaceUrl = c.access_token ? `${window.location.origin}/c/${c.access_token}` : null;
+  const cardSmsHref = (() => {
+    if (!c.phone || !spaceUrl) return null;
+    const body = `Bonjour ${c.first_name || ""}, voici votre espace personnel avec votre carte de fidélité : ${spaceUrl} — ${settings.brand_name || "Julien"}`;
+    return `sms:${c.phone.replace(/\s/g, "")}?body=${encodeURIComponent(body)}`;
+  })();
+  const copySpaceUrl = async () => {
+    if (!spaceUrl) return;
+    try {
+      await navigator.clipboard.writeText(spaceUrl);
+      toast.success("Lien copié");
+    } catch { toast.error("Copie impossible"); }
+  };
+
   return (
     <div className={`space-y-8 max-w-5xl p-4 rounded-3xl border-2 ${gc.border} ${gc.bg}`} data-testid="client-detail-page">
       <button onClick={() => navigate(-1)} className="text-sm text-slate-500 hover:text-[#0A192F] flex items-center gap-1"><ArrowLeft className="w-4 h-4" /> Retour</button>
@@ -145,6 +159,26 @@ export default function ClientDetail() {
           <button onClick={remove} data-testid="delete-client-btn" className="rounded-full px-4 py-2.5 border border-red-200 text-[#991B1B] hover:bg-red-50"><Trash2 className="w-4 h-4" /></button>
         </div>
       </div>
+
+      {/* Espace client — magic link + SMS */}
+      {spaceUrl && (
+        <div className="bg-gradient-to-br from-[#D4AF37]/10 via-white to-[#0A192F]/5 border border-[#D4AF37]/30 rounded-2xl p-5 flex flex-col md:flex-row md:items-center gap-3" data-testid="client-space-card">
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] tracking-[0.3em] uppercase text-[#8A6A1F] mb-1 flex items-center gap-1.5"><CreditCard className="w-3 h-3" /> Espace client & carte de fidélité</div>
+            <div className="text-sm text-slate-700">Envoyez à votre client le lien vers son espace personnel avec sa carte de fidélité et l'option de demander un RDV.</div>
+            <div className="mt-2 font-mono text-[11px] text-slate-500 truncate" data-testid="client-space-url">{spaceUrl}</div>
+          </div>
+          <div className="flex flex-wrap gap-2 flex-shrink-0">
+            <button onClick={copySpaceUrl} data-testid="copy-space-url" className="rounded-full px-4 py-2 border border-slate-200 text-slate-700 text-xs flex items-center gap-1.5 hover:bg-white"><Copy className="w-3.5 h-3.5" /> Copier</button>
+            <a href={spaceUrl} target="_blank" rel="noopener noreferrer" data-testid="open-space-url" className="rounded-full px-4 py-2 border border-slate-200 text-slate-700 text-xs flex items-center gap-1.5 hover:bg-white"><ExternalLink className="w-3.5 h-3.5" /> Aperçu</a>
+            {cardSmsHref ? (
+              <a href={cardSmsHref} data-testid="send-card-sms" className="rounded-full px-4 py-2 bg-gold-gradient text-white text-xs flex items-center gap-1.5 shadow-premium"><CreditCard className="w-3.5 h-3.5" /> Envoyer la carte de fidélité</a>
+            ) : (
+              <button onClick={() => toast.info("Ajoutez un téléphone à la fiche pour envoyer le SMS")} data-testid="send-card-sms-disabled" className="rounded-full px-4 py-2 border border-[#D4AF37]/50 text-[#8A6A1F] text-xs flex items-center gap-1.5 opacity-70"><CreditCard className="w-3.5 h-3.5" /> Envoyer la carte de fidélité</button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Stats strip */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
