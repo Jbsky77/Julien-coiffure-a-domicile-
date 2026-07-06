@@ -162,13 +162,12 @@ export default function ClientDetail() {
 
       {/* Espace client — magic link + SMS */}
       {spaceUrl && (
-        <div className="bg-gradient-to-br from-[#D4AF37]/10 via-white to-[#0A192F]/5 border border-[#D4AF37]/30 rounded-2xl p-5 flex flex-col md:flex-row md:items-center gap-3" data-testid="client-space-card">
-          <div className="flex-1 min-w-0">
-            <div className="text-[10px] tracking-[0.3em] uppercase text-[#8A6A1F] mb-1 flex items-center gap-1.5"><CreditCard className="w-3 h-3" /> Espace client & carte de fidélité</div>
-            <div className="text-sm text-slate-700">Envoyez à votre client le lien vers son espace personnel avec sa carte de fidélité et l'option de demander un RDV.</div>
+        <div className="bg-gradient-to-br from-[#D4AF37]/10 via-white to-[#0A192F]/5 border border-[#D4AF37]/30 rounded-2xl p-5 space-y-3" data-testid="client-space-card">
+          <div className="min-w-0">
+            <div className="text-[10px] tracking-[0.3em] uppercase text-[#8A6A1F] flex items-center gap-1.5"><CreditCard className="w-3 h-3 flex-shrink-0" /> Espace client & carte de fidélité</div>
             <div className="mt-2 font-mono text-[11px] text-slate-500 truncate" data-testid="client-space-url">{spaceUrl}</div>
           </div>
-          <div className="flex flex-wrap gap-2 flex-shrink-0">
+          <div className="flex flex-wrap gap-2">
             <button onClick={copySpaceUrl} data-testid="copy-space-url" className="rounded-full px-4 py-2 border border-slate-200 text-slate-700 text-xs flex items-center gap-1.5 hover:bg-white"><Copy className="w-3.5 h-3.5" /> Copier</button>
             <a href={spaceUrl} target="_blank" rel="noopener noreferrer" data-testid="open-space-url" className="rounded-full px-4 py-2 border border-slate-200 text-slate-700 text-xs flex items-center gap-1.5 hover:bg-white"><ExternalLink className="w-3.5 h-3.5" /> Aperçu</a>
             {cardSmsHref ? (
