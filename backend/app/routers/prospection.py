@@ -16,7 +16,7 @@ async def prospection_analyze(payload: Dict[str, Any], user: User = Depends(get_
     try:
         lat = float(payload["lat"])
         lng = float(payload["lng"])
-        radius_km = min(30.0, max(0.5, float(payload.get("radius_km", 5))))
+        radius_km = min(50.0, max(0.5, float(payload.get("radius_km", 5))))
     except (KeyError, TypeError, ValueError):
         raise HTTPException(400, "lat, lng et radius_km requis")
     try:

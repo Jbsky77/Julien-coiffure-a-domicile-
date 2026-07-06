@@ -49,6 +49,7 @@ export default function ClientDetail() {
       gender: r.data.client.gender || "",
       phone: r.data.client.phone,
       address: r.data.client.address,
+      address_parts: r.data.client.address_parts || { ...emptyParts },
       comment: r.data.client.comment,
       birthday: r.data.client.birthday || "",
       referrals: r.data.client.referrals || 0,

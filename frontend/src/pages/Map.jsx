@@ -131,7 +131,7 @@ export default function MapPage() {
           <div className="flex items-center gap-3 flex-wrap">
             <label className="text-xs text-slate-500 whitespace-nowrap">Rayon : <span className="font-semibold text-[#0A192F]">{radius} km</span></label>
             <input
-              type="range" min="1" max="20" step="1" value={radius}
+              type="range" min="1" max="50" step="1" value={radius}
               onChange={(e) => setRadius(parseInt(e.target.value))}
               data-testid="prospection-radius"
               className="flex-1 min-w-[120px] accent-[#D4AF37]"
