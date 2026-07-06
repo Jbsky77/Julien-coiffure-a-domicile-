@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { api, money, money2, fmtDate, fmtTime, genderClasses, genderLabel, computeAge } from "@/lib/api";
-import { ArrowLeft, MapPin, Phone, Cake, Plus, Trash2, Save, Gift, Users as UsersIcon, Mail, MessageSquare } from "lucide-react";
+import { ArrowLeft, MapPin, Phone, Cake, Plus, Trash2, Save, Gift, Users as UsersIcon, Mail, MessageSquare, Star } from "lucide-react";
 import { toast } from "sonner";
 import ClientPhotos from "@/components/app/ClientPhotos";
 
@@ -103,6 +103,19 @@ export default function ClientDetail() {
   const smsLink = c.phone ? `sms:${c.phone.replace(/\s/g, "")}?body=${encodeURIComponent(`Bonjour ${c.first_name || ""}, c'est Julien Bouche. `)}` : null;
   const mailLink = `mailto:?subject=${encodeURIComponent("Prendre rendez-vous")}&body=${encodeURIComponent(`Bonjour ${c.first_name || c.last_name},\n\nJ'espère que vous allez bien. Souhaitez-vous prendre un nouveau rendez-vous ?\n\nÀ bientôt,\nJulien Bouche`)}`;
 
+  const reviewUrl = (settings.google_review_url || "").trim();
+  const reviewSmsHref = (() => {
+    if (!c.phone || !reviewUrl) return null;
+    const template = settings.review_sms_template || "Bonjour {first_name}, merci pour votre confiance ! Donnez votre avis sur votre coiffeur ici : {url} — {brand_name}";
+    const body = template
+      .replace(/\{first_name\}/g, c.first_name || "")
+      .replace(/\{last_name\}/g, c.last_name || "")
+      .replace(/\{url\}/g, reviewUrl)
+      .replace(/\{brand_name\}/g, settings.brand_name || "Julien");
+    return `sms:${c.phone.replace(/\s/g, "")}?body=${encodeURIComponent(body)}`;
+  })();
+  const reviewDisabledReason = !c.phone ? "Ajoutez un téléphone à la fiche client" : !reviewUrl ? "Configurez votre lien d'avis dans Réglages" : null;
+
   return (
     <div className={`space-y-8 max-w-5xl p-4 rounded-3xl border-2 ${gc.border} ${gc.bg}`} data-testid="client-detail-page">
       <button onClick={() => navigate(-1)} className="text-sm text-slate-500 hover:text-[#0A192F] flex items-center gap-1"><ArrowLeft className="w-4 h-4" /> Retour</button>
@@ -123,6 +136,11 @@ export default function ClientDetail() {
         <div className="flex gap-2 flex-wrap">
           {smsLink && <a href={smsLink} data-testid="sms-link" className="rounded-full px-4 py-2.5 border border-slate-200 text-sm flex items-center gap-2"><MessageSquare className="w-4 h-4" /> SMS</a>}
           <a href={mailLink} data-testid="mail-link" className="rounded-full px-4 py-2.5 border border-slate-200 text-sm flex items-center gap-2"><Mail className="w-4 h-4" /> Email</a>
+          {reviewSmsHref ? (
+            <a href={reviewSmsHref} data-testid="ask-review-btn" className="rounded-full px-4 py-2.5 bg-gold-gradient text-white text-sm flex items-center gap-2 shadow-premium"><Star className="w-4 h-4 fill-current" /> Demander un avis</a>
+          ) : (
+            <button onClick={() => toast.info(reviewDisabledReason || "Non configuré")} data-testid="ask-review-disabled" className="rounded-full px-4 py-2.5 border border-[#D4AF37]/50 text-[#8A6A1F] text-sm flex items-center gap-2 opacity-70"><Star className="w-4 h-4" /> Demander un avis</button>
+          )}
           <Link to={`/rdv/nouveau?client=${c.id}`} data-testid="client-new-rdv" className="bg-[#0A192F] text-white rounded-full px-5 py-2.5 text-sm font-medium hover:bg-[#1E3A8A] flex items-center gap-2"><Plus className="w-4 h-4" /> RDV</Link>
           <button onClick={remove} data-testid="delete-client-btn" className="rounded-full px-4 py-2.5 border border-red-200 text-[#991B1B] hover:bg-red-50"><Trash2 className="w-4 h-4" /></button>
         </div>
