@@ -20,6 +20,13 @@ Julien Bouche — coiffeur indépendant auto-entrepreneur, mobile, passe d'un cl
 - Persistance MongoDB
 - Navigation cliquable partout
 
+## Implemented (v2.5 — 2026-06) — Rappels SMS, RDV récurrents & No-show/Acomptes
+- **Rappels SMS 24h avant** (semi-auto, gratuit) : `GET /api/reminders/tomorrow` liste les RDV `scheduled` du lendemain (fuseau Europe/Paris) avec message construit depuis `settings.reminder_sms_template` (variables {first_name},{time},{date},{services},{brand_name}, éditable dans Réglages). Widget dashboard `widget-reminders` avec bouton `sms:` pré-rempli → `POST /api/reminders/{rid}/sent` (collection `reminders_sent`) → badge "Envoyé".
+- **RDV récurrents** : `POST /api/appointments/{rid}/schedule-next` {weeks 1-26} crée le RDV suivant (même client/prestations/heure, prix recalculé, is_gift reset). UI : section `recurrence-section` sur tout RDV non annulé (boutons 4/5/6 sem + saisie libre, navigation vers le nouveau RDV).
+- **No-show / Acomptes** : champs client `deposit_required` + `deposit_note`. Fiche client : 6e carte stats `client-noshow-card` (compteur annulations + badge acompte), toggle + note dans l'onglet Infos. Formulaire RDV : bannière orange `client-risk-banner` si annulations > 0 ou acompte requis.
+- **Fix UI fiche client** : texte explicatif de l'encart espace client supprimé (demande user), encart compacté en colonne.
+- **Tests** : 38/38 pytest (dont `tests/test_session3_features.py` 11 tests, lancer avec `REACT_APP_BACKEND_URL` en env) + 100% flows frontend via agent de test. Bug critique corrigé : useState manquants dans AppointmentForm (write parallèle perdu).
+
 ## Implemented (v2.4 — 2026-06) — Prospection, RDV recommandé & Backup JSON
 - **Export/Backup JSON** (P0 rattrapé) : `GET /api/backup/export` (protégé PIN) exporte les 10 collections (settings, services, clients, appointments, appointment_requests, stock, notifications, relances, client_photos, urssaf_status) avec `counts` + `exported_at`. Bouton de téléchargement dans Réglages (`backup-section`).
 - **Prochain RDV recommandé** : `app/services/next_visit.py` calcule la fréquence moyenne (min 7j, null si <2 RDV done), `next_recommended_date`, `days_until` et les 2 prestations habituelles. Exposé dans `GET /api/clients/{cid}` (admin) ET `GET /api/public/client/{token}` (espace client). UI : carte compte à rebours gold dans l'Espace Client avec bouton "Réserver ce créneau" (pré-remplit date à 10h + prestations habituelles dans l'onglet Nouveau RDV) + bandeau `next-visit-admin` sur la fiche client avec bouton "Planifier".
@@ -85,10 +92,8 @@ Julien Bouche — coiffeur indépendant auto-entrepreneur, mobile, passe d'un cl
 - **v2.0 (2026-05)** : 20/20 backend, frontend ~80%. Bug `Client` Pydantic `lat`/`lng` corrigé. Routing `/api/clients/status` avant `{cid}`.
 
 ## P0/P1/P2 backlog
-- **P1** : Rappels SMS automatiques 24h avant un RDV.
-- **P1** : RDV récurrents (ex : toutes les 4-6 semaines) en un clic.
-- **P2** : Suivi no-show / acomptes (clients qui annulent à la dernière minute).
 - **P2** : Logo/branding image upload (actuellement seul `brand_name` est utilisé, le canvas social gère déjà brand_name).
+- **P2** : Rappels SMS 100% automatiques via Twilio (option payante, si le user le demande).
 - **P2** : Notifications push pour RDV imminents.
 - **P2** : Synchronisation tournée avec Google Maps Directions API pour estimation précise.
 - **P3** : CI GitHub Actions pour Playwright (actuellement standalone local).

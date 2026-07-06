@@ -123,7 +123,7 @@ async def appointments_schedule_next(rid: str, payload: Dict[str, Any], user: Us
     if not rdv:
         raise HTTPException(404, "Not found")
     try:
-        weeks = int(payload.get("weeks") or 5)
+        weeks = int(payload.get("weeks", 5))
     except (TypeError, ValueError):
         raise HTTPException(400, "weeks invalide")
     weeks = min(26, max(1, weeks))
