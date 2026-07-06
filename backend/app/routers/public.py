@@ -37,6 +37,28 @@ async def get_client_space(token: str):
     loyalty = await compute_loyalty_card(c["id"])
     notifs = await notifications.list_for_client(c["id"])
     next_visit = await compute_next_visit(c["id"])
+    invoices = [
+        {
+            "id": r["id"],
+            "invoice_number": r.get("invoice_number"),
+            "date": r["date"],
+            "finished_at": r.get("finished_at"),
+            "services": [
+                {
+                    "name": s["name"],
+                    "price": s["price"],
+                    "is_gift": s.get("is_gift", False),
+                    "stylist": s.get("stylist", "Julien"),
+                }
+                for s in r.get("services") or []
+            ],
+            "fuel_supplement": r.get("fuel_supplement", 0),
+            "price_final": r.get("price_final", 0),
+            "payment_mode": r.get("payment_mode"),
+        }
+        for r in rdvs
+        if r.get("status") == "done"
+    ]
     return {
         "client": {
             "id": c["id"],
@@ -52,6 +74,7 @@ async def get_client_space(token: str):
         "loyalty": loyalty,
         "notifications": notifs,
         "next_visit": next_visit,
+        "invoices": invoices,
         "brand": {
             "name": settings.brand_name,
             "review_url_short": settings.google_review_url_short,

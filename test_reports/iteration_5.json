@@ -1,0 +1,46 @@
+{
+  "summary": "Session 4 tested: (1) HOUR BUG on /rdv/:id — FIXED and confirmed stable across 4 open/edit/save cycles (2026-07-25T15:30 stays 15:30, DB stores 2026-07-25T15:30:00.000Z unchanged). (2) Backend finish() with stylists + sequential invoice_number F-2026-XXXX — WORKS via API (F-2026-0004 generated on new UI finish; re-finish → 400; counter atomic). (3) Client space /c/<token> tab-factures — WORKS: invoices-section renders 5 invoices, F-2026-0001 shows 'Coupe Homme par Marley' + 'Coupe + Barbe par Julien', legacy RDVs show 'par Julien' default and 'FACTURE' placeholder. (4) CRITICAL FRONTEND BUG FOUND: the stylist selection UI is disconnected from the finish payload — the `finish()` handler in AppointmentForm.jsx builds a payload WITHOUT the `stylists` field, so choosing Marley for a service has NO effect. UI test proved: clicked stylist-svc_9bb2d107ea-Marley → after finish, backend has stylist=Julien. Regression checks pass: 43/43 pytest, all 4 client-space tabs OK, edit-mode-toggle + save-rdv-btn + recurrence-section + client-risk-banner all render.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/public/client/{token}", "issue": "Legacy 'done' RDVs pre-invoice-feature keep invoice_number=null and are rendered as 'FACTURE' (no number) in the UI. Spec said 'chacun avec invoice_number'. Consider a backfill migration to assign numbers to older done RDVs, or explicitly document that only post-feature invoices are numbered."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "AppointmentForm.jsx :: finish()",
+        "issue": "The finish() handler (l.139-152) builds its payload with only {payment_mode, price_final, duration_minutes} and NEVER includes `stylists`. Consequence: the whole per-service stylist selection UI (stylist-section pills) is dead — Marley is visually selectable but never sent to POST /appointments/{rid}/finish. Reproduced end-to-end: clicked stylist-svc_9bb2d107ea-Marley on a fresh RDV, hit finish-rdv-btn, then GET /appointments returned stylist='Julien' for that service, and the resulting F-2026-0004 invoice shows 'par Julien' in the client space. Backend accepts stylists correctly (verified via curl + pytest).",
+        "selector": "[data-testid=\"finish-rdv-btn\"] / stylist-{sid}-{Julien|Marley}",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [
+      {"flow": "Encaissement avec choix coiffeur", "issue": "Missing `stylists: stylists` (or filtered subset) in the finish payload — one-line fix required.", "affected_selectors": ["stylist-section", "finish-rdv-btn"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_invoice_stylists.py",
+    "/app/test_reports/pytest/session4.xml"
+  ],
+  "action_items": [
+    "URGENT — Fix AppointmentForm.jsx finish(): include `stylists` in the payload. Suggested patch: `const payload = { payment_mode: paymentMode, price_final: form.price_final_override ?? preview.final, duration_minutes: duration === '' ? null : parseInt(duration), stylists };` (or `Object.keys(stylists).length ? stylists : undefined`). Backend already accepts it — this is a plumbing miss only.",
+    "Optional: backfill invoice_number on legacy done RDVs so client space shows F-YYYY-XXXX for every historical invoice."
+  ],
+  "critical_code_review_comments": [
+    "AppointmentForm.jsx finish() is out of sync with its own state — the `stylists` state is set up, hydrated from server, wired into the JSX pills, but the submit handler drops it. Suggest a small e2e/smoke test that finishes a RDV with a non-default stylist and re-reads it (same pattern as this iteration's playwright script).",
+    "PUT /appointments/{rid} does not preserve per-service `stylist` when the frontend re-sends the services list, because compute_appointment_totals rebuilds services from scratch. If a scheduled RDV had stylists partially chosen at creation, an unrelated PUT will silently reset them to 'Julien'. Not blocking today (stylist is only set at finish) but worth aware.",
+    "Client space renders legacy invoices with the string 'FACTURE' via a fallback — cleaner UX would either show 'F-—' or backfill the numbers."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_invoice_stylists.py"
+  ],
+  "success_rate": {"backend": "100% (43/43 + 4/4 new)", "frontend": "80% — hour bug fixed & verified; stylist selection UI broken (payload missing)"},
+  "test_credentials": "PIN 123456; Sophie cli_e998044705; token _V-HRjKzLbQYJU0pPRHlad_44GARhDU0; reference invoice rdv_037b0f8120 = F-2026-0001",
+  "seed_data_creation": "Created 2 temporary RDVs during UI testing (rdv_ceaba4423e for hour-stability, rdv_854c5577f7 for finish flow). Both deleted at end. F-2026-0004 was consumed by the finish test (counter is now at 4). rdv_037b0f8120 / F-2026-0001 untouched.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Hour bug fix (isoToLocalInput) works — no need to retest unless the helper is touched. When the stylists-in-payload bug is fixed, re-run the second Playwright block from this iteration: create RDV with 2 services → click stylist-svc_9bb2d107ea-Marley → finish-rdv-btn → GET /appointments → assert services[0].stylist === 'Marley'. Backend pytest at tests/test_invoice_stylists.py covers the API path.",
+  "rca of the issue": "Hour bug (fixed by main agent): datetime-local input received `existing.date.slice(0,16)` which was UTC, but on save `new Date(form.date).toISOString()` reinterprets the value as LOCAL, causing a tz offset drift each round-trip. The new isoToLocalInput() helper subtracts getTimezoneOffset before slicing, so what the user sees matches what will be sent back verbatim. Verified: 4 successive open/save cycles keep 2026-07-25T15:30 identical in both the input and the DB. Stylist bug (new, unfixed): AppointmentForm.jsx finish() forgets to spread `stylists` into the POST body — plumbing regression from the feature work."
+}

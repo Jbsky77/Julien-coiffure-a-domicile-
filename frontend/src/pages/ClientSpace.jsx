@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 import { API } from "@/lib/api";
-import { Bell, Calendar, Star, Gift, Scissors, ClipboardList, MessageSquare, Check, X, Sparkles, Clock, Award, CalendarClock } from "lucide-react";
+import { Bell, Calendar, Star, Gift, Scissors, ClipboardList, MessageSquare, Check, X, Sparkles, Clock, Award, CalendarClock, Receipt } from "lucide-react";
 import { toast, Toaster } from "sonner";
 
 const money = (v) => (Math.round((v || 0) * 100) / 100).toFixed(2);
@@ -14,6 +14,8 @@ const fmtDate = (iso) => {
     });
   } catch { return iso; }
 };
+
+const PAYMENT_LABELS = { CB: "Carte bancaire", CHEQUE: "Chèque", ESPECES: "Espèces", VIREMENT: "Virement" };
 
 export default function ClientSpace() {
   const { token } = useParams();
@@ -101,7 +103,7 @@ export default function ClientSpace() {
   if (error) return <ErrorScreen msg={error} />;
   if (!data) return <LoadingScreen />;
 
-  const { client, appointments, requests, loyalty, notifications, brand, next_visit } = data;
+  const { client, appointments, requests, loyalty, notifications, brand, next_visit, invoices } = data;
   const reviewLink = brand.review_url_short || brand.review_url;
   const activeCounter = requests.find((r) => r.status === "counter_proposed");
   const doneAppointments = appointments.filter((a) => a.status === "done");
@@ -168,7 +170,8 @@ export default function ClientSpace() {
           {[
             { id: "fidelite", label: "Fidélité", icon: Star },
             { id: "historique", label: "Historique", icon: ClipboardList },
-            { id: "rdv", label: "Nouveau RDV", icon: Sparkles },
+            { id: "factures", label: "Factures", icon: Receipt },
+            { id: "rdv", label: "RDV", icon: Sparkles },
           ].map((t) => (
             <button
               key={t.id}
@@ -298,6 +301,52 @@ export default function ClientSpace() {
                   </li>
                 ))}
               </ul>
+            )}
+          </section>
+        )}
+
+        {tab === "factures" && (
+          <section className="space-y-4" data-testid="invoices-section">
+            {(!invoices || invoices.length === 0) ? (
+              <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 text-sm text-slate-500 text-center">Aucune facture pour le moment.</div>
+            ) : (
+              invoices.map((inv) => (
+                <div key={inv.id} className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100" data-testid={`invoice-${inv.id}`}>
+                  <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100">
+                    <div>
+                      <div className="text-[10px] tracking-[0.25em] uppercase text-[#8A6A1F] flex items-center gap-1.5">
+                        <Receipt className="w-3 h-3" /> {inv.invoice_number || "Facture"}
+                      </div>
+                      <div className="font-medium text-sm mt-1">{fmtDate(inv.date)}</div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <div className="font-serif text-2xl text-[#0A192F]">{money(inv.price_final)} €</div>
+                      {inv.payment_mode && <div className="text-[10px] text-slate-400">{PAYMENT_LABELS[inv.payment_mode] || inv.payment_mode}</div>}
+                    </div>
+                  </div>
+                  <ul className="mt-3 space-y-2">
+                    {inv.services.map((s, i) => (
+                      <li key={i} className="flex items-center justify-between text-sm">
+                        <div>
+                          <span>{s.name}</span>
+                          <span className="text-xs text-slate-400 ml-2">par {s.stylist}</span>
+                        </div>
+                        {s.is_gift ? (
+                          <span className="text-xs text-[#C5A059] font-medium flex items-center gap-1"><Gift className="w-3 h-3" /> Offerte</span>
+                        ) : (
+                          <span className="text-slate-600">{money(s.price)} €</span>
+                        )}
+                      </li>
+                    ))}
+                    {inv.fuel_supplement > 0 && (
+                      <li className="flex items-center justify-between text-sm text-slate-500">
+                        <span>Supplément déplacement</span>
+                        <span>{money(inv.fuel_supplement)} €</span>
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              ))
             )}
           </section>
         )}

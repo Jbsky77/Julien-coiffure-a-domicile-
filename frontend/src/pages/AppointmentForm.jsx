@@ -4,6 +4,13 @@ import { api, money, money2, PAYMENT_MODES, fmtDate, fmtTime } from "@/lib/api";
 import { toast } from "sonner";
 import { ArrowLeft, Gift, Send, Trash2, CheckCircle2, Pencil, Sparkles, Clock, Repeat, AlertTriangle } from "lucide-react";
 
+const STYLISTS = ["Julien", "Marley"];
+
+const isoToLocalInput = (iso) => {
+  const d = new Date(iso);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+};
+
 export default function AppointmentForm() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -29,6 +36,7 @@ export default function AppointmentForm() {
   const [suggestions, setSuggestions] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [recurWeeks, setRecurWeeks] = useState(5);
+  const [stylists, setStylists] = useState({}); // service_id -> "Julien" | "Marley"
 
   const isDone = rdv?.status === "done";
 
@@ -44,12 +52,13 @@ export default function AppointmentForm() {
           setRdv(existing);
           setForm({
             client_id: existing.client_id,
-            date: existing.date.slice(0, 16),
+            date: isoToLocalInput(existing.date),
             services: existing.services.map((x) => ({ service_id: x.service_id, is_gift: x.is_gift })),
             kilometrage: existing.kilometrage,
             notes: existing.notes,
             price_final_override: existing.price_final,
           });
+          setStylists(Object.fromEntries(existing.services.map((x) => [x.service_id, x.stylist || "Julien"])));
           setPaymentMode(existing.payment_mode || "CB");
           setDuration(existing.duration_minutes || "");
           setEditMode(false);
@@ -256,7 +265,7 @@ export default function AppointmentForm() {
         )}
       </div>
 
-      {isDone && <div className="bg-[#166534]/10 border border-[#166534]/30 rounded-2xl px-6 py-3 text-[#166534] text-sm flex items-center gap-2"><CheckCircle2 className="w-4 h-4" /> Rendez-vous terminé — {rdv.payment_mode}</div>}
+      {isDone && <div className="bg-[#166534]/10 border border-[#166534]/30 rounded-2xl px-6 py-3 text-[#166534] text-sm flex items-center gap-2"><CheckCircle2 className="w-4 h-4" /> Rendez-vous terminé — {rdv.payment_mode}{rdv.invoice_number ? ` · Facture ${rdv.invoice_number}` : ""}</div>}
       {rdv?.status === "cancelled" && <div className="bg-red-50 border border-red-200 rounded-2xl px-6 py-3 text-[#991B1B] text-sm">Rendez-vous annulé (no-show)</div>}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -344,7 +353,7 @@ export default function AppointmentForm() {
                 <button disabled={readOnly} onClick={() => toggleService(s.id)} data-testid={`svc-toggle-${s.id}`} className="w-full text-left flex items-center justify-between">
                   <div>
                     <div className="font-medium">{s.name}</div>
-                    <div className="text-xs text-slate-500">{s.category} · {money(s.price)}</div>
+                    <div className="text-xs text-slate-500">{s.category} · {money(s.price)}{isDone && picked ? ` · par ${(rdv?.services.find((x) => x.service_id === s.id)?.stylist) || "Julien"}` : ""}</div>
                   </div>
                   <div className="text-xs text-slate-400">{count}/5</div>
                 </button>
@@ -418,6 +427,36 @@ export default function AppointmentForm() {
               </button>
             ))}
           </div>
+          {form.services.length > 0 && (
+            <div data-testid="stylist-section">
+              <label className="text-[10px] tracking-widest uppercase text-slate-500">Qui a réalisé chaque prestation ?</label>
+              <ul className="mt-2 space-y-2">
+                {form.services.map((fs) => {
+                  const svc = services.find((s) => s.id === fs.service_id);
+                  if (!svc) return null;
+                  const current = stylists[fs.service_id] || "Julien";
+                  return (
+                    <li key={fs.service_id} className="flex items-center justify-between gap-3 bg-slate-50 rounded-xl px-4 py-2.5">
+                      <span className="text-sm font-medium truncate">{svc.name}</span>
+                      <div className="flex gap-1.5 flex-shrink-0">
+                        {STYLISTS.map((st) => (
+                          <button
+                            key={st}
+                            type="button"
+                            onClick={() => setStylists((prev) => ({ ...prev, [fs.service_id]: st }))}
+                            data-testid={`stylist-${fs.service_id}-${st}`}
+                            className={`px-3 py-1.5 rounded-full text-xs ${current === st ? "bg-[#0A192F] text-white" : "border border-slate-200 text-slate-600"}`}
+                          >
+                            {st}
+                          </button>
+                        ))}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
           <div>
             <label className="text-[10px] tracking-widest uppercase text-slate-500">Temps passé (minutes)</label>
             <input type="number" min="0" step="5" data-testid="rdv-duration-input" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="Ex : 45" className={fieldBase} />

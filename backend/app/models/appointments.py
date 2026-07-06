@@ -10,6 +10,7 @@ class AppointmentService(BaseModel):
     price: float
     category: str
     is_gift: bool = False
+    stylist: str = "Julien"
 
 
 class Appointment(BaseModel):
@@ -28,6 +29,7 @@ class Appointment(BaseModel):
     family_pack_applied: bool = False
     gift_applied: bool = False
     duration_minutes: Optional[int] = None
+    invoice_number: Optional[str] = None
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     finished_at: Optional[str] = None
 
@@ -53,3 +55,4 @@ class FinishAppointment(BaseModel):
     payment_mode: str
     price_final: Optional[float] = None
     duration_minutes: Optional[int] = None
+    stylists: Optional[Dict[str, str]] = None  # service_id -> "Julien" | "Marley"

@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException
+from pymongo import ReturnDocument
 
 from app.db import db
 from app.dependencies import get_current_user
@@ -98,6 +99,21 @@ async def appointments_finish(rid: str, payload: FinishAppointment, user: User =
     }
     if payload.duration_minutes is not None:
         update_fields["duration_minutes"] = payload.duration_minutes
+    if payload.stylists:
+        svcs = rdv.get("services") or []
+        for s in svcs:
+            if s["service_id"] in payload.stylists:
+                s["stylist"] = payload.stylists[s["service_id"]]
+        update_fields["services"] = svcs
+    if not rdv.get("invoice_number"):
+        year = datetime.now(timezone.utc).year
+        counter = await db.counters.find_one_and_update(
+            {"_id": f"invoice_{year}"},
+            {"$inc": {"seq": 1}},
+            upsert=True,
+            return_document=ReturnDocument.AFTER,
+        )
+        update_fields["invoice_number"] = f"F-{year}-{counter['seq']:04d}"
     await db.appointments.update_one({"id": rid}, {"$set": update_fields})
     # Update client loyalty counters
     client = await db.clients.find_one({"id": rdv["client_id"]}, {"_id": 0})
