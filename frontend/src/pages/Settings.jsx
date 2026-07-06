@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { api, money, API } from "@/lib/api";
 import { toast } from "sonner";
-import { Plus, Trash2, Save, Copy, Calendar } from "lucide-react";
+import { Plus, Trash2, Save, Copy, Calendar, Download } from "lucide-react";
 
 function IcalBlock() {
   const [url, setUrl] = useState("");
@@ -33,6 +33,27 @@ export default function Settings() {
   const [settings, setSettings] = useState(null);
   const [services, setServices] = useState([]);
   const [addForm, setAddForm] = useState({ name: "", price: 0, category: "HOMME", duration_minutes: 30 });
+  const [exporting, setExporting] = useState(false);
+
+  const exportBackup = async () => {
+    setExporting(true);
+    try {
+      const r = await api.get("/backup/export");
+      const blob = new Blob([JSON.stringify(r.data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `sauvegarde-julienbouche-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      const total = Object.values(r.data.counts || {}).reduce((x, y) => x + y, 0);
+      toast.success(`Sauvegarde téléchargée (${total} enregistrements)`);
+    } catch {
+      toast.error("Export impossible");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const load = async () => {
     const [s, sv] = await Promise.all([api.get("/settings"), api.get("/services")]);
@@ -74,6 +95,14 @@ export default function Settings() {
         <div className="text-[10px] tracking-[0.3em] uppercase text-slate-500 mb-2">Paramètres</div>
         <h1 className="font-serif text-4xl md:text-5xl tracking-tight">Réglages</h1>
       </div>
+
+      <section className="bg-white border border-slate-100 rounded-2xl p-6 shadow-premium" data-testid="backup-section">
+        <div className="text-[10px] tracking-widest uppercase text-slate-500 mb-3">Sauvegarde des données</div>
+        <div className="text-sm text-slate-500 mb-4">Téléchargez une copie complète de vos données (clients, RDV, prestations, compta, stock, photos…) au format JSON. Conservez ce fichier en lieu sûr.</div>
+        <button onClick={exportBackup} disabled={exporting} data-testid="backup-export-btn" className="bg-[#0A192F] text-white rounded-full px-6 py-3 font-medium flex items-center gap-2 disabled:opacity-50">
+          <Download className="w-4 h-4" /> {exporting ? "Export en cours…" : "Télécharger la sauvegarde JSON"}
+        </button>
+      </section>
 
       <section className="bg-white border border-slate-100 rounded-2xl p-6 shadow-premium">
         <div className="text-[10px] tracking-widest uppercase text-slate-500 mb-3">Synchronisation agenda (iCal)</div>

@@ -13,6 +13,7 @@ from app.db import db
 from app.models.requests import AppointmentRequest, RequestServiceRef
 from app.services import notifications
 from app.services.loyalty import compute_loyalty_card
+from app.services.next_visit import compute_next_visit
 from app.services.settings import get_settings
 
 router = APIRouter()
@@ -35,6 +36,7 @@ async def get_client_space(token: str):
     reqs = await db.appointment_requests.find({"client_id": c["id"]}, {"_id": 0}).sort("created_at", -1).to_list(100)
     loyalty = await compute_loyalty_card(c["id"])
     notifs = await notifications.list_for_client(c["id"])
+    next_visit = await compute_next_visit(c["id"])
     return {
         "client": {
             "id": c["id"],
@@ -49,6 +51,7 @@ async def get_client_space(token: str):
         "requests": reqs,
         "loyalty": loyalty,
         "notifications": notifs,
+        "next_visit": next_visit,
         "brand": {
             "name": settings.brand_name,
             "review_url_short": settings.google_review_url_short,

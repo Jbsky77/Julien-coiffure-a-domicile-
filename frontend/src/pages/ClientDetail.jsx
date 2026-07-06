@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { api, money, money2, fmtDate, fmtTime, genderClasses, genderLabel, computeAge } from "@/lib/api";
-import { ArrowLeft, MapPin, Phone, Cake, Plus, Trash2, Save, Gift, Users as UsersIcon, Mail, MessageSquare, Star, CreditCard, Copy, ExternalLink } from "lucide-react";
+import { ArrowLeft, MapPin, Phone, Cake, Plus, Trash2, Save, Gift, Users as UsersIcon, Mail, MessageSquare, Star, CreditCard, Copy, ExternalLink, CalendarClock } from "lucide-react";
 import { toast } from "sonner";
 import ClientPhotos from "@/components/app/ClientPhotos";
 
@@ -177,6 +177,29 @@ export default function ClientDetail() {
               <button onClick={() => toast.info("Ajoutez un téléphone à la fiche pour envoyer le SMS")} data-testid="send-card-sms-disabled" className="rounded-full px-4 py-2 border border-[#D4AF37]/50 text-[#8A6A1F] text-xs flex items-center gap-1.5 opacity-70"><CreditCard className="w-3.5 h-3.5" /> Envoyer la carte de fidélité</button>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Next visit recommendation */}
+      {data.next_visit && (
+        <div className="bg-white border border-[#D4AF37]/40 rounded-2xl p-5 flex flex-col md:flex-row md:items-center gap-3" data-testid="next-visit-admin">
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] tracking-[0.3em] uppercase text-[#8A6A1F] mb-1 flex items-center gap-1.5"><CalendarClock className="w-3 h-3" /> Prochain RDV recommandé</div>
+            <div className="font-serif text-2xl text-[#0A192F]">
+              {data.next_visit.days_until > 1
+                ? `Dans ${data.next_visit.days_until} jours`
+                : data.next_visit.days_until === 1
+                ? "Demain"
+                : data.next_visit.days_until === 0
+                ? "Aujourd'hui"
+                : `En retard de ${-data.next_visit.days_until} jour${-data.next_visit.days_until > 1 ? "s" : ""}`}
+            </div>
+            <div className="text-xs text-slate-500 mt-1">
+              Vient tous les {data.next_visit.avg_frequency_days} jours (~{data.next_visit.avg_frequency_weeks} sem.) · suggéré le {new Date(data.next_visit.next_recommended_date).toLocaleDateString("fr-FR")}
+              {data.next_visit.usual_service_names?.length > 0 && <> · habitude : {data.next_visit.usual_service_names.join(" + ")}</>}
+            </div>
+          </div>
+          <Link to={`/rdv/nouveau?client=${c.id}`} data-testid="next-visit-plan-btn" className="rounded-full px-5 py-2.5 bg-gold-gradient text-white text-sm flex items-center gap-2 shadow-premium flex-shrink-0 self-start md:self-center"><CalendarClock className="w-4 h-4" /> Planifier</Link>
         </div>
       )}
 

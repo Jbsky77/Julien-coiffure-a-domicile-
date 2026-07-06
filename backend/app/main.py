@@ -12,6 +12,7 @@ from app.routers import (
     appointment_requests,
     appointments,
     auth,
+    backup,
     calendar,
     clients,
     dashboard,
@@ -19,6 +20,7 @@ from app.routers import (
     insights,
     photos,
     pin,
+    prospection,
     public,
     services as services_router,
     settings as settings_router,
@@ -56,6 +58,8 @@ ROUTERS = [
     dashboard.router,
     public.router,
     appointment_requests.router,
+    prospection.router,
+    backup.router,
 ]
 for r in ROUTERS:
     app.include_router(r, prefix="/api")

@@ -1,0 +1,34 @@
+{
+  "summary": "Tested 3 new features (Backup export, Next visit recommendation, Prospection zone). All 7 backend pytest cases PASS. Frontend: backup section + download + toast OK; next-visit-admin block OK with '35 jours' text; next-visit-card OK on public space; book-btn prefills date + toast OK; prospection toggle/controls/analyze/results with 3 KPIs and 3 suggestions OK.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "ClientDetail next-visit-plan-btn", "issue": "Link has correct href '/rdv/nouveau?client=cli_e998044705' and direct navigation works, but a Playwright click(force=True) then wait resulted in URL /compta. Could not reproduce a real user-facing bug (direct nav confirmed working); may be a click coordinate collision with bottom nav 'Compta' tab in narrow layout. Manual verification recommended.", "selector": "[data-testid=next-visit-plan-btn]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Prospection", "issues": ["Map is not centered on Angers by default when opening /carte — a click at map visual center landed on Aulnay-la-Rivière (dept 45) instead of the Angers cluster (47.47,-0.56). Consider setting default map center to the barycenter of geocoded clients so the review-request UX ('un clic au milieu de la carte devrait tomber en France près d'Angers') holds."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_new_features.py",
+    "/app/test_reports/pytest/new_features.xml"
+  ],
+  "action_items": [
+    "(Low) Verify manually that clicking the 'Planifier' button on /clients/cli_e998044705 navigates to /rdv/nouveau?client=... in real usage (route + href are correct; direct URL nav works).",
+    "(Design) Consider auto-centering /carte on the client barycenter instead of a France-wide default, so the Prospection zone lands on the actual client cluster."
+  ],
+  "critical_code_review_comments": [
+    "Backup route correctly gated by X-Pin-Token (returns 401 without).",
+    "compute_next_visit correctly returns null for clients with <2 done RDVs (verified with cli_98f120d9ce).",
+    "Prospection: geo.api.gouv.fr integration cached via communes_cache Mongo collection; response includes exactly 3 suggestions with the required schema.",
+    "Public route /api/public/client/{token} exposes next_visit without auth — appropriate for magic-link flow."
+  ],
+  "updated_files": ["/app/backend/tests/test_new_features.py"],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "~95% (3/3 features working end-to-end)"},
+  "test_credentials": "PIN admin 123456; magic-link token _V-HRjKzLbQYJU0pPRHlad_44GARhDU0.",
+  "seed_data_creation": "None (used existing seeds: Sophie cli_e998044705 with 3 done RDVs @ 35d frequency).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend fully green including the earlier 20 pytest cases. New features test file: /app/backend/tests/test_new_features.py. Frontend: all new-feature data-testids present and behaviors correct. Public /c/{token} flow (next-visit-card → book-btn → prefilled Nouveau RDV tab) works end-to-end with 'Coupe Homme' pre-checked and date field non-empty."
+}

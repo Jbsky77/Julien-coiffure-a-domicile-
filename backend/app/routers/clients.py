@@ -10,6 +10,7 @@ from app.models.auth import User
 from app.models.clients import Client, ClientCreate
 from app.services.client_status import compute_client_statuses
 from app.services.geocoding import auto_geocode
+from app.services.next_visit import compute_next_visit
 
 router = APIRouter()
 
@@ -60,7 +61,8 @@ async def clients_get(cid: str, user: User = Depends(get_current_user)):
     if not doc:
         raise HTTPException(404, "Not found")
     rdvs = await db.appointments.find({"client_id": cid}, {"_id": 0}).to_list(500)
-    return {"client": doc, "appointments": rdvs}
+    next_visit = await compute_next_visit(cid)
+    return {"client": doc, "appointments": rdvs, "next_visit": next_visit}
 
 
 @router.put("/clients/{cid}")
