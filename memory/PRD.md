@@ -1,5 +1,17 @@
 # PRD — Coiffure à domicile Julien Bouche
 
+## Implemented (v2.7 — 2026-06) — Adresses structurées + fix demandes PWA
+- **Adresse structurée + autocomplétion** : composant `AddressAutocomplete.jsx` (n° / rue / code postal / ville / pays France). Autocomplétion pendant la frappe via l'API Adresse data.gouv.fr (BAN, gratuite) — la sélection remplit les champs ET fournit lat/lng (pas de géocodage Nominatim). CP à 5 chiffres → liste des communes via geo.api.gouv.fr (select si plusieurs villes). Intégré à la création client (Clients.jsx) et l'édition (ClientDetail.jsx onglet Infos). Backend : `address_parts` sur Client/ClientCreate, lat/lng acceptés au create/update (skip géocodage si fournis).
+- **BUG FIX demandes de RDV** : « Proposer autre » et « Refuser » ne marchaient pas (window.prompt/confirm bloqués en PWA installée). Remplacés par des panneaux inline (`counter-form-*`, `reject-confirm-*`) dans AppointmentRequests.jsx + même fix pour « Autre date » de l'espace client (`alt-date-form`).
+- Tests : agent de test 100% (10/10 pytest `test_client_address.py` + 6/6 flux UI). L'agent a aussi corrigé un import manquant dans Clients.jsx.
+
+## Implemented (v2.6 — 2026-06) — Factures, coiffeurs & fix heure RDV
+- **BUG FIX heure RDV** (rapporté user) : l'heure changeait à chaque réouverture d'un RDV (datetime-local recevait l'UTC brut, la sauvegarde reconvertissait local→UTC → dérive). Fix : `isoToLocalInput()` dans AppointmentForm.jsx. Vérifié stable sur 4 cycles.
+- **Coiffeur par prestation** : à l'encaissement, choix Julien/Marley par prestation (`stylist-section`, constante STYLISTS). `AppointmentService.stylist` (défaut "Julien"), `FinishAppointment.stylists` (dict service_id→nom).
+- **Factures espace client** : à chaque règlement validé, numéro séquentiel `F-YYYY-XXXX` (compteur atomique `db.counters._id=invoice_YYYY`). Onglet « Factures » dans l'espace client (`tab-factures`, `invoices-section`) : numéro, jour/heure, prestations avec « par Julien/Marley », prix (ou « Offerte »), supplément déplacement, total, mode de paiement. Exposé via `invoices` dans GET /api/public/client/{token} (RDV done uniquement, stylist défaut "Julien" pour l'historique).
+- Tests : iteration_5/6 — heure stable, stylists persistés, facture F-2026-0001 de référence (rdv_037b0f8120). Bug plumbing (stylists absent du payload finish) trouvé par l'agent de test et corrigé.
+
+
 ## Original problem statement
 Application premium mobile-first en français pour Julien Bouche (coiffeur à domicile). Couleurs BLANC/BLEU + or champagne, typographie élégante (Cormorant Garamond + Outfit). Gestion complète : tarifs, RDV, paiement multi-modal, CRM fidélité, comptabilité URSSAF, stock, dashboard.
 

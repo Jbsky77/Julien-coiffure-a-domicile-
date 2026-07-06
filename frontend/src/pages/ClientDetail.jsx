@@ -250,7 +250,7 @@ export default function ClientDetail() {
             {computeAge(editing.birthday) !== null && <div className="text-xs text-slate-500 mt-1">{computeAge(editing.birthday)} ans</div>}
           </div>
           <div className="md:col-span-2">
-            {c.address && <div className="text-xs text-slate-500 mb-3">Adresse actuelle : <span className="text-slate-700">{c.address}</span></div>}
+            <div className="text-xs text-slate-500 mb-3">{c.address ? <>Adresse actuelle : <span className="text-slate-700">{c.address}</span></> : "Aucune adresse enregistrée."}</div>
             <AddressAutocomplete
               value={editing.address_parts}
               onChange={(parts, coords) => { setEditing({ ...editing, address_parts: parts }); setEditCoords(coords); }}
