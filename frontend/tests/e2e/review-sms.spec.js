@@ -1,5 +1,5 @@
 // E2E — Bouton "Demander un avis" sur la fiche client
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 const axios = require('axios');
 const { API } = require('./helpers');
 

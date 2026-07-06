@@ -1,7 +1,8 @@
 """FastAPI app entrypoint. Mounts every domain router under /api."""
 import logging
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 
 from app.db import client
@@ -16,12 +17,14 @@ from app.routers import (
     geocode,
     insights,
     photos,
+    pin,
     services as services_router,
     settings as settings_router,
     slots,
     stock,
     tour,
 )
+from app.routers.pin import _token_is_valid, _read_security
 from app.routers.services import ensure_default_services, migrate_service_durations
 from app.services.settings import get_settings
 
@@ -33,6 +36,7 @@ app = FastAPI()
 # Order matters: clients router exposes /clients/status BEFORE /clients/{cid} (verified inside the file).
 ROUTERS = [
     auth.router,
+    pin.router,
     settings_router.router,
     services_router.router,
     clients.router,
@@ -50,6 +54,32 @@ ROUTERS = [
 ]
 for r in ROUTERS:
     app.include_router(r, prefix="/api")
+
+
+# ---- PIN lock middleware ---------------------------------------------
+# Any path under /api requires a valid X-Pin-Token header once a PIN is set.
+# Exceptions: PIN routes themselves, iCal feed (uses its own token),
+# and the FastAPI docs.
+_OPEN_PATHS = {
+    "/api/pin/status",
+    "/api/pin/unlock",
+    "/api/pin/set",
+}
+
+
+@app.middleware("http")
+async def pin_guard(request: Request, call_next):
+    path = request.url.path
+    if path.startswith("/api/") and not any(path == p or path.startswith(p + "/") for p in _OPEN_PATHS):
+        # iCal feed is guarded by its own session token — bypass here.
+        if not path.startswith("/api/calendar/"):
+            sec = await _read_security()
+            if sec.get("hash"):
+                token = request.headers.get("x-pin-token")
+                if not await _token_is_valid(token):
+                    return JSONResponse({"detail": "Locked"}, status_code=401)
+    return await call_next(request)
+
 
 app.add_middleware(
     CORSMiddleware,

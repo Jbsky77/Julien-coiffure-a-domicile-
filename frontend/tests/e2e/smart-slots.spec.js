@@ -1,5 +1,5 @@
 // E2E — Smart slot suggestions on AppointmentForm
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 const { seedSmartSlots, cleanupClient } = require('./helpers');
 
 test.describe('Smart slots — AppointmentForm', () => {

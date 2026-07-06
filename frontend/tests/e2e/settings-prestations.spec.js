@@ -1,5 +1,5 @@
 // E2E — Ajout d'une prestation depuis Réglages (avec durée moyenne)
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 const axios = require('axios');
 const { API } = require('./helpers');
 

@@ -3,10 +3,53 @@ import axios from "axios";
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
 
+const PIN_TOKEN_KEY = "jb_pin_token";
+const PIN_EXP_KEY = "jb_pin_exp";
+
+export const pinStorage = {
+  set(token, expiresIn) {
+    if (!token) return this.clear();
+    localStorage.setItem(PIN_TOKEN_KEY, token);
+    localStorage.setItem(PIN_EXP_KEY, String(Date.now() + expiresIn * 1000));
+  },
+  get() {
+    return localStorage.getItem(PIN_TOKEN_KEY);
+  },
+  expiresAt() {
+    const v = localStorage.getItem(PIN_EXP_KEY);
+    return v ? parseInt(v, 10) : 0;
+  },
+  clear() {
+    localStorage.removeItem(PIN_TOKEN_KEY);
+    localStorage.removeItem(PIN_EXP_KEY);
+  },
+};
+
 export const api = axios.create({
   baseURL: API,
   withCredentials: true,
 });
+
+api.interceptors.request.use((config) => {
+  const token = pinStorage.get();
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers["X-Pin-Token"] = token;
+  }
+  return config;
+});
+
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401 && err.response?.data?.detail === "Locked") {
+      pinStorage.clear();
+      // Broadcast so the app can re-render the lock screen.
+      window.dispatchEvent(new CustomEvent("jb:locked"));
+    }
+    return Promise.reject(err);
+  }
+);
 
 export const money = (n) => {
   if (n === null || n === undefined || Number.isNaN(Number(n))) return "0,00 €";

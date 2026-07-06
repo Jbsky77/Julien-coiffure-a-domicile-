@@ -1,7 +1,9 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { LayoutDashboard, CalendarClock, Users, Receipt, Package, Settings as SettingsIcon, Scissors, TrendingUp, Route, AlertCircle } from "lucide-react";
+import { LayoutDashboard, CalendarClock, Users, Receipt, Package, Settings as SettingsIcon, Scissors, TrendingUp, Route, AlertCircle, Search, Lock, Map as MapIcon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { pinStorage } from "@/lib/api";
+import GlobalSearch from "@/components/app/GlobalSearch";
 
 const NAV = [
   { to: "/", label: "Accueil", icon: LayoutDashboard, tid: "nav-dashboard" },
@@ -13,6 +15,7 @@ const NAV = [
 
 const MORE = [
   { to: "/tour", label: "Tournée", icon: Route, tid: "nav-tour" },
+  { to: "/carte", label: "Carte", icon: MapIcon, tid: "nav-map" },
   { to: "/clients-status", label: "Risque", icon: AlertCircle, tid: "nav-clients-status" },
   { to: "/stock", label: "Stock", icon: Package, tid: "nav-stock" },
   { to: "/reglages", label: "Réglages", icon: SettingsIcon, tid: "nav-settings" },
@@ -20,6 +23,25 @@ const MORE = [
 
 export default function Layout({ children }) {
   const navigate = useNavigate();
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  // Global keyboard shortcut: "/" opens search
+  useEffect(() => {
+    const onKey = (e) => {
+      const tag = (e.target?.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || e.target?.isContentEditable) return;
+      if (e.key === "/") { e.preventDefault(); setSearchOpen(true); }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setSearchOpen(true); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const lockNow = () => {
+    pinStorage.clear();
+    window.dispatchEvent(new CustomEvent("jb:locked"));
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-slate-50 to-blue-50 md:flex md:items-start md:justify-center md:py-8">
       {/* Phone frame on desktop */}
@@ -33,12 +55,18 @@ export default function Layout({ children }) {
               <div className="text-[9px] tracking-[0.25em] uppercase text-slate-400 mt-1">Coiffure à domicile</div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <button onClick={() => setSearchOpen(true)} data-testid="topbar-search" className="p-2 rounded-full text-slate-500 hover:bg-slate-50">
+              <Search className="w-4 h-4" strokeWidth={1.5} />
+            </button>
             {MORE.map((n) => (
               <NavLink key={n.to} to={n.to} data-testid={n.tid} className={({isActive}) => `p-2 rounded-full ${isActive ? "bg-[#0A192F] text-white" : "text-slate-500 hover:bg-slate-50"}`}>
                 <n.icon className="w-4 h-4" strokeWidth={1.5} />
               </NavLink>
             ))}
+            <button onClick={lockNow} data-testid="topbar-lock" className="p-2 rounded-full text-slate-500 hover:bg-slate-50" title="Verrouiller l'app">
+              <Lock className="w-4 h-4" strokeWidth={1.5} />
+            </button>
           </div>
         </header>
 
@@ -68,6 +96,7 @@ export default function Layout({ children }) {
           })}
         </nav>
       </div>
+      <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   );
 }

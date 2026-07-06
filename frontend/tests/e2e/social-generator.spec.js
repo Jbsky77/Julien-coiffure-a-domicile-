@@ -1,5 +1,5 @@
 // E2E — Avant/Après social media generator
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./fixtures');
 const { seedSocialGenerator, cleanupClient } = require('./helpers');
 
 async function openPhotosTab(page, clientId) {

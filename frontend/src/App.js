@@ -16,7 +16,9 @@ import Settings from "@/pages/Settings";
 import Analytics from "@/pages/Analytics";
 import Tour from "@/pages/Tour";
 import ClientStatus from "@/pages/ClientStatus";
+import MapPage from "@/pages/Map";
 import Layout from "@/components/app/Layout";
+import PinGate from "@/components/app/PinGate";
 
 function Protected() {
   return (
@@ -43,6 +45,7 @@ function RootRouter() {
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/tour" element={<Tour />} />
         <Route path="/clients-status" element={<ClientStatus />} />
+        <Route path="/carte" element={<MapPage />} />
       </Route>
     </Routes>
   );
@@ -52,7 +55,9 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <RootRouter />
+        <PinGate>
+          <RootRouter />
+        </PinGate>
         <Toaster position="top-right" richColors closeButton />
       </BrowserRouter>
     </AuthProvider>

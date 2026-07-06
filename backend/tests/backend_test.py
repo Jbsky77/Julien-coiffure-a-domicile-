@@ -26,6 +26,16 @@ API = f"{BASE_URL}/api"
 def api_client():
     s = requests.Session()
     s.headers.update({"Content-Type": "application/json"})
+    # Unlock the app (PIN 123456 is the E2E default). If no PIN is configured,
+    # /pin/unlock returns configured=false and we simply proceed unauthenticated.
+    try:
+        status = s.get(f"{API}/pin/status", timeout=5).json()
+        if status.get("configured"):
+            r = s.post(f"{API}/pin/unlock", json={"pin": "123456", "ttl_seconds": 3600}, timeout=5)
+            if r.ok and r.json().get("token"):
+                s.headers.update({"X-Pin-Token": r.json()["token"]})
+    except Exception:
+        pass
     return s
 
 

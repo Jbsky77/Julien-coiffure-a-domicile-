@@ -4,6 +4,25 @@ const axios = require('axios');
 
 const API = (process.env.PLAYWRIGHT_BASE_URL || process.env.REACT_APP_BACKEND_URL) + '/api';
 
+// Ensure the app is unlocked before any test setup runs. Called once from a
+// global fixture. If a PIN is configured, we unlock it with the well-known
+// default (123456). The returned token is injected in every axios call.
+let _pinToken = null;
+async function ensureUnlocked() {
+  if (_pinToken) return _pinToken;
+  try {
+    const status = (await axios.get(API + '/pin/status')).data;
+    if (status.configured) {
+      const r = await axios.post(API + '/pin/unlock', { pin: '123456', ttl_seconds: 3600 });
+      _pinToken = r.data.token;
+      axios.defaults.headers.common['X-Pin-Token'] = _pinToken;
+    }
+  } catch (_) { /* ignore */ }
+  return _pinToken;
+}
+// Auto-run at module load so `axios.get/post(...)` in tests are pre-authenticated.
+ensureUnlocked();
+
 const TINY_JPEG_BEFORE =
   'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wgARCAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD0r/PnX//Z';
 const TINY_JPEG_AFTER = TINY_JPEG_BEFORE; // a different image not needed for E2E correctness
@@ -48,6 +67,7 @@ async function cleanupClient(clientId) {
 
 module.exports = {
   API,
+  ensureUnlocked,
   seedSmartSlots,
   seedSocialGenerator,
   cleanupClient,
