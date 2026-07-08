@@ -35,9 +35,13 @@ export default function ClientSpace() {
         axios.get(`${API}/public/client/${token}`),
         axios.get(`${API}/public/client/${token}/services`),
       ]);
-      setData(r.data);
+      const fresh = r.data;
+      setData((prev) => ({
+        ...fresh,
+        notifications: (fresh.notifications?.length ? fresh.notifications : prev?.notifications) || [],
+      }));
       setAvailableSvc(svc.data);
-      // Auto-mark notifications as read
+      // Mark as read: they stay visible this session, gone at next visit
       axios.post(`${API}/public/client/${token}/notifications/read`).catch(() => {});
     } catch (e) {
       setError(e.response?.data?.detail || "Lien invalide");
@@ -116,6 +120,9 @@ export default function ClientSpace() {
   const reviewLink = brand.review_url_short || brand.review_url;
   const activeCounter = requests.find((r) => r.status === "counter_proposed");
   const doneAppointments = appointments.filter((a) => a.status === "done");
+  const upcomingAppointments = appointments
+    .filter((a) => a.status === "scheduled" && new Date(a.date) >= new Date(Date.now() - 3600 * 1000))
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
@@ -204,6 +211,30 @@ export default function ClientSpace() {
                 </button>
               </div>
             )}
+          </section>
+        )}
+
+        {/* Upcoming appointments */}
+        {upcomingAppointments.length > 0 && (
+          <section className="bg-white border border-blue-100 rounded-3xl p-5 shadow-premium" data-testid="upcoming-appointments">
+            <div className="text-[10px] tracking-[0.3em] uppercase text-[#1E3A8A] mb-3 flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5" /> Vos prochains rendez-vous
+            </div>
+            <ul className="space-y-3">
+              {upcomingAppointments.map((a) => (
+                <li key={a.id} data-testid={`upcoming-rdv-${a.id}`} className="flex items-start justify-between gap-3 bg-gradient-to-r from-blue-50/60 to-white border border-blue-100/60 rounded-2xl p-4">
+                  <div>
+                    <div className="font-serif text-lg text-[#0A192F] capitalize">{fmtDate(a.date)}</div>
+                    {a.services?.length > 0 && (
+                      <div className="text-xs text-slate-500 mt-1">{a.services.map((s) => s.name).join(" · ")}</div>
+                    )}
+                  </div>
+                  <span className="flex-shrink-0 text-[10px] px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 font-medium flex items-center gap-1">
+                    <Check className="w-3 h-3" /> Confirmé
+                  </span>
+                </li>
+              ))}
+            </ul>
           </section>
         )}
 

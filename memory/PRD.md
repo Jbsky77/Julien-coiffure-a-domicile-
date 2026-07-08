@@ -1,6 +1,8 @@
 # PRD — Coiffure à domicile Julien Bouche
 
 ## Implemented (v2.9 — 2026-06) — Version bureau + ergonomie mobile
+- Espace Client : carte "Vos prochains rendez-vous" (`upcoming-appointments`) toujours visible au-dessus des onglets — RDV `scheduled` futurs, badge "Confirmé".
+- Notifications client éphémères : `list_for_client` ne renvoie que `read != True`. Le front les marque lues au chargement (visibles pendant la session grâce au merge sticky dans `load()` — protège du double-effect StrictMode) puis elles disparaissent à la visite suivante. Vérifié e2e : demande RDV → accept/reject/counter admin → notif visible visite 1, disparue visite 2.
 - Layout desktop (lg+) : sidebar gauche fixe avec tous les menus, contenu pleine largeur max-w-6xl (fini le cadre "téléphone" sur ordinateur). Recherche + Verrouiller dans la sidebar.
 - Mobile : flèche ChevronDown dans la topbar (`topbar-quick-menu`) ouvrant un panneau grille 4 colonnes avec les 11 menus (`quick-menu-panel`, badge demandes inclus). Fermeture au clic extérieur/navigation.
 - Espace Client : onglets (Fidélité/Historique/Factures/RDV) passés en grille 4 colonnes icône+label empilés — l'onglet RDV n'était pas visible sur petits téléphones.

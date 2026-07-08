@@ -38,7 +38,7 @@ async def list_admin(unread_only: bool = False, limit: int = 50):
 
 async def list_for_client(client_id: str, limit: int = 30):
     return await db.notifications.find(
-        {"audience": "client", "client_id": client_id, "dismissed": {"$ne": True}},
+        {"audience": "client", "client_id": client_id, "dismissed": {"$ne": True}, "read": {"$ne": True}},
         {"_id": 0},
     ).sort("created_at", -1).to_list(limit)
 
