@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 import { API } from "@/lib/api";
-import { Bell, Calendar, Star, Gift, Scissors, ClipboardList, MessageSquare, Check, X, Sparkles, Clock, Award, CalendarClock, Receipt } from "lucide-react";
+import { Bell, Calendar, Star, Gift, Scissors, ClipboardList, MessageSquare, Check, X, Sparkles, Clock, Award, CalendarClock, Receipt, Download } from "lucide-react";
 import { toast, Toaster } from "sonner";
 
 const money = (v) => (Math.round((v || 0) * 100) / 100).toFixed(2);
@@ -79,6 +79,13 @@ export default function ClientSpace() {
     }
   };
 
+  const dismissNotifs = async () => {
+    try {
+      await axios.post(`${API}/public/client/${token}/notifications/dismiss`);
+      setData((prev) => ({ ...prev, notifications: [] }));
+    } catch {}
+  };
+
   const totalDuration = useMemo(() => {
     return form.service_ids.reduce((acc, id) => {
       const s = availableSvc.find((x) => x.id === id);
@@ -133,9 +140,19 @@ export default function ClientSpace() {
         {/* Notifications */}
         {notifications && notifications.length > 0 && (
           <section className="bg-white border border-[#D4AF37]/30 rounded-3xl p-5 shadow-lg" data-testid="client-notifications">
-            <div className="flex items-center gap-2 mb-3">
-              <Bell className="w-4 h-4 text-[#D4AF37]" />
-              <h2 className="text-sm font-semibold tracking-wide">Notifications</h2>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Bell className="w-4 h-4 text-[#D4AF37]" />
+                <h2 className="text-sm font-semibold tracking-wide">Notifications</h2>
+              </div>
+              <button
+                onClick={dismissNotifs}
+                data-testid="dismiss-notifications-btn"
+                aria-label="Fermer les notifications"
+                className="w-7 h-7 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
             <ul className="space-y-2">
               {notifications.slice(0, 5).map((n, i) => (
@@ -370,6 +387,14 @@ export default function ClientSpace() {
                       </li>
                     )}
                   </ul>
+                  <a
+                    href={`${API}/public/client/${token}/invoices/${inv.id}/pdf`}
+                    download
+                    data-testid={`invoice-pdf-${inv.id}`}
+                    className="mt-4 w-full flex items-center justify-center gap-2 border border-[#D4AF37]/50 text-[#8A6A1F] rounded-full px-4 py-2.5 text-sm font-medium hover:bg-[#D4AF37]/10 transition"
+                  >
+                    <Download className="w-4 h-4" /> Télécharger en PDF
+                  </a>
                 </div>
               ))
             )}

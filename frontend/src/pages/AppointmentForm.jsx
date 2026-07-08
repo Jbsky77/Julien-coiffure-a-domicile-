@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams, Link } from "react-router-dom";
 import { api, money, money2, PAYMENT_MODES, fmtDate, fmtTime } from "@/lib/api";
 import { toast } from "sonner";
-import { ArrowLeft, Gift, Send, Trash2, CheckCircle2, Pencil, Sparkles, Clock, Repeat, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Gift, Send, Trash2, CheckCircle2, Pencil, Sparkles, Clock, Repeat, AlertTriangle, UserRound } from "lucide-react";
 
 const STYLISTS = ["Julien", "Marley"];
 
@@ -276,6 +276,15 @@ export default function AppointmentForm() {
             <option value="">— Sélectionner —</option>
             {clients.map((c) => <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>)}
           </select>
+          {form.client_id && (
+            <Link
+              to={`/clients/${form.client_id}`}
+              data-testid="open-client-file-btn"
+              className="mt-2 inline-flex items-center gap-1.5 text-xs px-3.5 py-1.5 rounded-full border border-[#D4AF37]/50 text-[#8A6A1F] hover:bg-[#D4AF37]/10 transition"
+            >
+              <UserRound className="w-3.5 h-3.5" /> Fiche client
+            </Link>
+          )}
         </div>
         <div>
           <label className="text-[10px] tracking-widest uppercase text-slate-500">Date & heure</label>

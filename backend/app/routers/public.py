@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import Response
 
 from app.db import db
 from app.models.requests import AppointmentRequest, RequestServiceRef
@@ -202,3 +203,28 @@ async def public_mark_read(token: str):
     c = await _resolve_client(token)
     await notifications.mark_client_all_read(c["id"])
     return {"ok": True}
+
+
+@router.post("/public/client/{token}/notifications/dismiss")
+async def public_dismiss_notifs(token: str):
+    c = await _resolve_client(token)
+    await notifications.dismiss_client_all(c["id"])
+    return {"ok": True}
+
+
+@router.get("/public/client/{token}/invoices/{rdv_id}/pdf")
+async def public_invoice_pdf(token: str, rdv_id: str):
+    from app.services.invoice_pdf import build_invoice_pdf
+
+    c = await _resolve_client(token)
+    rdv = await db.appointments.find_one({"id": rdv_id, "client_id": c["id"], "status": "done"}, {"_id": 0})
+    if not rdv:
+        raise HTTPException(404, "Facture introuvable")
+    settings = await get_settings()
+    pdf = build_invoice_pdf(rdv, c, settings.invoice_brand_name)
+    num = rdv.get("invoice_number") or rdv_id
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="Facture-{num}.pdf"'},
+    )

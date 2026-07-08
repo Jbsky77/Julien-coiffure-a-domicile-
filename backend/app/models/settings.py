@@ -24,3 +24,4 @@ class Settings(BaseModel):
     google_review_url_short: str = ""
     review_sms_template: str = "Bonjour {first_name}, merci pour votre confiance ! Donnez votre avis sur votre coiffeur ici : {url} — {brand_name}"
     reminder_sms_template: str = "Bonjour {first_name}, petit rappel de votre rendez-vous demain à {time} ({services}). À demain ! — {brand_name}"
+    invoice_brand_name: str = "Julien coiffeur à domicile"
