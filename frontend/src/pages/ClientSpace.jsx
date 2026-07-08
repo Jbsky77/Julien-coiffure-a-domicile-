@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 import { API } from "@/lib/api";
-import { Bell, Calendar, Star, Gift, Scissors, ClipboardList, MessageSquare, Check, X, Sparkles, Clock, Award, CalendarClock, Receipt, Download, Users } from "lucide-react";
+import { Bell, Calendar, Star, Gift, Scissors, ClipboardList, MessageSquare, Check, X, Sparkles, Clock, Award, Receipt, Download, Users, Share2 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 
 const money = (v) => (Math.round((v || 0) * 100) / 100).toFixed(2);
@@ -99,26 +99,31 @@ export default function ClientSpace() {
     }, 0);
   }, [form.service_ids, availableSvc]);
 
-  const prefillFromRecommendation = () => {
-    const nv = data?.next_visit;
-    if (!nv) return;
-    let d = new Date(nv.next_recommended_date);
-    const min = new Date();
-    min.setDate(min.getDate() + 1);
-    if (d < min) d = min;
-    d.setHours(10, 0, 0, 0);
-    const pad = (x) => String(x).padStart(2, "0");
-    const local = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    const validIds = (nv.usual_service_ids || []).filter((id) => availableSvc.some((s) => s.id === id));
-    setForm({ requested_date: local, service_ids: validIds, comment: "" });
-    setTab("rdv");
-    toast.success("Demande pré-remplie avec vos habitudes");
+  const shareReferral = async () => {
+    const firstName = data?.client?.first_name || "";
+    const brandName = data?.brand?.name || "Julien Bouche";
+    const msg = `Salut, je te recommande ${brandName}, coiffeur à domicile. Prestation vraiment top ! Tu peux le contacter pour prendre RDV. Dis-lui que ${firstName} t'envoie 😉`;
+    // Try native share first (best on mobile PWA)
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: brandName, text: msg });
+        return;
+      } catch {
+        // user cancelled or share failed — fall back to sms:
+      }
+    }
+    // Fallback: sms: URL scheme (opens native SMS composer)
+    const encoded = encodeURIComponent(msg);
+    // iOS uses "sms:&body=", Android uses "sms:?body="
+    const ua = navigator.userAgent || "";
+    const url = /iPhone|iPad|iPod/i.test(ua) ? `sms:&body=${encoded}` : `sms:?body=${encoded}`;
+    window.location.href = url;
   };
 
   if (error) return <ErrorScreen msg={error} />;
   if (!data) return <LoadingScreen />;
 
-  const { client, appointments, requests, loyalty, notifications, brand, next_visit, invoices, referral } = data;
+  const { client, appointments, requests, loyalty, notifications, brand, invoices, referral } = data;
   const reviewLink = brand.review_url_short || brand.review_url;
   const activeCounter = requests.find((r) => r.status === "counter_proposed");
   const doneAppointments = appointments.filter((a) => a.status === "done");
@@ -280,35 +285,6 @@ export default function ClientSpace() {
               <div className="text-xs text-white/70 mt-4 flex items-center gap-1.5"><Gift className="w-3.5 h-3.5 text-[#D4AF37]" /> 5 payées = 1 offerte, par prestation</div>
             </div>
 
-            {/* Next recommended appointment */}
-            {next_visit && (
-              <div className="bg-white border border-[#D4AF37]/40 rounded-3xl p-5 shadow-premium" data-testid="next-visit-card">
-                <div className="text-[10px] tracking-[0.3em] uppercase text-[#8A6A1F] mb-2 flex items-center gap-1.5">
-                  <CalendarClock className="w-3.5 h-3.5" /> Prochain RDV recommandé
-                </div>
-                <div className="font-serif text-3xl text-[#0A192F]" data-testid="next-visit-countdown">
-                  {next_visit.days_until > 1
-                    ? `Dans ${next_visit.days_until} jours`
-                    : next_visit.days_until === 1
-                    ? "Demain"
-                    : "C'est le moment !"}
-                </div>
-                <p className="text-sm text-slate-600 mt-1.5">
-                  Vous venez environ toutes les {next_visit.avg_frequency_weeks} semaines
-                  {next_visit.usual_service_names?.length > 0 && (
-                    <> — habituellement <span className="font-medium">{next_visit.usual_service_names.join(" + ")}</span></>
-                  )}.
-                </p>
-                <button
-                  onClick={prefillFromRecommendation}
-                  data-testid="next-visit-book-btn"
-                  className="mt-4 w-full bg-gradient-to-r from-[#D4AF37] to-[#C5A059] text-white rounded-full px-5 py-3 text-sm font-medium flex items-center justify-center gap-2 shadow-premium hover:shadow-lg transition"
-                >
-                  <Sparkles className="w-4 h-4" /> Réserver ce créneau
-                </button>
-              </div>
-            )}
-
             {/* Loyalty details per service */}
             <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 space-y-3">
               <h3 className="text-[10px] tracking-[0.3em] uppercase text-slate-500 mb-3">Prestations engagées</h3>
@@ -382,6 +358,13 @@ export default function ClientSpace() {
                     </div>
                   </div>
                 )}
+                <button
+                  onClick={shareReferral}
+                  data-testid="referral-share-btn"
+                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#D4AF37] to-[#C5A059] text-white rounded-full px-5 py-3 text-sm font-medium shadow-premium hover:shadow-lg transition"
+                >
+                  <Share2 className="w-4 h-4" /> Recommander à un ami
+                </button>
                 <p className="text-xs text-slate-500 italic border-t border-slate-100 pt-3">
                   « Recommandez mon service à votre entourage. Toutes les {referral.threshold} recommandations devenues clientes, profitez d'une coupe offerte en remerciement de votre confiance. »
                 </p>
