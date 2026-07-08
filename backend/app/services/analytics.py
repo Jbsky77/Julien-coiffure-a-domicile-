@@ -95,6 +95,30 @@ async def compute_analytics() -> dict:
     average_duration = round(sum(durations) / len(durations), 1) if durations else None
     total_duration = sum(durations) if durations else 0
 
+    # Average time per service type (multi-service RDVs split proportionally
+    # to theoretical durations)
+    services_all = await db.services.find({}, {"_id": 0}).to_list(500)
+    theo = {s["id"]: (s.get("duration_minutes") or 45) for s in services_all}
+    time_acc: dict = {}
+    for r in rdvs:
+        dm = r.get("duration_minutes")
+        svcs = r.get("services") or []
+        if not dm or not svcs:
+            continue
+        weights = [(s, theo.get(s["service_id"], 45)) for s in svcs]
+        wsum = sum(w for _, w in weights) or 1
+        for s, w in weights:
+            e = time_acc.setdefault(s["service_id"], {"service_id": s["service_id"], "name": s["name"], "minutes": 0.0, "count": 0})
+            e["minutes"] += dm * w / wsum
+            e["count"] += 1
+    service_time_stats = sorted(
+        (
+            {"service_id": e["service_id"], "name": e["name"], "avg_minutes": round(e["minutes"] / e["count"]), "count": e["count"]}
+            for e in time_acc.values()
+        ),
+        key=lambda x: -x["count"],
+    )
+
     return {
         "top_services": top_services,
         "top_clients": top_clients,
@@ -108,4 +132,5 @@ async def compute_analytics() -> dict:
         "average_age": average_age,
         "average_duration_minutes": average_duration,
         "total_duration_minutes": total_duration,
+        "service_time_stats": service_time_stats,
     }

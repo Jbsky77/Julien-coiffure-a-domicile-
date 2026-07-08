@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 import { API } from "@/lib/api";
-import { Bell, Calendar, Star, Gift, Scissors, ClipboardList, MessageSquare, Check, X, Sparkles, Clock, Award, CalendarClock, Receipt, Download } from "lucide-react";
+import { Bell, Calendar, Star, Gift, Scissors, ClipboardList, MessageSquare, Check, X, Sparkles, Clock, Award, CalendarClock, Receipt, Download, Users } from "lucide-react";
 import { toast, Toaster } from "sonner";
 
 const money = (v) => (Math.round((v || 0) * 100) / 100).toFixed(2);
@@ -116,7 +116,7 @@ export default function ClientSpace() {
   if (error) return <ErrorScreen msg={error} />;
   if (!data) return <LoadingScreen />;
 
-  const { client, appointments, requests, loyalty, notifications, brand, next_visit, invoices } = data;
+  const { client, appointments, requests, loyalty, notifications, brand, next_visit, invoices, referral } = data;
   const reviewLink = brand.review_url_short || brand.review_url;
   const activeCounter = requests.find((r) => r.status === "counter_proposed");
   const doneAppointments = appointments.filter((a) => a.status === "done");
@@ -340,6 +340,51 @@ export default function ClientSpace() {
                 </ul>
               )}
             </div>
+
+            {/* Referral (parrainage) */}
+            {referral && (
+              <div className="bg-white border border-[#D4AF37]/30 rounded-3xl p-5 shadow-sm space-y-4" data-testid="referral-card">
+                <div className="text-[10px] tracking-[0.3em] uppercase text-[#8A6A1F] flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5" /> Parrainage
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="bg-slate-50 rounded-2xl p-3">
+                    <div className="font-serif text-2xl text-[#0A192F]" data-testid="referral-godchildren">{referral.godchildren_count}</div>
+                    <div className="text-[10px] uppercase tracking-wider text-slate-500 mt-0.5">Filleul{referral.godchildren_count > 1 ? "s" : ""}</div>
+                  </div>
+                  <div className="bg-[#D4AF37]/10 rounded-2xl p-3">
+                    <div className="font-serif text-2xl text-[#C5A059]" data-testid="referral-rewards-available">{referral.rewards_available}</div>
+                    <div className="text-[10px] uppercase tracking-wider text-slate-500 mt-0.5">Offerte{referral.rewards_available > 1 ? "s" : ""} dispo</div>
+                  </div>
+                  <div className="bg-slate-50 rounded-2xl p-3">
+                    <div className="font-serif text-2xl text-slate-500">{referral.rewards_used}</div>
+                    <div className="text-[10px] uppercase tracking-wider text-slate-500 mt-0.5">Utilisée{referral.rewards_used > 1 ? "s" : ""}</div>
+                  </div>
+                </div>
+                {referral.rewards_available > 0 ? (
+                  <div className="text-sm text-[#8A6A1F] bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-xl px-4 py-3 flex items-center gap-2">
+                    <Gift className="w-4 h-4 flex-shrink-0" /> Une coupe offerte vous attend lors de votre prochain rendez-vous !
+                  </div>
+                ) : (
+                  <div className="text-xs text-slate-500">
+                    Plus que <span className="font-semibold text-[#0A192F]">{referral.remaining_to_next}</span> recommandation{referral.remaining_to_next > 1 ? "s" : ""} avant votre prochaine coupe offerte.
+                  </div>
+                )}
+                {referral.godchildren?.length > 0 && (
+                  <div>
+                    <div className="text-[10px] uppercase tracking-widest text-slate-400 mb-1.5">Vos filleuls</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {referral.godchildren.map((g) => (
+                        <span key={g.id} className="text-xs px-2.5 py-1 rounded-full bg-slate-50 border border-slate-100 text-slate-600">{g.name}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <p className="text-xs text-slate-500 italic border-t border-slate-100 pt-3">
+                  « Recommandez mon service à votre entourage. Toutes les {referral.threshold} recommandations devenues clientes, profitez d'une coupe offerte en remerciement de votre confiance. »
+                </p>
+              </div>
+            )}
 
             {/* Google Review CTA */}
             {reviewLink && (

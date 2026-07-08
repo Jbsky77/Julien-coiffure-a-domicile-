@@ -17,6 +17,7 @@ class Settings(BaseModel):
     goal_rdv: int = 60
     goal_panier: float = 50.0
     goal_relances: int = 10
+    referral_threshold: int = 4  # filleuls needed per free cut
     brand_name: str = "Julien Bouche"
     brand_color: str = "#D4AF37"
     brand_logo: Optional[str] = None  # data URL

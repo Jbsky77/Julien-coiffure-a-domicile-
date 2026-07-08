@@ -31,7 +31,7 @@ from app.routers import (
 )
 from app.routers.pin import _token_is_valid, _read_security
 from app.routers.services import ensure_default_services, migrate_service_durations
-from app.services.migrations import backfill_client_access_tokens
+from app.services.migrations import backfill_client_access_tokens, remove_legacy_referrals
 from app.services.settings import get_settings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -106,6 +106,7 @@ async def on_startup():
     await ensure_default_services()
     await migrate_service_durations()
     await backfill_client_access_tokens()
+    await remove_legacy_referrals()
     await get_settings()
 
 

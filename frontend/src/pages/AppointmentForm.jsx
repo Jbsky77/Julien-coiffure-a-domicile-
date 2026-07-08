@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams, Link } from "react-router-dom";
 import { api, money, money2, PAYMENT_MODES, fmtDate, fmtTime } from "@/lib/api";
 import { toast } from "sonner";
-import { ArrowLeft, Gift, Send, Trash2, CheckCircle2, Pencil, Sparkles, Clock, Repeat, AlertTriangle, UserRound } from "lucide-react";
+import { ArrowLeft, Gift, Send, Trash2, CheckCircle2, Pencil, Sparkles, Clock, Repeat, AlertTriangle, UserRound, Timer, Play } from "lucide-react";
 
 const STYLISTS = ["Julien", "Marley"];
 
@@ -37,8 +37,36 @@ export default function AppointmentForm() {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [recurWeeks, setRecurWeeks] = useState(5);
   const [stylists, setStylists] = useState({}); // service_id -> "Julien" | "Marley"
+  const [clientReferral, setClientReferral] = useState(null);
+  const [useReferral, setUseReferral] = useState(false);
+  const [nowTick, setNowTick] = useState(Date.now());
 
   const isDone = rdv?.status === "done";
+
+  // Live timer tick
+  useEffect(() => {
+    if (!rdv?.started_at || isDone) return;
+    const iv = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(iv);
+  }, [rdv?.started_at, isDone]);
+
+  const elapsedLabel = useMemo(() => {
+    if (!rdv?.started_at) return "";
+    const secs = Math.max(0, Math.floor((nowTick - new Date(rdv.started_at).getTime()) / 1000));
+    const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), s = secs % 60;
+    return (h > 0 ? `${h}h ` : "") + `${String(m).padStart(2, "0")}min ${String(s).padStart(2, "0")}s`;
+  }, [nowTick, rdv?.started_at]);
+
+  const startTimer = async () => {
+    try {
+      const r = await api.post(`/appointments/${id}/start-timer`);
+      setRdv((prev) => ({ ...prev, started_at: r.data.started_at }));
+      setNowTick(Date.now());
+      toast.success("Chronomètre démarré");
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Erreur");
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -73,6 +101,7 @@ export default function AppointmentForm() {
         try {
           const r = await api.get(`/clients/${form.client_id}`);
           setClientLoyalty(r.data.client.loyalty_counters || {});
+          setClientReferral(r.data.referral || null);
           const cancelled = (r.data.appointments || []).filter((a) => a.status === "cancelled").length;
           setClientRisk({
             cancelled,
@@ -138,14 +167,19 @@ export default function AppointmentForm() {
 
   const finish = async () => {
     try {
+      let useReward = useReferral;
+      if (!useReward && clientReferral?.rewards_available > 0) {
+        useReward = window.confirm("Ce client dispose d'une coupe offerte obtenue grâce au parrainage. Souhaitez-vous l'appliquer à cette prestation ?");
+      }
       const payload = {
         payment_mode: paymentMode,
         price_final: form.price_final_override ?? preview.final,
         duration_minutes: duration === "" ? null : parseInt(duration),
         stylists: Object.fromEntries(form.services.map((fs) => [fs.service_id, stylists[fs.service_id] || "Julien"])),
+        use_referral_reward: useReward,
       };
       await api.post(`/appointments/${id}/finish`, payload);
-      toast.success("Paiement confirmé. Rendez-vous terminé.");
+      toast.success(useReward ? "Coupe offerte appliquée. Rendez-vous terminé." : "Paiement confirmé. Rendez-vous terminé.");
       navigate("/rdv");
     } catch (e) {
       toast.error(e.response?.data?.detail || "Erreur");
@@ -266,8 +300,34 @@ export default function AppointmentForm() {
         )}
       </div>
 
-      {isDone && <div className="bg-[#166534]/10 border border-[#166534]/30 rounded-2xl px-6 py-3 text-[#166534] text-sm flex items-center gap-2"><CheckCircle2 className="w-4 h-4" /> Rendez-vous terminé — {rdv.payment_mode}{rdv.invoice_number ? ` · Facture ${rdv.invoice_number}` : ""}</div>}
+      {isDone && <div className="bg-[#166534]/10 border border-[#166534]/30 rounded-2xl px-6 py-3 text-[#166534] text-sm flex items-center gap-2"><CheckCircle2 className="w-4 h-4" /> Rendez-vous terminé — {rdv.payment_mode}{rdv.duration_minutes ? ` · ${rdv.duration_minutes} min` : ""}{rdv.invoice_number ? ` · Facture ${rdv.invoice_number}` : ""}</div>}
       {rdv?.status === "cancelled" && <div className="bg-red-50 border border-red-200 rounded-2xl px-6 py-3 text-[#991B1B] text-sm">Rendez-vous annulé (no-show)</div>}
+
+      {/* Timer: start manually on arrival, stops automatically at payment */}
+      {id && rdv && !isDone && rdv.status !== "cancelled" && (
+        <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-premium flex items-center justify-between gap-4" data-testid="timer-card">
+          {!rdv.started_at ? (
+            <>
+              <div className="min-w-0">
+                <div className="text-[10px] tracking-widest uppercase text-slate-500 flex items-center gap-1.5"><Timer className="w-3.5 h-3.5 text-[#D4AF37]" /> Chronométrage</div>
+                <div className="text-xs text-slate-500 mt-1">Démarrez en arrivant chez le client. Le chrono s'arrêtera automatiquement à l'encaissement.</div>
+              </div>
+              <button onClick={startTimer} data-testid="start-timer-btn" className="bg-[#0A192F] text-white rounded-full px-5 py-3 text-sm font-medium flex items-center gap-2 hover:bg-[#1E3A8A] flex-shrink-0">
+                <Play className="w-4 h-4" /> Démarrer la prestation
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="min-w-0">
+                <div className="text-[10px] tracking-widest uppercase text-slate-500 flex items-center gap-1.5"><Timer className="w-3.5 h-3.5 text-[#D4AF37]" /> Prestation en cours</div>
+                <div className="font-serif text-3xl text-[#0A192F] tabular-nums mt-1" data-testid="timer-elapsed">{elapsedLabel}</div>
+                <div className="text-xs text-slate-500 mt-1">La durée sera enregistrée à la validation du paiement.</div>
+              </div>
+              <button onClick={startTimer} data-testid="restart-timer-btn" className="border border-slate-200 text-slate-600 rounded-full px-4 py-2 text-xs flex-shrink-0 hover:bg-slate-50">Redémarrer</button>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
@@ -430,6 +490,22 @@ export default function AppointmentForm() {
       {!isDone && id && (
         <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-premium space-y-4">
           <div className="text-[10px] tracking-widest uppercase text-slate-500">Confirmer le paiement</div>
+          {clientReferral?.rewards_available > 0 && (
+            <div className="bg-gradient-to-r from-[#D4AF37]/10 to-white border border-[#D4AF37]/40 rounded-xl p-4 space-y-3" data-testid="referral-reward-banner">
+              <div className="text-sm text-[#8A6A1F] flex items-start gap-2">
+                <Gift className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <span>Ce client dispose de <strong>{clientReferral.rewards_available} coupe{clientReferral.rewards_available > 1 ? "s" : ""} offerte{clientReferral.rewards_available > 1 ? "s" : ""}</strong> grâce au parrainage ({clientReferral.godchildren_count} filleul{clientReferral.godchildren_count > 1 ? "s" : ""}).</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setUseReferral((v) => !v)}
+                data-testid="use-referral-toggle"
+                className={`w-full text-xs flex items-center justify-center gap-2 px-3 py-2.5 rounded-full ${useReferral ? "bg-gold-gradient text-white shadow-premium" : "border border-[#D4AF37] text-[#C5A059]"}`}
+              >
+                <Gift className="w-3.5 h-3.5" /> {useReferral ? "Coupe offerte appliquée (prestation la plus chère)" : "Appliquer la coupe offerte"}
+              </button>
+            </div>
+          )}
           <div className="flex flex-wrap gap-2">
             {PAYMENT_MODES.map((p) => (
               <button key={p.id} onClick={() => setPaymentMode(p.id)} data-testid={`pm-${p.id}`} className={`px-4 py-2 rounded-full text-sm ${paymentMode === p.id ? "bg-[#0A192F] text-white" : "border border-slate-200 text-slate-600"}`}>
@@ -469,8 +545,8 @@ export default function AppointmentForm() {
           )}
           <div>
             <label className="text-[10px] tracking-widest uppercase text-slate-500">Temps passé (minutes)</label>
-            <input type="number" min="0" step="5" data-testid="rdv-duration-input" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="Ex : 45" className={fieldBase} />
-            <div className="text-xs text-slate-500 mt-1">Enregistré à la validation du paiement (sera affiché dans la fiche client et les stats)</div>
+            <input type="number" min="0" step="5" data-testid="rdv-duration-input" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder={rdv?.started_at ? "Auto (chronomètre)" : "Ex : 45"} className={fieldBase} />
+            <div className="text-xs text-slate-500 mt-1">{rdv?.started_at ? "Laissez vide : la durée du chronomètre sera enregistrée automatiquement." : "Enregistré à la validation du paiement (sera affiché dans la fiche client et les stats)"}</div>
           </div>
           <button onClick={finish} data-testid="finish-rdv-btn" className="w-full bg-gold-gradient text-white rounded-full px-8 py-4 font-medium flex items-center justify-center gap-2">
             <CheckCircle2 className="w-4 h-4" /> Valider le paiement & terminer

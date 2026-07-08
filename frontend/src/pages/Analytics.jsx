@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { api, money, money2 } from "@/lib/api";
 import { Link } from "react-router-dom";
-import { Crown, Scissors, TrendingUp, Calendar, Users } from "lucide-react";
+import { Crown, Scissors, TrendingUp, Calendar, Users, Timer } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, PieChart, Pie } from "recharts";
 
 export default function Analytics() {
@@ -112,6 +112,22 @@ export default function Analytics() {
           ))}
           {d.top_services.length === 0 && <li className="text-slate-400 text-sm py-3">Pas encore de données.</li>}
         </ul>
+      </div>
+
+      <div className="bg-white border border-slate-100 rounded-2xl p-5" data-testid="service-time-stats">
+        <div className="flex items-center gap-2 mb-3"><Timer className="w-4 h-4 text-[#D4AF37]" /><div className="text-[10px] uppercase tracking-widest text-slate-500">Temps moyen par prestation</div></div>
+        <ul className="divide-y divide-slate-100">
+          {(d.service_time_stats || []).map((s, i) => (
+            <li key={s.service_id} className="flex items-center gap-3 py-2.5" data-testid={`time-svc-${i}`}>
+              <div className="flex-1 min-w-0"><div className="truncate text-sm font-medium">{s.name}</div><div className="text-xs text-slate-500">basé sur {s.count} RDV chronométré{s.count > 1 ? "s" : ""}</div></div>
+              <div className="font-serif text-base text-purple-600">{s.avg_minutes} min</div>
+            </li>
+          ))}
+          {(d.service_time_stats || []).length === 0 && <li className="text-slate-400 text-sm py-3">Aucune durée enregistrée pour le moment — utilisez le chronomètre sur vos RDV.</li>}
+        </ul>
+        {d.average_duration_minutes != null && (
+          <div className="mt-3 pt-3 border-t border-slate-100 text-xs text-slate-500">Temps moyen global : <span className="font-semibold text-[#0A192F]">{d.average_duration_minutes} min</span> par rendez-vous</div>
+        )}
       </div>
 
       <div className="bg-white border border-slate-100 rounded-2xl p-5">

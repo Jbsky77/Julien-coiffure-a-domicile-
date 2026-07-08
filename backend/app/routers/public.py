@@ -15,6 +15,7 @@ from app.models.requests import AppointmentRequest, RequestServiceRef
 from app.services import notifications
 from app.services.loyalty import compute_loyalty_card
 from app.services.next_visit import compute_next_visit
+from app.services.referrals import compute_referral_info
 from app.services.settings import get_settings
 
 router = APIRouter()
@@ -46,6 +47,7 @@ async def get_client_space(token: str):
     loyalty = await compute_loyalty_card(c["id"])
     notifs = await notifications.list_for_client(c["id"])
     next_visit = await compute_next_visit(c["id"])
+    referral = await compute_referral_info(c["id"])
     invoices = [
         {
             "id": r["id"],
@@ -83,6 +85,7 @@ async def get_client_space(token: str):
         "loyalty": loyalty,
         "notifications": notifs,
         "next_visit": next_visit,
+        "referral": referral,
         "invoices": invoices,
         "brand": {
             "name": settings.brand_name,

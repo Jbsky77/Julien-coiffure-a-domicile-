@@ -22,7 +22,8 @@ class Client(BaseModel):
     birthday: Optional[str] = None  # YYYY-MM-DD
     custom_fields: Dict[str, str] = {}
     loyalty_counters: Dict[str, int] = {}  # service_id -> count paid
-    referrals: int = 0  # validated filleuls
+    referred_by: Optional[str] = None  # client_id of the sponsor (parrain)
+    referral_rewards_used: list = []  # [{used_at, appointment_id, service_name}]
     deposit_required: bool = False
     deposit_note: str = ""
     last_seen: Optional[str] = None
@@ -42,5 +43,6 @@ class ClientCreate(BaseModel):
     comment: str = ""
     birthday: Optional[str] = None
     custom_fields: Dict[str, str] = {}
+    referred_by: Optional[str] = None
     lat: Optional[float] = None
     lng: Optional[float] = None

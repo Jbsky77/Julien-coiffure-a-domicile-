@@ -56,7 +56,7 @@ export default function Clients() {
   const [list, setList] = useState([]);
   const [q, setQ] = useState("");
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ first_name: "", last_name: "", phone: "", address: "", comment: "", birthday: "" });
+  const [form, setForm] = useState({ first_name: "", last_name: "", phone: "", address: "", comment: "", birthday: "", referred_by: "" });
   const [addressParts, setAddressParts] = useState(emptyParts);
   const [addressCoords, setAddressCoords] = useState(null);
   const fileRef = useRef(null);
@@ -71,6 +71,7 @@ export default function Clients() {
     if (!form.last_name) return toast.error("Nom obligatoire");
     const payload = {
       ...form,
+      referred_by: form.referred_by || null,
       address: composeAddress(addressParts),
       address_parts: addressParts,
       ...(addressCoords || {}),
@@ -78,7 +79,7 @@ export default function Clients() {
     await api.post("/clients", payload);
     toast.success("Client créé");
     setShowAdd(false);
-    setForm({ first_name: "", last_name: "", gender: "", phone: "", address: "", comment: "", birthday: "" });
+    setForm({ first_name: "", last_name: "", gender: "", phone: "", address: "", comment: "", birthday: "", referred_by: "" });
     setAddressParts(emptyParts);
     setAddressCoords(null);
     load();
@@ -139,6 +140,13 @@ export default function Clients() {
           <div><label className="text-[10px] tracking-widest uppercase text-slate-500">Prénom</label><input data-testid="new-first-name" className={fb} value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} /></div>
           <div><label className="text-[10px] tracking-widest uppercase text-slate-500">Nom *</label><input data-testid="new-last-name" className={fb} value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} /></div>
           <div><label className="text-[10px] tracking-widest uppercase text-slate-500">Téléphone</label><input data-testid="new-phone" className={fb} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
+          <div>
+            <label className="text-[10px] tracking-widest uppercase text-slate-500">Parrain (qui l'a recommandé ?)</label>
+            <select data-testid="new-referred-by" className={fb} value={form.referred_by} onChange={(e) => setForm({ ...form, referred_by: e.target.value })}>
+              <option value="">— Aucun —</option>
+              {list.map((c) => <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>)}
+            </select>
+          </div>
           <div className="md:col-span-2">
             <AddressAutocomplete
               value={addressParts}
@@ -173,7 +181,7 @@ export default function Clients() {
                   </div>
                   <div className="text-xs text-slate-500 truncate">{c.phone || "—"}</div>
                 </div>
-                {c.referrals >= 2 && <span className="text-[9px] tracking-widest uppercase px-2 py-0.5 rounded-full bg-[#D4AF37]/10 text-[#C5A059] border border-[#D4AF37]/30">Parrain ★</span>}
+                {c.godchildren_count >= 1 && <span className="text-[9px] tracking-widest uppercase px-2 py-0.5 rounded-full bg-[#D4AF37]/10 text-[#C5A059] border border-[#D4AF37]/30">{c.godchildren_count} filleul{c.godchildren_count > 1 ? "s" : ""} ★</span>}
               </Link>
             </li>
           );

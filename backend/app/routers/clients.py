@@ -11,17 +11,30 @@ from app.models.clients import Client, ClientCreate
 from app.services.client_status import compute_client_statuses
 from app.services.geocoding import auto_geocode
 from app.services.next_visit import compute_next_visit
+from app.services.referrals import compute_referral_info
 
 router = APIRouter()
 
 
 @router.get("/clients")
 async def clients_list(user: User = Depends(get_current_user)):
-    return await db.clients.find({}, {"_id": 0}).to_list(5000)
+    rows = await db.clients.find({}, {"_id": 0}).to_list(5000)
+    counts: Dict[str, int] = {}
+    for r in rows:
+        rb = r.get("referred_by")
+        if rb:
+            counts[rb] = counts.get(rb, 0) + 1
+    for r in rows:
+        r["godchildren_count"] = counts.get(r["id"], 0)
+    return rows
 
 
 @router.post("/clients")
 async def clients_create(payload: ClientCreate, user: User = Depends(get_current_user)):
+    if payload.referred_by:
+        sponsor = await db.clients.find_one({"id": payload.referred_by}, {"_id": 0, "id": 1})
+        if not sponsor:
+            raise HTTPException(400, "Parrain introuvable")
     c = Client(**payload.model_dump())
     if c.lat is None and c.address:
         c.lat, c.lng = await auto_geocode(c.address)
@@ -62,11 +75,22 @@ async def clients_get(cid: str, user: User = Depends(get_current_user)):
         raise HTTPException(404, "Not found")
     rdvs = await db.appointments.find({"client_id": cid}, {"_id": 0}).to_list(500)
     next_visit = await compute_next_visit(cid)
-    return {"client": doc, "appointments": rdvs, "next_visit": next_visit}
+    referral = await compute_referral_info(cid)
+    return {"client": doc, "appointments": rdvs, "next_visit": next_visit, "referral": referral}
 
 
 @router.put("/clients/{cid}")
 async def clients_update(cid: str, payload: Dict[str, Any], user: User = Depends(get_current_user)):
+    payload.pop("referrals", None)  # legacy field
+    if "referred_by" in payload:
+        rb = payload.get("referred_by") or None
+        payload["referred_by"] = rb
+        if rb:
+            if rb == cid:
+                raise HTTPException(400, "Un client ne peut pas être son propre parrain")
+            sponsor = await db.clients.find_one({"id": rb}, {"_id": 0, "id": 1})
+            if not sponsor:
+                raise HTTPException(400, "Parrain introuvable")
     has_coords = payload.get("lat") is not None and payload.get("lng") is not None
     if "address" in payload and payload["address"] and not has_coords:
         existing = await db.clients.find_one({"id": cid}, {"_id": 0}) or {}

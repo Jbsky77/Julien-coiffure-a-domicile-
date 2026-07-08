@@ -31,6 +31,7 @@ class Appointment(BaseModel):
     duration_minutes: Optional[int] = None
     invoice_number: Optional[str] = None
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    started_at: Optional[str] = None  # timer start (arrival at client's home)
     finished_at: Optional[str] = None
 
 
@@ -56,3 +57,4 @@ class FinishAppointment(BaseModel):
     price_final: Optional[float] = None
     duration_minutes: Optional[int] = None
     stylists: Optional[Dict[str, str]] = None  # service_id -> "Julien" | "Marley"
+    use_referral_reward: bool = False

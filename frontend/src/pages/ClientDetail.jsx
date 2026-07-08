@@ -32,6 +32,7 @@ export default function ClientDetail() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [services, setServices] = useState([]);
+  const [allClients, setAllClients] = useState([]);
   const [settings, setSettings] = useState({ cb_fee_rate: 0.0175 });
   const [tab, setTab] = useState("infos");
   const [cf, setCf] = useState({ key: "", value: "" });
@@ -39,10 +40,11 @@ export default function ClientDetail() {
   const [editCoords, setEditCoords] = useState(null);
 
   const load = async () => {
-    const [r, s, st] = await Promise.all([api.get(`/clients/${id}`), api.get("/services"), api.get("/settings")]);
+    const [r, s, st, cl] = await Promise.all([api.get(`/clients/${id}`), api.get("/services"), api.get("/settings"), api.get("/clients")]);
     setData(r.data);
     setServices(s.data);
     setSettings(st.data);
+    setAllClients(cl.data);
     setEditing({
       first_name: r.data.client.first_name,
       last_name: r.data.client.last_name,
@@ -52,7 +54,7 @@ export default function ClientDetail() {
       address_parts: r.data.client.address_parts || { ...emptyParts },
       comment: r.data.client.comment,
       birthday: r.data.client.birthday || "",
-      referrals: r.data.client.referrals || 0,
+      referred_by: r.data.client.referred_by || "",
       deposit_required: r.data.client.deposit_required || false,
       deposit_note: r.data.client.deposit_note || "",
     });
@@ -67,7 +69,7 @@ export default function ClientDetail() {
 
   const save = async () => {
     const composed = composeAddress(editing.address_parts);
-    const payload = { ...editing, address: composed || editing.address };
+    const payload = { ...editing, address: composed || editing.address, referred_by: editing.referred_by || null };
     if (editCoords) { payload.lat = editCoords.lat; payload.lng = editCoords.lng; }
     await api.put(`/clients/${id}`, payload);
     setEditCoords(null);
@@ -227,7 +229,7 @@ export default function ClientDetail() {
       </div>
 
       <div className="flex gap-2 flex-wrap">
-        {[{ id: "infos", l: "Informations" }, { id: "loyalty", l: "Suivi Gratuité" }, { id: "history", l: "Historique" }, { id: "photos", l: "Photos" }, { id: "custom", l: "Champs personnalisés" }].map((t) => (
+        {[{ id: "infos", l: "Informations" }, { id: "loyalty", l: "Suivi Gratuité" }, { id: "parrainage", l: "Parrainage" }, { id: "history", l: "Historique" }, { id: "photos", l: "Photos" }, { id: "custom", l: "Champs personnalisés" }].map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)} data-testid={`tab-${t.id}`} className={`px-4 py-2 rounded-full text-sm ${tab === t.id ? "bg-[#0A192F] text-white" : "border border-slate-200 text-slate-600"}`}>{t.l}</button>
         ))}
       </div>
@@ -259,9 +261,19 @@ export default function ClientDetail() {
           </div>
           <div className="md:col-span-2"><label className="text-[10px] tracking-widest uppercase text-slate-500">Commentaire permanent</label><textarea rows={3} className={`${fb} resize-none`} value={editing.comment} onChange={(e) => setEditing({ ...editing, comment: e.target.value })} /></div>
           <div>
-            <label className="text-[10px] tracking-widest uppercase text-slate-500">Filleuls validés</label>
-            <input type="number" className={fb} value={editing.referrals} onChange={(e) => setEditing({ ...editing, referrals: parseInt(e.target.value) || 0 })} />
-            {editing.referrals >= 2 && <div className="text-xs text-[#C5A059] mt-1 flex items-center gap-1"><UsersIcon className="w-3 h-3" /> Prochaine prestation OFFERTE (parrainage)</div>}
+            <label className="text-[10px] tracking-widest uppercase text-slate-500">Parrain</label>
+            <select
+              className={fb}
+              data-testid="referred-by-select"
+              value={editing.referred_by || ""}
+              onChange={(e) => setEditing({ ...editing, referred_by: e.target.value })}
+            >
+              <option value="">— Aucun —</option>
+              {allClients.filter((x) => x.id !== id).map((x) => (
+                <option key={x.id} value={x.id}>{x.first_name} {x.last_name}</option>
+              ))}
+            </select>
+            <div className="text-xs text-slate-500 mt-1 flex items-center gap-1"><UsersIcon className="w-3 h-3" /> Le client qui vous a recommandé à cette personne</div>
           </div>
           <div className="md:col-span-2 bg-orange-50/50 border border-orange-100 rounded-xl p-4 space-y-3">
             <label className="flex items-center gap-3 cursor-pointer">
@@ -303,6 +315,69 @@ export default function ClientDetail() {
           })()}
         </div>
       )}
+
+      {tab === "parrainage" && (() => {
+        const ref = data.referral || {};
+        const plural = (n, w) => `${n} ${w}${n > 1 ? "s" : ""}`;
+        return (
+          <div className="space-y-4" data-testid="referral-tab">
+            <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-premium space-y-4">
+              <div className="flex items-center gap-2">
+                <UsersIcon className="w-4 h-4 text-[#D4AF37]" />
+                <div className="text-[10px] tracking-[0.3em] uppercase text-slate-500">Parrainage</div>
+              </div>
+              {ref.referred_by_name && (
+                <div className="text-sm" data-testid="referral-sponsor">
+                  Parrainé par{" "}
+                  <Link to={`/clients/${ref.referred_by}`} className="font-medium text-[#1E3A8A] hover:underline">{ref.referred_by_name}</Link>
+                </div>
+              )}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="bg-slate-50 rounded-2xl p-4"><div className="text-[10px] uppercase tracking-widest text-slate-500">Filleuls</div><div className="font-serif text-2xl text-[#0A192F]" data-testid="referral-count">{ref.godchildren_count || 0}</div></div>
+                <div className="bg-[#D4AF37]/10 rounded-2xl p-4"><div className="text-[10px] uppercase tracking-widest text-slate-500">Récompenses obtenues</div><div className="font-serif text-2xl text-[#C5A059]">{ref.rewards_earned || 0}</div></div>
+                <div className="bg-green-50 rounded-2xl p-4"><div className="text-[10px] uppercase tracking-widest text-slate-500">Disponibles</div><div className="font-serif text-2xl text-green-700" data-testid="referral-available">{ref.rewards_available || 0}</div></div>
+                <div className="bg-slate-50 rounded-2xl p-4"><div className="text-[10px] uppercase tracking-widest text-slate-500">Utilisées</div><div className="font-serif text-2xl text-slate-600">{ref.rewards_used || 0}</div></div>
+              </div>
+              <div className="text-xs text-slate-500 flex items-center gap-1.5">
+                <Gift className="w-3.5 h-3.5 text-[#D4AF37]" />
+                Plus que {plural(ref.remaining_to_next ?? ref.threshold ?? 4, "filleul")} avant la prochaine coupe offerte ({ref.threshold || 4} filleuls = 1 coupe offerte).
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-premium">
+              <div className="text-[10px] tracking-[0.3em] uppercase text-slate-500 mb-3">Liste des filleuls</div>
+              {(ref.godchildren || []).length === 0 ? (
+                <div className="text-sm text-slate-400">Aucun filleul pour le moment. Sélectionnez ce client comme « Parrain » sur la fiche d'un nouveau client.</div>
+              ) : (
+                <ul className="divide-y divide-slate-100">
+                  {ref.godchildren.map((g, i) => (
+                    <li key={g.id}>
+                      <Link to={`/clients/${g.id}`} className="flex items-center gap-3 py-2.5 hover:opacity-80" data-testid={`godchild-${g.id}`}>
+                        <span className="w-6 text-xs font-medium text-slate-400">#{i + 1}</span>
+                        <span className="text-sm font-medium">{g.name}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {(ref.rewards_used_history || []).length > 0 && (
+              <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-premium">
+                <div className="text-[10px] tracking-[0.3em] uppercase text-slate-500 mb-3">Récompenses utilisées</div>
+                <ul className="divide-y divide-slate-100">
+                  {ref.rewards_used_history.map((u, i) => (
+                    <li key={i} className="py-2.5 flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2"><Gift className="w-3.5 h-3.5 text-[#C5A059]" /> {u.service_name || "Prestation offerte"}</span>
+                      <span className="text-xs text-slate-500">{u.used_at ? new Date(u.used_at).toLocaleDateString("fr-FR") : "—"}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {tab === "history" && (
         <div className="space-y-2">

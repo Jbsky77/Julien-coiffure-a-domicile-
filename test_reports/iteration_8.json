@@ -1,0 +1,27 @@
+{
+  "summary": "Tested new referral (parrainage) system + auto timer + analytics service_time_stats + settings.referral_threshold. Backend: 14/14 pytest passing (all endpoints validated including create/update with referred_by, self-parrainage 400, godchildren_count on list, referral info on client detail, start-timer, auto-computed duration, manual-wins-over-auto, use_referral_reward flow with is_gift/gift_source=referral + rewards_used_history + loyalty_counters not touched, public client space referral, analytics service_time_stats). Frontend: PIN unlock OK, /clients form 'new-referred-by' select works and badge 'X filleul(s) ★' appears on parrain card, ClientDetail 'referred-by-select' + Parrainage tab + referral-sponsor + referral-count/available visible, RDV timer-card + start-timer-btn + timer-elapsed increments live + restart-timer-btn present, Analytics service-time-stats section rendered, /reglages set-referral-threshold input renders value 4, public client space (Sophie) shows referral-card in Fidélité tab.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_referral_timer.py",
+    "/app/test_reports/pytest/pytest_referral.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "appointments.finish: auto duration uses max(1, min(240, mins)) — correct spec (>=1min, cap 240).",
+    "referrals.compute_referral_info: rewards_available = max(0, earned - used) — safe against negative if history longer than earned.",
+    "clients_update pops legacy 'referrals' field before persist — good migration hygiene.",
+    "loyalty logic in finish: referral-gift services are `continue`d in loyalty loop (no reset, no increment) — matches spec. Non-referral gifts still reset the counter as expected.",
+    "public.py: referral is exposed on GET /public/client/{token} — includes threshold + counts. Good.",
+    "Frontend AppointmentForm timer-card correctly hides after status=done and elapsed increments client-side via setInterval. No issue observed."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_referral_timer.py (new pytest, 14 tests, all passing)"
+  ],
+  "success_rate": {"backend": "100% (14/14)", "frontend": "100% (all 6 UI flows verified)"},
+  "test_credentials": "PIN 123456; Sophie token _V-HRjKzLbQYJU0pPRHlad_44GARhDU0",
+  "seed_data_creation": "Created TEST_ clients + appointments via pytest — all cleaned up in module fixture teardown. Also created 1 TFront1 client + linked to Marie Dupont as parrain via UI (deleted via UI window.confirm). One accidental Sophie RDV rdv_f9374aa3d3 (created during initial Playwright RDV-nouveau attempt) was manually deleted; started_at reset on rdv_a67c9cf136 (Sophie seed RDV) so no leftover timer state.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All parrainage + timer + analytics features are green backend & frontend. referral-reward-banner in AppointmentForm was NOT visually observed because seed clients have 0 filleuls; backend end-to-end has been fully validated (test_use_referral_reward_at_finish). If needed, main agent can seed one client with 4 filleuls to visually demo the UI banner + toggle."
+}
