@@ -124,7 +124,7 @@ export default function ClientSpace() {
   if (!data) return <LoadingScreen />;
 
   const { client, appointments, requests, loyalty, notifications, brand, invoices, referral } = data;
-  const reviewLink = brand.review_url_short || brand.review_url;
+  const reviewLink = brand.review_url_short || brand.review_url || `https://www.google.com/search?q=${encodeURIComponent((brand.name || "Julien Bouche") + " coiffeur à domicile avis")}`;
   const activeCounter = requests.find((r) => r.status === "counter_proposed");
   const doneAppointments = appointments.filter((a) => a.status === "done");
   const upcomingAppointments = appointments
