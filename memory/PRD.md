@@ -1,5 +1,11 @@
 # PRD — Coiffure à domicile Julien Bouche
 
+## Implemented (v3.0 — 2026-06) — Chronométrage auto + Refonte parrainage
+- **Chrono** : `started_at` sur Appointment, `POST /appointments/{rid}/start-timer` (démarrage MANUEL depuis la fiche RDV — choix user). À `finish` : durée auto = now - started_at (min 1, cap 240 min), la saisie manuelle prime. UI : `timer-card` avec chrono live (`timer-elapsed`), bouton Redémarrer. Durée dans bandeau RDV terminé + historique fiche client.
+- **Stats temps** : `service_time_stats` dans /api/analytics (proratisation par durées théoriques pour RDV multi-prestations) + section "Temps moyen par prestation" dans Stats. Temps moyen/total par client déjà sur fiche client.
+- **Parrainage** : `referred_by` (1 seul parrain, dropdown clients à la création `new-referred-by` et fiche `referred-by-select`, self-parrainage → 400). Ancien compteur `referrals` supprimé (migration `remove_legacy_referrals` au startup). Filleuls auto-calculés (`app/services/referrals.py::compute_referral_info`). Seuil `referral_threshold` (défaut 4, Réglages). À `finish` avec `use_referral_reward=true` : prestation la plus chère → `is_gift + gift_source='referral'`, prix réduit, usage historisé dans `referral_rewards_used` {used_at, appointment_id, service_name}, fidélité NON touchée. Front : bandeau `referral-reward-banner` + toggle + window.confirm avant validation. Fiche client : onglet Parrainage complet. Espace Client public : `referral-card` avec message d'encouragement. Badge "{n} filleul(s) ★" dans la liste clients.
+- Tests : iteration_8 — 14/14 pytest backend (`tests/test_referral_timer.py`), 6/6 flux UI. 100%.
+
 ## Implemented (v2.9 — 2026-06) — Version bureau + ergonomie mobile
 - Espace Client : carte "Vos prochains rendez-vous" (`upcoming-appointments`) toujours visible au-dessus des onglets — RDV `scheduled` futurs, badge "Confirmé".
 - Notifications client éphémères : `list_for_client` ne renvoie que `read != True`. Le front les marque lues au chargement (visibles pendant la session grâce au merge sticky dans `load()` — protège du double-effect StrictMode) puis elles disparaissent à la visite suivante. Vérifié e2e : demande RDV → accept/reject/counter admin → notif visible visite 1, disparue visite 2.
