@@ -10,11 +10,11 @@ function Keypad({ onDigit, onDelete, disabled }) {
   return (
     <div className="grid grid-cols-3 gap-3 w-full max-w-xs mx-auto">
       {keys.map((k, i) => {
-        if (k === null) return <div key={i} />;
+        if (k === null) return <div key={`blank-${i}`} />;
         if (k === "del") {
           return (
             <button
-              key={i}
+              key="del"
               type="button"
               disabled={disabled}
               onClick={onDelete}
@@ -27,7 +27,7 @@ function Keypad({ onDigit, onDelete, disabled }) {
         }
         return (
           <button
-            key={i}
+            key={k}
             type="button"
             disabled={disabled}
             onClick={() => onDigit(k)}

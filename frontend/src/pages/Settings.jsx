@@ -10,7 +10,9 @@ function IcalBlock() {
       try {
         const r = await api.get("/calendar/ical-url");
         setUrl(`${API}/calendar/${r.data.token}.ics`);
-      } catch (e) {}
+      } catch (e) {
+        console.warn("ical url:", e);
+      }
     })();
   }, []);
   const copy = async () => {

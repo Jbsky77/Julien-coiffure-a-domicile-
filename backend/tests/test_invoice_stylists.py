@@ -4,7 +4,7 @@ import pytest
 import requests
 
 BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/") + "/api"
-PIN = "123456"
+PIN = os.environ.get("TEST_PIN", "123456")
 SOPHIE_TOKEN = "_V-HRjKzLbQYJU0pPRHlad_44GARhDU0"
 SOPHIE_ID = "cli_e998044705"
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { api, money, money2, fmtDate, fmtTime, genderClasses, genderLabel, computeAge } from "@/lib/api";
 import { AddressAutocomplete, composeAddress, emptyParts } from "@/components/app/AddressAutocomplete";
@@ -39,7 +39,7 @@ export default function ClientDetail() {
   const [editing, setEditing] = useState({});
   const [editCoords, setEditCoords] = useState(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const [r, s, st, cl] = await Promise.all([api.get(`/clients/${id}`), api.get("/services"), api.get("/settings"), api.get("/clients")]);
     setData(r.data);
     setServices(s.data);
@@ -58,9 +58,9 @@ export default function ClientDetail() {
       deposit_required: r.data.client.deposit_required || false,
       deposit_note: r.data.client.deposit_note || "",
     });
-  };
+  }, [id]);
 
-  useEffect(() => { load(); }, [id]);
+  useEffect(() => { load(); }, [load]);
 
   if (!data) return <div className="text-slate-500">Chargement…</div>;
   const c = data.client;
@@ -367,7 +367,7 @@ export default function ClientDetail() {
                 <div className="text-[10px] tracking-[0.3em] uppercase text-slate-500 mb-3">Récompenses utilisées</div>
                 <ul className="divide-y divide-slate-100">
                   {ref.rewards_used_history.map((u, i) => (
-                    <li key={i} className="py-2.5 flex items-center justify-between text-sm">
+                    <li key={u.used_at || i} className="py-2.5 flex items-center justify-between text-sm">
                       <span className="flex items-center gap-2"><Gift className="w-3.5 h-3.5 text-[#C5A059]" /> {u.service_name || "Prestation offerte"}</span>
                       <span className="text-xs text-slate-500">{u.used_at ? new Date(u.used_at).toLocaleDateString("fr-FR") : "—"}</span>
                     </li>

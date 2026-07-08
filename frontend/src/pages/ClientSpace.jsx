@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 import { API } from "@/lib/api";
@@ -29,7 +29,7 @@ export default function ClientSpace() {
   const [altOpen, setAltOpen] = useState(false);
   const [altDate, setAltDate] = useState("");
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const [r, svc] = await Promise.all([
         axios.get(`${API}/public/client/${token}`),
@@ -46,9 +46,9 @@ export default function ClientSpace() {
     } catch (e) {
       setError(e.response?.data?.detail || "Lien invalide");
     }
-  };
+  }, [token]);
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [token]);
+  useEffect(() => { load(); }, [load]);
 
   const submitRequest = async () => {
     if (!form.requested_date) return toast.error("Choisissez une date et une heure");
@@ -87,7 +87,9 @@ export default function ClientSpace() {
     try {
       await axios.post(`${API}/public/client/${token}/notifications/dismiss`);
       setData((prev) => ({ ...prev, notifications: [] }));
-    } catch {}
+    } catch (e) {
+      console.warn("dismiss notifications:", e);
+    }
   };
 
   const totalDuration = useMemo(() => {
@@ -163,7 +165,7 @@ export default function ClientSpace() {
             </div>
             <ul className="space-y-2">
               {notifications.slice(0, 5).map((n, i) => (
-                <li key={i} className="text-sm text-slate-700 flex items-start gap-2">
+                <li key={n.id || i} className="text-sm text-slate-700 flex items-start gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] mt-2 flex-shrink-0" />
                   <div>
                     <div>{n.message}</div>

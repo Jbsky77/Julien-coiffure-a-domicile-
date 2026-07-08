@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, money2, fmtTime, genderClasses, genderLabel } from "@/lib/api";
 import { ArrowLeft, Navigation, MapPin, Clock, Car, AlertTriangle, Route } from "lucide-react";
@@ -8,11 +8,11 @@ export default function Tour() {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const navigate = useNavigate();
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const r = await api.get(`/tour/today?date=${date}`);
     setData(r.data);
-  };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [date]);
+  }, [date]);
+  useEffect(() => { load(); }, [load]);
 
   const buildItineraryUrl = (addr) => `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addr)}`;
 

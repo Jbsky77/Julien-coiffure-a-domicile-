@@ -114,7 +114,9 @@ export default function AppointmentForm() {
             deposit_required: !!r.data.client.deposit_required,
             deposit_note: r.data.client.deposit_note || "",
           });
-        } catch (e) {}
+        } catch (e) {
+          console.warn("load client info:", e);
+        }
       })();
     } else {
       setClientRisk(null);

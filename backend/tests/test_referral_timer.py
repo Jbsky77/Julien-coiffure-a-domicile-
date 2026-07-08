@@ -19,7 +19,7 @@ import pytest
 import requests
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
-PIN = "123456"
+PIN = os.environ.get("TEST_PIN", "123456")
 SOPHIE_TOKEN = "_V-HRjKzLbQYJU0pPRHlad_44GARhDU0"
 
 CREATED_CLIENTS = []

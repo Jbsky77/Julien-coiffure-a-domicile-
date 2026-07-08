@@ -9,7 +9,7 @@ API = BASE_URL + "/api"
 
 @pytest.fixture(scope="module")
 def pin_token():
-    r = requests.post(f"{API}/pin/unlock", json={"pin": "123456", "ttl_seconds": 3600})
+    r = requests.post(f"{API}/pin/unlock", json={"pin": os.environ.get("TEST_PIN", "123456"), "ttl_seconds": 3600})
     assert r.status_code == 200, r.text
     return r.json()["token"]
 
@@ -104,7 +104,7 @@ class TestClientAddress:
     @classmethod
     def teardown_class(cls):
         try:
-            token = requests.post(f"{API}/pin/unlock", json={"pin": "123456"}).json()["token"]
+            token = requests.post(f"{API}/pin/unlock", json={"pin": os.environ.get("TEST_PIN", "123456")}).json()["token"]
             h = {"X-Pin-Token": token}
             for cid in cls.created:
                 requests.delete(f"{API}/clients/{cid}", headers=h)
@@ -154,7 +154,7 @@ class TestRequestFlow:
         assert r.status_code == 200, r.text
         # Verify status is back to pending
         # Access via admin
-        token = requests.post(f"{API}/pin/unlock", json={"pin": "123456"}).json()["token"]
+        token = requests.post(f"{API}/pin/unlock", json={"pin": os.environ.get("TEST_PIN", "123456")}).json()["token"]
         h = {"X-Pin-Token": token}
         lst = requests.get(f"{API}/appointment-requests", headers=h).json()
         one = next((x for x in lst if x["id"] == rid), None)
@@ -194,7 +194,7 @@ class TestRequestFlow:
     @classmethod
     def teardown_class(cls):
         try:
-            token = requests.post(f"{API}/pin/unlock", json={"pin": "123456"}).json()["token"]
+            token = requests.post(f"{API}/pin/unlock", json={"pin": os.environ.get("TEST_PIN", "123456")}).json()["token"]
             h = {"X-Pin-Token": token}
             for rid in cls.created_rids:
                 requests.delete(f"{API}/appointment-requests/{rid}", headers=h)

@@ -67,14 +67,16 @@ export default function Dashboard() {
 
   const dismissNotif = async (nid) => {
     setAdminNotifs((prev) => prev.filter((n) => n.id !== nid));
-    try { await api.post(`/notifications/admin/${nid}/dismiss`); } catch {}
+    try { await api.post(`/notifications/admin/${nid}/dismiss`); } catch (e) { console.warn("dismiss notification:", e); }
   };
 
   const markReminderSent = async (aid) => {
     try {
       await api.post(`/reminders/${aid}/sent`);
       setReminders((prev) => prev.map((r) => (r.appointment_id === aid ? { ...r, sent: true } : r)));
-    } catch {}
+    } catch (e) {
+      console.warn("mark reminder sent:", e);
+    }
   };
 
   useEffect(() => { load(); }, []);
@@ -102,7 +104,9 @@ export default function Dashboard() {
       try {
         new Notification("🎂 Anniversaires à venir", { body: names, tag: "birthdays" });
         localStorage.setItem(KEY, today);
-      } catch {}
+      } catch (e) {
+        console.warn("birthday notification:", e);
+      }
     }
   }, [d]);
 
@@ -205,7 +209,7 @@ export default function Dashboard() {
           <Widget title="Insights automatiques" tid="widget-insights">
             <ul className="space-y-2">
               {insights.map((txt, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
+                <li key={txt || i} className="flex items-start gap-2 text-sm text-slate-700">
                   <Lightbulb className="w-4 h-4 text-[#D4AF37] mt-0.5 flex-shrink-0" />
                   <span>{txt}</span>
                 </li>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { api, money, money2, fmtMonth } from "@/lib/api";
 import { toast } from "sonner";
 import { ExternalLink, RefreshCcw, ChevronLeft, ChevronRight, Download, FileText, CreditCard, Pencil, Save } from "lucide-react";
@@ -38,24 +38,21 @@ export default function Accounting() {
     setPayments(r.data.filter((x) => x.status === "done"));
   };
 
-  const load = async () => {
-    const [r, m, cb] = await Promise.all([
+  const load = useCallback(async () => {
+    const [r, m] = await Promise.all([
       api.get(`/accounting/month/${yyyymm}`),
       api.get("/accounting/months"),
-      api.get(`/accounting/cb-fees?period=${cbPeriod}`),
     ]);
     setData(r.data);
     setMonths(m.data);
+  }, [yyyymm]);
+  const loadCbFees = useCallback(async () => {
+    const cb = await api.get(`/accounting/cb-fees?period=${cbPeriod}`);
     setCbData(cb.data);
-  };
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [yyyymm]);
-  useEffect(() => { loadPayments(); }, []);
-  useEffect(() => {
-    (async () => {
-      const cb = await api.get(`/accounting/cb-fees?period=${cbPeriod}`);
-      setCbData(cb.data);
-    })();
   }, [cbPeriod]);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadPayments(); }, []);
+  useEffect(() => { loadCbFees(); }, [loadCbFees]);
 
   const setStatus = async (monthKey, patch) => {
     await api.post(`/accounting/urssaf/${monthKey}`, patch);

@@ -133,6 +133,73 @@ async def _timer_action(rid: str, action: str):
     return {"ok": True, **update}
 
 
+def _auto_duration(rdv: dict, now: datetime):
+    """Timer-based duration in minutes (>=1, capped at 4h), or None."""
+    total = float(rdv.get("timer_seconds") or 0)
+    if rdv.get("started_at") and (rdv.get("timer_status") or "running") == "running":
+        start = parse_iso(rdv["started_at"])
+        if start:
+            total += (now - start).total_seconds()
+    if total <= 0:
+        return None
+    return max(1, min(240, int(round(total / 60))))
+
+
+async def _apply_referral_reward(rdv: dict, svcs: list, final: float):
+    """Mark the most expensive non-gift service as a referral gift.
+
+    Returns (new_final, gifted_service)."""
+    info = await compute_referral_info(rdv["client_id"])
+    if info["rewards_available"] <= 0:
+        raise HTTPException(400, "Aucune récompense parrainage disponible")
+    candidates = [s for s in svcs if not s.get("is_gift")]
+    if not candidates:
+        raise HTTPException(400, "Aucune prestation éligible à la gratuité")
+    target = max(candidates, key=lambda s: s.get("price", 0) or 0)
+    target["is_gift"] = True
+    target["gift_source"] = "referral"
+    return max(0.0, round(final - (target.get("price") or 0), 2)), target
+
+
+async def _next_invoice_number() -> str:
+    year = datetime.now(timezone.utc).year
+    counter = await db.counters.find_one_and_update(
+        {"_id": f"invoice_{year}"},
+        {"$inc": {"seq": 1}},
+        upsert=True,
+        return_document=ReturnDocument.AFTER,
+    )
+    return f"F-{year}-{counter['seq']:04d}"
+
+
+async def _update_client_after_finish(rdv: dict, svcs: list, now: datetime, referral_service):
+    if referral_service is not None:
+        await db.clients.update_one(
+            {"id": rdv["client_id"]},
+            {"$push": {"referral_rewards_used": {
+                "used_at": now.isoformat(),
+                "appointment_id": rdv["id"],
+                "service_name": referral_service.get("name", ""),
+            }}},
+        )
+    client = await db.clients.find_one({"id": rdv["client_id"]}, {"_id": 0})
+    if not client:
+        return
+    counters = client.get("loyalty_counters", {}) or {}
+    for s in svcs:
+        sid = s["service_id"]
+        if s.get("is_gift"):
+            if s.get("gift_source") == "referral":
+                continue  # referral gifts don't touch loyalty
+            counters[sid] = 0  # reset after loyalty gift
+        else:
+            counters[sid] = counters.get(sid, 0) + 1
+    await db.clients.update_one(
+        {"id": rdv["client_id"]},
+        {"$set": {"loyalty_counters": counters, "last_seen": now.isoformat()}},
+    )
+
+
 @router.post("/appointments/{rid}/finish")
 async def appointments_finish(rid: str, payload: FinishAppointment, user: User = Depends(get_current_user)):
     rdv = await db.appointments.find_one({"id": rid}, {"_id": 0})
@@ -149,77 +216,27 @@ async def appointments_finish(rid: str, payload: FinishAppointment, user: User =
         "payment_mode": payload.payment_mode,
         "finished_at": now.isoformat(),
     }
-    # Duration: manual value wins, else auto-computed from the timer (capped at 4h)
-    if payload.duration_minutes is not None:
-        update_fields["duration_minutes"] = payload.duration_minutes
-    else:
-        total = float(rdv.get("timer_seconds") or 0)
-        if rdv.get("started_at") and (rdv.get("timer_status") or "running") == "running":
-            start = parse_iso(rdv["started_at"])
-            if start:
-                total += (now - start).total_seconds()
-        if total > 0:
-            update_fields["duration_minutes"] = max(1, min(240, int(round(total / 60))))
+    # Duration: manual value wins, else auto-computed from the timer
+    duration = payload.duration_minutes if payload.duration_minutes is not None else _auto_duration(rdv, now)
+    if duration is not None:
+        update_fields["duration_minutes"] = duration
     if payload.stylists:
         for s in svcs:
             if s["service_id"] in payload.stylists:
                 s["stylist"] = payload.stylists[s["service_id"]]
         services_changed = True
-    # Referral reward: free the most expensive non-gift service
-    referral_reward_service = None
+    referral_service = None
     if payload.use_referral_reward:
-        info = await compute_referral_info(rdv["client_id"])
-        if info["rewards_available"] <= 0:
-            raise HTTPException(400, "Aucune récompense parrainage disponible")
-        candidates = [s for s in svcs if not s.get("is_gift")]
-        if not candidates:
-            raise HTTPException(400, "Aucune prestation éligible à la gratuité")
-        target = max(candidates, key=lambda s: s.get("price", 0) or 0)
-        target["is_gift"] = True
-        target["gift_source"] = "referral"
-        referral_reward_service = target
-        final = max(0.0, round(final - (target.get("price") or 0), 2))
+        final, referral_service = await _apply_referral_reward(rdv, svcs, final)
         update_fields["gift_applied"] = True
         services_changed = True
     update_fields["price_final"] = final
     if services_changed:
         update_fields["services"] = svcs
     if not rdv.get("invoice_number"):
-        year = datetime.now(timezone.utc).year
-        counter = await db.counters.find_one_and_update(
-            {"_id": f"invoice_{year}"},
-            {"$inc": {"seq": 1}},
-            upsert=True,
-            return_document=ReturnDocument.AFTER,
-        )
-        update_fields["invoice_number"] = f"F-{year}-{counter['seq']:04d}"
+        update_fields["invoice_number"] = await _next_invoice_number()
     await db.appointments.update_one({"id": rid}, {"$set": update_fields})
-    # Record referral reward usage in the client's history
-    if referral_reward_service is not None:
-        await db.clients.update_one(
-            {"id": rdv["client_id"]},
-            {"$push": {"referral_rewards_used": {
-                "used_at": now.isoformat(),
-                "appointment_id": rid,
-                "service_name": referral_reward_service.get("name", ""),
-            }}},
-        )
-    # Update client loyalty counters (referral gifts don't touch loyalty)
-    client = await db.clients.find_one({"id": rdv["client_id"]}, {"_id": 0})
-    if client:
-        counters = client.get("loyalty_counters", {}) or {}
-        for s in svcs:
-            sid = s["service_id"]
-            if s.get("is_gift"):
-                if s.get("gift_source") == "referral":
-                    continue
-                counters[sid] = 0  # reset after loyalty gift
-            else:
-                counters[sid] = counters.get(sid, 0) + 1
-        await db.clients.update_one(
-            {"id": rdv["client_id"]},
-            {"$set": {"loyalty_counters": counters, "last_seen": now.isoformat()}},
-        )
+    await _update_client_after_finish(rdv, svcs, now, referral_service)
     return await db.appointments.find_one({"id": rid}, {"_id": 0})
 
 

@@ -1,6 +1,5 @@
 """Retest iteration 8 — address_parts reload contract + prospection clamp 50km."""
 import os
-import time
 import pytest
 import requests
 
@@ -11,7 +10,7 @@ SOPHIE = "cli_e998044705"
 
 @pytest.fixture(scope="module")
 def hdrs():
-    r = requests.post(f"{API}/pin/unlock", json={"pin": "123456", "ttl_seconds": 3600})
+    r = requests.post(f"{API}/pin/unlock", json={"pin": os.environ.get("TEST_PIN", "123456"), "ttl_seconds": 3600})
     assert r.status_code == 200, r.text
     return {"X-Pin-Token": r.json()["token"], "Content-Type": "application/json"}
 

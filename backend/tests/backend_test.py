@@ -13,7 +13,7 @@ Covers:
 """
 import os
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import pytest
 import requests
@@ -31,7 +31,7 @@ def api_client():
     try:
         status = s.get(f"{API}/pin/status", timeout=5).json()
         if status.get("configured"):
-            r = s.post(f"{API}/pin/unlock", json={"pin": "123456", "ttl_seconds": 3600}, timeout=5)
+            r = s.post(f"{API}/pin/unlock", json={"pin": os.environ.get("TEST_PIN", "123456"), "ttl_seconds": 3600}, timeout=5)
             if r.ok and r.json().get("token"):
                 s.headers.update({"X-Pin-Token": r.json()["token"]})
     except Exception:

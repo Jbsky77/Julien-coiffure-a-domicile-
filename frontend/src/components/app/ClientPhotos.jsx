@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { Camera, Upload, Trash2, Share2, Download, Mail, MessageSquare, X, Image as ImageIcon, Smartphone, Square } from "lucide-react";
 import { toast } from "sonner";
@@ -188,11 +188,11 @@ export default function ClientPhotos({ clientId, clientName }) {
     api.get("/settings").then((r) => setBrandName(r.data.brand_name || "Julien")).catch(() => {});
   }, []);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const r = await api.get(`/clients/${clientId}/photos`);
     setPairs(r.data);
-  };
-  useEffect(() => { if (clientId) load(); /* eslint-disable-next-line */ }, [clientId]);
+  }, [clientId]);
+  useEffect(() => { if (clientId) load(); }, [clientId, load]);
 
   const onPick = async (kind, e) => {
     const f = e.target.files?.[0];

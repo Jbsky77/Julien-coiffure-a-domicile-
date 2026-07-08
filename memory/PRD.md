@@ -1,5 +1,13 @@
 # PRD — Coiffure à domicile Julien Bouche
 
+## Implemented (v3.1 — 2026-06) — Revue de code appliquée
+- Tests backend : PIN via `os.environ.get("TEST_PIN", "123456")` (7 fichiers). Imports inutilisés supprimés. Pyflakes clean.
+- `analytics.py` refactoré en 7 fonctions ciblées ; `appointments_finish` refactoré (helpers `_auto_duration`, `_apply_referral_reward`, `_next_invoice_number`, `_update_client_after_finish`).
+- Frontend : 5 warnings exhaustive-deps corrigés (useCallback `load` : ClientDetail, ClientSpace, Tour, Accounting, ClientPhotos) → 0 warning ESLint. Catches vides → console.warn. Keys stables (PinLock digits, notifications n.id, insights, historique récompenses used_at).
+- Tests fragiles rendus robustes : prospection `>= 1`, reminders skip si seed date drift.
+- NON appliqué (justifié) : localStorage→httpOnly cookies (architecture PIN-gate PWA volontaire), découpage gros composants (risque régression, backlog), refactor accounting/_timer_action (complexité acceptable).
+- Régression : 76 passed, 1 skipped. Webpack : 0 erreur, 0 warning ESLint.
+
 ## Implemented (v3.0 — 2026-06) — Chronométrage auto + Refonte parrainage
 - **Chrono v2 (Pause/Stop)** : champs `timer_seconds` (cumul, pauses exclues) + `timer_status` (running/paused/stopped). `POST /appointments/{rid}/timer` {action: start|pause|resume|stop} (+ `/start-timer` conservé = start). UI : boutons Pause (`pause-timer-btn`), Reprendre (`resume-timer-btn`), Stop (`stop-timer-btn`, fige la durée), Redémarrer à zéro après stop (confirm). Finish auto-duration = timer_seconds cumulés (+ temps courant si running). Testé e2e : 35s + pause 10s + 35s → 70s retenues → 1 min.
 - **Chrono** : `started_at` sur Appointment, `POST /appointments/{rid}/start-timer` (démarrage MANUEL depuis la fiche RDV — choix user). À `finish` : durée auto = now - started_at (min 1, cap 240 min), la saisie manuelle prime. UI : `timer-card` avec chrono live (`timer-elapsed`), bouton Redémarrer. Durée dans bandeau RDV terminé + historique fiche client.
