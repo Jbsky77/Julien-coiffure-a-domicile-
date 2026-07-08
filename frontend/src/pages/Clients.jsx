@@ -96,10 +96,16 @@ export default function Clients() {
     load();
   };
 
-  const filtered = list.filter((c) => {
-    const s = `${c.first_name} ${c.last_name} ${c.phone}`.toLowerCase();
-    return s.includes(q.toLowerCase());
-  });
+  const filtered = list
+    .filter((c) => {
+      const s = `${c.first_name} ${c.last_name} ${c.phone}`.toLowerCase();
+      return s.includes(q.toLowerCase());
+    })
+    .sort((a, b) =>
+      `${a.last_name || ""} ${a.first_name || ""}`.trim().localeCompare(
+        `${b.last_name || ""} ${b.first_name || ""}`.trim(), "fr", { sensitivity: "base" }
+      )
+    );
 
   const fb = "w-full bg-transparent border-b border-slate-300 rounded-none px-0 py-2 focus:border-[#0A192F] focus:outline-none text-base";
 

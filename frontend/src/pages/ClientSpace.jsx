@@ -208,7 +208,7 @@ export default function ClientSpace() {
         )}
 
         {/* Tabs */}
-        <div className="flex gap-2 bg-white rounded-full p-1 shadow-sm">
+        <div className="grid grid-cols-4 gap-1 bg-white rounded-2xl p-1.5 shadow-sm">
           {[
             { id: "fidelite", label: "Fidélité", icon: Star },
             { id: "historique", label: "Historique", icon: ClipboardList },
@@ -219,11 +219,12 @@ export default function ClientSpace() {
               key={t.id}
               onClick={() => setTab(t.id)}
               data-testid={`tab-${t.id}`}
-              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-full text-sm font-medium transition ${
+              className={`min-w-0 flex flex-col items-center justify-center gap-1 px-1 py-2.5 rounded-xl text-[11px] sm:text-xs font-medium transition ${
                 tab === t.id ? "bg-[#0A192F] text-white" : "text-slate-500 hover:bg-slate-50"
               }`}
             >
-              <t.icon className="w-3.5 h-3.5" /> {t.label}
+              <t.icon className="w-4 h-4 flex-shrink-0" />
+              <span className="truncate w-full text-center">{t.label}</span>
             </button>
           ))}
         </div>

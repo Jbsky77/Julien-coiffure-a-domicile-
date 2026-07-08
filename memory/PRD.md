@@ -1,5 +1,12 @@
 # PRD — Coiffure à domicile Julien Bouche
 
+## Implemented (v2.9 — 2026-06) — Version bureau + ergonomie mobile
+- Layout desktop (lg+) : sidebar gauche fixe avec tous les menus, contenu pleine largeur max-w-6xl (fini le cadre "téléphone" sur ordinateur). Recherche + Verrouiller dans la sidebar.
+- Mobile : flèche ChevronDown dans la topbar (`topbar-quick-menu`) ouvrant un panneau grille 4 colonnes avec les 11 menus (`quick-menu-panel`, badge demandes inclus). Fermeture au clic extérieur/navigation.
+- Espace Client : onglets (Fidélité/Historique/Factures/RDV) passés en grille 4 colonnes icône+label empilés — l'onglet RDV n'était pas visible sur petits téléphones.
+- Clients : tri alphabétique par nom (localeCompare fr).
+- Vérifié par screenshots mobile (390px) + desktop (1920px) : tabs OK, sidebar OK, quick menu OK, tri OK.
+
 ## Implemented (v2.8 — 2026-02) — Notifications visites portail + UX chargement
 - **Notifications de visite portail client** : chaque fois qu'un client ouvre son Espace Client via son magic link, une notification admin est créée automatiquement (« Marie D. a consulté sa carte de fidélité »). Anti-spam intégré : une seule notification par client par heure (dedupe_key). Nouveau widget « Activité récente » sur le Dashboard avec bouton d'effacement par notification. Endpoints : `POST /api/notifications/admin/{nid}/dismiss`, `push_admin_debounced()` dans `services/notifications.py`.
 - **Écran de chargement amélioré** : PinGate.jsx totalement refait — messages dynamiques progressifs (« Chargement… » → « Réveil du serveur, quelques secondes… » → « Encore un instant… »), spinner animé avec logo Julien Bouche, retry automatique jusqu'à 60s (12 tentatives × 5s) pour tolérer le cold-start du backend en production, et écran d'erreur avec bouton « Réessayer » si tous les retries échouent.
