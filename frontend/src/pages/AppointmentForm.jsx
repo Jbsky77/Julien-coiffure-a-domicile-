@@ -40,6 +40,7 @@ export default function AppointmentForm() {
   const [clientReferral, setClientReferral] = useState(null);
   const [useReferral, setUseReferral] = useState(false);
   const [nowTick, setNowTick] = useState(Date.now());
+  const [confirmRestart, setConfirmRestart] = useState(false);
 
   const isDone = rdv?.status === "done";
   const timerStatus = rdv?.timer_status || (rdv?.started_at ? "running" : "idle");
@@ -364,8 +365,20 @@ export default function AppointmentForm() {
                   </>
                 )}
                 {timerStatus === "stopped" && (
-                  <button onClick={() => { if (window.confirm("Repartir de zéro ? La durée actuelle sera perdue.")) timerAction("start", "Chronomètre redémarré"); }} data-testid="restart-timer-btn" className="flex-1 border border-slate-200 text-slate-600 rounded-full px-4 py-2.5 text-sm flex items-center justify-center gap-2 hover:bg-slate-50">
-                    <Play className="w-4 h-4" /> Redémarrer à zéro
+                  <button
+                    onClick={() => {
+                      if (!confirmRestart) {
+                        setConfirmRestart(true);
+                        setTimeout(() => setConfirmRestart(false), 4000);
+                        return;
+                      }
+                      setConfirmRestart(false);
+                      timerAction("start", "Chronomètre redémarré");
+                    }}
+                    data-testid="restart-timer-btn"
+                    className={`flex-1 rounded-full px-4 py-2.5 text-sm flex items-center justify-center gap-2 border ${confirmRestart ? "border-red-300 bg-red-50 text-[#991B1B]" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+                  >
+                    <Play className="w-4 h-4" /> {confirmRestart ? "Confirmer — repartir de zéro" : "Redémarrer à zéro"}
                   </button>
                 )}
               </div>
