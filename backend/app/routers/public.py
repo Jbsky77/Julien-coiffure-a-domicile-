@@ -33,6 +33,14 @@ async def _resolve_client(token: str) -> dict:
 async def get_client_space(token: str):
     c = await _resolve_client(token)
     settings = await get_settings()
+    # Track portal visit (debounced: 1 admin notification per client per hour)
+    client_name = f"{c.get('first_name','') or ''} {c.get('last_name','') or ''}".strip() or "Un client"
+    await notifications.push_admin_debounced(
+        f"{client_name} a consulté sa carte de fidélité",
+        dedupe_key=f"portal_visit:{c['id']}",
+        within_seconds=3600,
+        meta={"type": "portal_visit", "client_id": c["id"]},
+    )
     rdvs = await db.appointments.find({"client_id": c["id"]}, {"_id": 0}).sort("date", -1).to_list(500)
     reqs = await db.appointment_requests.find({"client_id": c["id"]}, {"_id": 0}).sort("created_at", -1).to_list(100)
     loyalty = await compute_loyalty_card(c["id"])

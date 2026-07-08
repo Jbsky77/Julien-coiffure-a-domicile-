@@ -121,3 +121,10 @@ async def admin_unread(user: User = Depends(get_current_user)):
 async def mark_admin_read(user: User = Depends(get_current_user)):
     await notifications.mark_admin_all_read()
     return {"ok": True}
+
+
+
+@router.post("/notifications/admin/{notif_id}/dismiss")
+async def dismiss_admin_notif(notif_id: str, user: User = Depends(get_current_user)):
+    await notifications.dismiss_admin(notif_id)
+    return {"ok": True}

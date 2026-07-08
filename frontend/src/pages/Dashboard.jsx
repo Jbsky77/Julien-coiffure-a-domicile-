@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, money, fmtDate, fmtTime, fmtMonth, money2 } from "@/lib/api";
-import { CalendarClock, Cake, Gift, Gauge, TrendingUp, Package, Users, Wallet, Bell, Plus, Navigation, Lightbulb, Target, AlertCircle, MessageSquare, Check } from "lucide-react";
+import { CalendarClock, Cake, Gift, Gauge, TrendingUp, Package, Users, Wallet, Bell, Plus, Navigation, Lightbulb, Target, AlertCircle, MessageSquare, Check, X, Eye } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 
 const PIE_COLORS = ["#0A192F", "#1E3A8A", "#D4AF37", "#94A3B8", "#CBD5E1", "#64748B"];
@@ -39,10 +39,11 @@ export default function Dashboard() {
   const [atRisk, setAtRisk] = useState(0);
   const [pendingReqs, setPendingReqs] = useState([]);
   const [reminders, setReminders] = useState([]);
+  const [adminNotifs, setAdminNotifs] = useState([]);
   const navigate = useNavigate();
 
   const load = async () => {
-    const [r, m, t, g, ins, st, reqs, rem] = await Promise.all([
+    const [r, m, t, g, ins, st, reqs, rem, notifs] = await Promise.all([
       api.get("/dashboard"),
       api.get("/accounting/months"),
       api.get("/tour/today").catch(() => ({ data: null })),
@@ -51,6 +52,7 @@ export default function Dashboard() {
       api.get("/clients/status").catch(() => ({ data: [] })),
       api.get("/appointment-requests").catch(() => ({ data: [] })),
       api.get("/reminders/tomorrow").catch(() => ({ data: { reminders: [] } })),
+      api.get("/notifications/admin").catch(() => ({ data: [] })),
     ]);
     setD(r.data);
     setMonths(m.data);
@@ -60,6 +62,12 @@ export default function Dashboard() {
     setAtRisk((st.data || []).filter((c) => ["a_relancer", "en_retard", "presque_perdu"].includes(c.status)).length);
     setPendingReqs((reqs.data || []).filter((r) => r.status === "pending" || r.status === "counter_proposed").slice(0, 4));
     setReminders(rem.data?.reminders || []);
+    setAdminNotifs((notifs.data || []).slice(0, 8));
+  };
+
+  const dismissNotif = async (nid) => {
+    setAdminNotifs((prev) => prev.filter((n) => n.id !== nid));
+    try { await api.post(`/notifications/admin/${nid}/dismiss`); } catch {}
   };
 
   const markReminderSent = async (aid) => {
@@ -266,6 +274,46 @@ export default function Dashboard() {
                 </span>
               </li>
             ))}
+          </ul>
+        </Widget>
+      )}
+
+      {/* Activité récente — admin notifications (portal visits, etc.) */}
+      {adminNotifs.length > 0 && (
+        <Widget title="Activité récente" tid="widget-admin-notifs" color="blue">
+          <ul className="space-y-2">
+            {adminNotifs.map((n) => {
+              const isVisit = n.meta?.type === "portal_visit";
+              const clientId = n.meta?.client_id;
+              const when = n.created_at ? new Date(n.created_at).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
+              return (
+                <li
+                  key={n.id}
+                  className={`flex items-start justify-between gap-3 p-2.5 rounded-xl ${n.read ? "bg-white/60" : "bg-blue-50/70 border border-blue-100"}`}
+                  data-testid={`admin-notif-${n.id}`}
+                >
+                  <div className="flex items-start gap-2 min-w-0">
+                    {isVisit ? <Eye className="w-4 h-4 text-[#1E3A8A] mt-0.5 flex-shrink-0" /> : <Bell className="w-4 h-4 text-[#D4AF37] mt-0.5 flex-shrink-0" />}
+                    <div className="min-w-0">
+                      {isVisit && clientId ? (
+                        <Link to={`/clients/${clientId}`} className="text-sm text-[#0A192F] hover:underline block truncate">{n.message}</Link>
+                      ) : (
+                        <div className="text-sm text-slate-800 truncate">{n.message}</div>
+                      )}
+                      <div className="text-[10px] text-slate-400 mt-0.5">{when}</div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => dismissNotif(n.id)}
+                    data-testid={`dismiss-notif-${n.id}`}
+                    className="p-1 rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700 flex-shrink-0"
+                    title="Effacer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </Widget>
       )}
