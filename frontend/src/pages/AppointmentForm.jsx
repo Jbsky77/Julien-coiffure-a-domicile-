@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams, Link } from "react-router-dom";
 import { api, money, money2, PAYMENT_MODES, fmtDate, fmtTime } from "@/lib/api";
 import { toast } from "sonner";
-import { ArrowLeft, Gift, Send, Trash2, CheckCircle2, Pencil, Sparkles, Clock, Repeat, AlertTriangle, UserRound, Timer, Play } from "lucide-react";
+import { ArrowLeft, Gift, Send, Trash2, CheckCircle2, Pencil, Sparkles, Clock, Repeat, AlertTriangle, UserRound, Timer, Play, Pause, Square } from "lucide-react";
 
 const STYLISTS = ["Julien", "Marley"];
 
@@ -42,27 +42,33 @@ export default function AppointmentForm() {
   const [nowTick, setNowTick] = useState(Date.now());
 
   const isDone = rdv?.status === "done";
+  const timerStatus = rdv?.timer_status || (rdv?.started_at ? "running" : "idle");
+  const timerRunning = timerStatus === "running" && !!rdv?.started_at;
 
   // Live timer tick
   useEffect(() => {
-    if (!rdv?.started_at || isDone) return;
+    if (!timerRunning || isDone) return;
     const iv = setInterval(() => setNowTick(Date.now()), 1000);
     return () => clearInterval(iv);
-  }, [rdv?.started_at, isDone]);
+  }, [timerRunning, isDone]);
+
+  const elapsedSecs = useMemo(() => {
+    let total = rdv?.timer_seconds || 0;
+    if (timerRunning) total += Math.max(0, (nowTick - new Date(rdv.started_at).getTime()) / 1000);
+    return Math.floor(total);
+  }, [nowTick, rdv?.started_at, rdv?.timer_seconds, timerRunning]);
 
   const elapsedLabel = useMemo(() => {
-    if (!rdv?.started_at) return "";
-    const secs = Math.max(0, Math.floor((nowTick - new Date(rdv.started_at).getTime()) / 1000));
-    const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), s = secs % 60;
+    const h = Math.floor(elapsedSecs / 3600), m = Math.floor((elapsedSecs % 3600) / 60), s = elapsedSecs % 60;
     return (h > 0 ? `${h}h ` : "") + `${String(m).padStart(2, "0")}min ${String(s).padStart(2, "0")}s`;
-  }, [nowTick, rdv?.started_at]);
+  }, [elapsedSecs]);
 
-  const startTimer = async () => {
+  const timerAction = async (action, msg) => {
     try {
-      const r = await api.post(`/appointments/${id}/start-timer`);
-      setRdv((prev) => ({ ...prev, started_at: r.data.started_at }));
+      const r = await api.post(`/appointments/${id}/timer`, { action });
+      setRdv((prev) => ({ ...prev, started_at: r.data.started_at, timer_seconds: r.data.timer_seconds, timer_status: r.data.timer_status }));
       setNowTick(Date.now());
-      toast.success("Chronomètre démarré");
+      if (msg) toast.success(msg);
     } catch (e) {
       toast.error(e.response?.data?.detail || "Erreur");
     }
@@ -305,25 +311,62 @@ export default function AppointmentForm() {
 
       {/* Timer: start manually on arrival, stops automatically at payment */}
       {id && rdv && !isDone && rdv.status !== "cancelled" && (
-        <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-premium flex items-center justify-between gap-4" data-testid="timer-card">
-          {!rdv.started_at ? (
-            <>
+        <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-premium space-y-4" data-testid="timer-card">
+          {timerStatus === "idle" ? (
+            <div className="flex items-center justify-between gap-4">
               <div className="min-w-0">
                 <div className="text-[10px] tracking-widest uppercase text-slate-500 flex items-center gap-1.5"><Timer className="w-3.5 h-3.5 text-[#D4AF37]" /> Chronométrage</div>
                 <div className="text-xs text-slate-500 mt-1">Démarrez en arrivant chez le client. Le chrono s'arrêtera automatiquement à l'encaissement.</div>
               </div>
-              <button onClick={startTimer} data-testid="start-timer-btn" className="bg-[#0A192F] text-white rounded-full px-5 py-3 text-sm font-medium flex items-center gap-2 hover:bg-[#1E3A8A] flex-shrink-0">
+              <button onClick={() => timerAction("start", "Chronomètre démarré")} data-testid="start-timer-btn" className="bg-[#0A192F] text-white rounded-full px-5 py-3 text-sm font-medium flex items-center gap-2 hover:bg-[#1E3A8A] flex-shrink-0">
                 <Play className="w-4 h-4" /> Démarrer la prestation
               </button>
-            </>
+            </div>
           ) : (
             <>
-              <div className="min-w-0">
-                <div className="text-[10px] tracking-widest uppercase text-slate-500 flex items-center gap-1.5"><Timer className="w-3.5 h-3.5 text-[#D4AF37]" /> Prestation en cours</div>
-                <div className="font-serif text-3xl text-[#0A192F] tabular-nums mt-1" data-testid="timer-elapsed">{elapsedLabel}</div>
-                <div className="text-xs text-slate-500 mt-1">La durée sera enregistrée à la validation du paiement.</div>
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="text-[10px] tracking-widest uppercase text-slate-500 flex items-center gap-1.5">
+                    <Timer className="w-3.5 h-3.5 text-[#D4AF37]" />
+                    {timerStatus === "running" ? "Prestation en cours" : timerStatus === "paused" ? "Chronomètre en pause" : "Chronomètre arrêté"}
+                    {timerStatus === "running" && <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse ml-1" />}
+                    {timerStatus === "paused" && <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 normal-case tracking-normal ml-1">Pause</span>}
+                  </div>
+                  <div className="font-serif text-3xl text-[#0A192F] tabular-nums mt-1" data-testid="timer-elapsed">{elapsedLabel}</div>
+                  <div className="text-xs text-slate-500 mt-1">
+                    {timerStatus === "stopped"
+                      ? `Durée retenue : ${Math.max(1, Math.round(elapsedSecs / 60))} min — enregistrée à l'encaissement.`
+                      : "Les pauses ne comptent pas dans le temps enregistré."}
+                  </div>
+                </div>
               </div>
-              <button onClick={startTimer} data-testid="restart-timer-btn" className="border border-slate-200 text-slate-600 rounded-full px-4 py-2 text-xs flex-shrink-0 hover:bg-slate-50">Redémarrer</button>
+              <div className="flex flex-wrap gap-2">
+                {timerStatus === "running" && (
+                  <>
+                    <button onClick={() => timerAction("pause", "Chronomètre en pause")} data-testid="pause-timer-btn" className="flex-1 border border-amber-300 text-amber-700 rounded-full px-4 py-2.5 text-sm font-medium flex items-center justify-center gap-2 hover:bg-amber-50">
+                      <Pause className="w-4 h-4" /> Pause
+                    </button>
+                    <button onClick={() => timerAction("stop", "Chronomètre arrêté — durée retenue")} data-testid="stop-timer-btn" className="flex-1 border border-red-200 text-[#991B1B] rounded-full px-4 py-2.5 text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-50">
+                      <Square className="w-3.5 h-3.5" /> Stop
+                    </button>
+                  </>
+                )}
+                {timerStatus === "paused" && (
+                  <>
+                    <button onClick={() => timerAction("resume", "Chronomètre relancé")} data-testid="resume-timer-btn" className="flex-1 bg-[#0A192F] text-white rounded-full px-4 py-2.5 text-sm font-medium flex items-center justify-center gap-2 hover:bg-[#1E3A8A]">
+                      <Play className="w-4 h-4" /> Reprendre
+                    </button>
+                    <button onClick={() => timerAction("stop", "Chronomètre arrêté — durée retenue")} data-testid="stop-timer-btn" className="flex-1 border border-red-200 text-[#991B1B] rounded-full px-4 py-2.5 text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-50">
+                      <Square className="w-3.5 h-3.5" /> Stop
+                    </button>
+                  </>
+                )}
+                {timerStatus === "stopped" && (
+                  <button onClick={() => { if (window.confirm("Repartir de zéro ? La durée actuelle sera perdue.")) timerAction("start", "Chronomètre redémarré"); }} data-testid="restart-timer-btn" className="flex-1 border border-slate-200 text-slate-600 rounded-full px-4 py-2.5 text-sm flex items-center justify-center gap-2 hover:bg-slate-50">
+                    <Play className="w-4 h-4" /> Redémarrer à zéro
+                  </button>
+                )}
+              </div>
             </>
           )}
         </div>
@@ -545,8 +588,8 @@ export default function AppointmentForm() {
           )}
           <div>
             <label className="text-[10px] tracking-widest uppercase text-slate-500">Temps passé (minutes)</label>
-            <input type="number" min="0" step="5" data-testid="rdv-duration-input" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder={rdv?.started_at ? "Auto (chronomètre)" : "Ex : 45"} className={fieldBase} />
-            <div className="text-xs text-slate-500 mt-1">{rdv?.started_at ? "Laissez vide : la durée du chronomètre sera enregistrée automatiquement." : "Enregistré à la validation du paiement (sera affiché dans la fiche client et les stats)"}</div>
+            <input type="number" min="0" step="5" data-testid="rdv-duration-input" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder={timerStatus !== "idle" ? "Auto (chronomètre)" : "Ex : 45"} className={fieldBase} />
+            <div className="text-xs text-slate-500 mt-1">{timerStatus !== "idle" ? "Laissez vide : la durée du chronomètre sera enregistrée automatiquement." : "Enregistré à la validation du paiement (sera affiché dans la fiche client et les stats)"}</div>
           </div>
           <button onClick={finish} data-testid="finish-rdv-btn" className="w-full bg-gold-gradient text-white rounded-full px-8 py-4 font-medium flex items-center justify-center gap-2">
             <CheckCircle2 className="w-4 h-4" /> Valider le paiement & terminer

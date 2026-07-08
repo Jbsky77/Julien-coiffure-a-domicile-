@@ -32,6 +32,8 @@ class Appointment(BaseModel):
     invoice_number: Optional[str] = None
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     started_at: Optional[str] = None  # timer start (arrival at client's home)
+    timer_seconds: float = 0  # accumulated elapsed seconds (pauses excluded)
+    timer_status: Optional[str] = None  # None|"running"|"paused"|"stopped"
     finished_at: Optional[str] = None
 
 

@@ -86,14 +86,51 @@ async def appointments_update(rid: str, payload: AppointmentUpdate, user: User =
 
 @router.post("/appointments/{rid}/start-timer")
 async def appointments_start_timer(rid: str, user: User = Depends(get_current_user)):
+    return await _timer_action(rid, "start")
+
+
+@router.post("/appointments/{rid}/timer")
+async def appointments_timer(rid: str, payload: Dict[str, Any], user: User = Depends(get_current_user)):
+    return await _timer_action(rid, payload.get("action") or "")
+
+
+async def _timer_action(rid: str, action: str):
     rdv = await db.appointments.find_one({"id": rid}, {"_id": 0})
     if not rdv:
         raise HTTPException(404, "Not found")
     if rdv.get("status") == "done":
         raise HTTPException(400, "Rendez-vous déjà terminé")
-    now = datetime.now(timezone.utc).isoformat()
-    await db.appointments.update_one({"id": rid}, {"$set": {"started_at": now}})
-    return {"ok": True, "started_at": now}
+    now = datetime.now(timezone.utc)
+    started = rdv.get("started_at")
+    status = rdv.get("timer_status") or ("running" if started else "idle")
+    seconds = float(rdv.get("timer_seconds") or 0)
+
+    if action == "start":
+        update = {"started_at": now.isoformat(), "timer_seconds": 0, "timer_status": "running"}
+    elif action == "pause":
+        if status != "running" or not started:
+            raise HTTPException(400, "Le chronomètre n'est pas en cours")
+        st = parse_iso(started)
+        if st:
+            seconds += (now - st).total_seconds()
+        update = {"started_at": None, "timer_seconds": seconds, "timer_status": "paused"}
+    elif action == "resume":
+        if status != "paused":
+            raise HTTPException(400, "Le chronomètre n'est pas en pause")
+        update = {"started_at": now.isoformat(), "timer_seconds": seconds, "timer_status": "running"}
+    elif action == "stop":
+        if status == "running" and started:
+            st = parse_iso(started)
+            if st:
+                seconds += (now - st).total_seconds()
+        elif status != "paused":
+            raise HTTPException(400, "Le chronomètre n'est pas actif")
+        update = {"started_at": None, "timer_seconds": seconds, "timer_status": "stopped"}
+    else:
+        raise HTTPException(400, "action inconnue (start|pause|resume|stop)")
+
+    await db.appointments.update_one({"id": rid}, {"$set": update})
+    return {"ok": True, **update}
 
 
 @router.post("/appointments/{rid}/finish")
@@ -115,11 +152,14 @@ async def appointments_finish(rid: str, payload: FinishAppointment, user: User =
     # Duration: manual value wins, else auto-computed from the timer (capped at 4h)
     if payload.duration_minutes is not None:
         update_fields["duration_minutes"] = payload.duration_minutes
-    elif rdv.get("started_at"):
-        start = parse_iso(rdv["started_at"])
-        if start:
-            mins = int(round((now - start).total_seconds() / 60))
-            update_fields["duration_minutes"] = max(1, min(240, mins))
+    else:
+        total = float(rdv.get("timer_seconds") or 0)
+        if rdv.get("started_at") and (rdv.get("timer_status") or "running") == "running":
+            start = parse_iso(rdv["started_at"])
+            if start:
+                total += (now - start).total_seconds()
+        if total > 0:
+            update_fields["duration_minutes"] = max(1, min(240, int(round(total / 60))))
     if payload.stylists:
         for s in svcs:
             if s["service_id"] in payload.stylists:
