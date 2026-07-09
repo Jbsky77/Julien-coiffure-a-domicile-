@@ -1,8 +1,8 @@
 """Calendar / iCal feed."""
+import secrets
 from datetime import timedelta
-from typing import Optional
 
-from fastapi import APIRouter, Cookie, Header, HTTPException, Request
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response as FResponse
 
 from app.db import db
@@ -10,28 +10,45 @@ from app.utils.dates import parse_iso
 
 router = APIRouter()
 
+_ICAL_DOC_ID = "ical_settings"
+
+
+async def _get_or_create_ical_token() -> str:
+    doc = await db.settings.find_one({"_id": _ICAL_DOC_ID})
+    if doc and doc.get("token"):
+        return doc["token"]
+    token = secrets.token_urlsafe(24)
+    await db.settings.update_one(
+        {"_id": _ICAL_DOC_ID},
+        {"$set": {"token": token}},
+        upsert=True,
+    )
+    return token
+
 
 @router.get("/calendar/ical-url")
-async def ical_url_endpoint(
-    request: Request,
-    session_token: Optional[str] = Cookie(default=None),
-    authorization: Optional[str] = Header(default=None),
-):
-    token = session_token
-    if not token and authorization and authorization.startswith("Bearer "):
-        token = authorization[7:]
-    if not token:
-        raise HTTPException(401, "Not authenticated")
-    sess = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
-    if not sess:
-        raise HTTPException(401, "Invalid session")
+async def ical_url_endpoint():
+    # PIN-protected via middleware. Returns the stable iCal subscription token.
+    token = await _get_or_create_ical_token()
     return {"url": f"/api/calendar/{token}.ics", "token": token}
+
+
+@router.post("/calendar/ical-rotate")
+async def ical_rotate():
+    # Regenerate the token — invalidates any existing subscription.
+    new_token = secrets.token_urlsafe(24)
+    await db.settings.update_one(
+        {"_id": _ICAL_DOC_ID},
+        {"$set": {"token": new_token}},
+        upsert=True,
+    )
+    return {"url": f"/api/calendar/{new_token}.ics", "token": new_token}
 
 
 @router.get("/calendar/{token}.ics")
 async def ical_feed(token: str):
-    sess = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
-    if not sess:
+    doc = await db.settings.find_one({"_id": _ICAL_DOC_ID})
+    if not doc or doc.get("token") != token:
         raise HTTPException(401, "Invalid token")
     rdvs = await db.appointments.find({"status": {"$in": ["scheduled", "done"]}}, {"_id": 0}).to_list(5000)
     lines = [

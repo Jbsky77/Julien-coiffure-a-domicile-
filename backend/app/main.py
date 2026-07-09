@@ -82,8 +82,9 @@ _OPEN_PATHS = {
 async def pin_guard(request: Request, call_next):
     path = request.url.path
     if path.startswith("/api/") and not any(path == p or path.startswith(p + "/") for p in _OPEN_PATHS):
-        # iCal feed & public client space are guarded by their own tokens.
-        if not path.startswith("/api/calendar/") and not path.startswith("/api/public/"):
+        # iCal feed (.ics) and public client space are guarded by their own tokens.
+        is_ical_feed = path.startswith("/api/calendar/") and path.endswith(".ics")
+        if not is_ical_feed and not path.startswith("/api/public/"):
             sec = await _read_security()
             if sec.get("hash"):
                 token = request.headers.get("x-pin-token")

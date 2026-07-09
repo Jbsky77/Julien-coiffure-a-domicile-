@@ -102,7 +102,7 @@ export default function ClientSpace() {
   const shareReferral = async () => {
     const firstName = data?.client?.first_name || "";
     const brandName = data?.brand?.name || "Julien Bouche";
-    const msg = `Salut, je te recommande ${brandName}, coiffeur à domicile. Prestation vraiment top ! Tu peux le contacter pour prendre RDV. Dis-lui que ${firstName} t'envoie 😉`;
+    const msg = `Salut, je te recommande ${brandName}, coiffeur à domicile ! Prestation vraiment top. Contacte-le au 07 44 42 64 62 pour prendre RDV. Dis-lui que ${firstName} t'envoie 😉`;
     // Try native share first (best on mobile PWA)
     if (navigator.share) {
       try {

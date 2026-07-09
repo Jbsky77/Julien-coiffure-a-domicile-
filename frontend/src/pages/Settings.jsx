@@ -5,26 +5,38 @@ import { Plus, Trash2, Save, Copy, Calendar, Download } from "lucide-react";
 
 function IcalBlock() {
   const [url, setUrl] = useState("");
+  const [err, setErr] = useState("");
   useEffect(() => {
     (async () => {
       try {
         const r = await api.get("/calendar/ical-url");
         setUrl(`${API}/calendar/${r.data.token}.ics`);
       } catch (e) {
-        console.warn("ical url:", e);
+        setErr(e.response?.data?.detail || "Impossible de générer l'URL");
       }
     })();
   }, []);
   const copy = async () => {
-    if (!url) return toast.error("Session indisponible — reconnectez-vous");
+    if (!url) return toast.error("URL non disponible");
     await navigator.clipboard.writeText(url);
     toast.success("URL copiée dans le presse-papiers");
   };
+  const rotate = async () => {
+    if (!window.confirm("Régénérer l'URL ? L'ancien lien deviendra invalide.")) return;
+    try {
+      const r = await api.post("/calendar/ical-rotate");
+      setUrl(`${API}/calendar/${r.data.token}.ics`);
+      toast.success("Nouvelle URL générée");
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Erreur");
+    }
+  };
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <input data-testid="ical-url" readOnly value={url || "Reconnectez-vous pour générer l'URL"} className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-full px-4 py-2 text-xs text-slate-600" />
-      <button onClick={copy} data-testid="ical-copy" className="rounded-full px-4 py-2 border border-slate-200 text-sm flex items-center gap-2"><Copy className="w-4 h-4" /> Copier</button>
+      <input data-testid="ical-url" readOnly value={url || err || "Chargement…"} className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-full px-4 py-2 text-xs text-slate-600" />
+      <button onClick={copy} disabled={!url} data-testid="ical-copy" className="rounded-full px-4 py-2 border border-slate-200 text-sm flex items-center gap-2 disabled:opacity-40"><Copy className="w-4 h-4" /> Copier</button>
       {url && <a href={url} download="julienbouche.ics" data-testid="ical-download" className="rounded-full px-4 py-2 bg-[#0A192F] text-white text-sm flex items-center gap-2"><Calendar className="w-4 h-4" /> Télécharger .ics</a>}
+      {url && <button onClick={rotate} data-testid="ical-rotate" className="rounded-full px-4 py-2 border border-slate-200 text-sm text-slate-600">Régénérer</button>}
     </div>
   );
 }
