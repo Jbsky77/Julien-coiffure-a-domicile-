@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 from app.db import db
 from app.services.accounting import accounting_month_data
-from app.utils.dates import now_utc, parse_iso, yyyymm_now
+from app.utils.dates import PARIS_TZ, now_utc, paris_day_range, parse_iso, yyyymm_now
 
 
 async def build_dashboard() -> dict:
@@ -32,6 +32,10 @@ async def build_dashboard() -> dict:
                 upcoming_today.append(r)
             elif tomorrow_start <= dt < day_after:
                 upcoming_tomorrow.append(r)
+
+    upcoming_today.sort(key=lambda r: (parse_iso(r.get("date")), r.get("created_at") or ""))
+    upcoming_tomorrow.sort(key=lambda r: (parse_iso(r.get("date")), r.get("created_at") or ""))
+    all_upcoming.sort(key=lambda r: (parse_iso(r.get("date")), r.get("created_at") or ""))
 
     clients = await db.clients.find({}, {"_id": 0}).to_list(5000)
     upcoming_birthdays = []
@@ -107,7 +111,11 @@ async def build_dashboard() -> dict:
         "upcoming_amount": round(upcoming_amount, 2),
         "upcoming_birthdays": upcoming_birthdays,
         "unseen_clients": unseen,
-        "avg_basket": {"day": avg_day, "month": avg_month, "year": avg_year},
+        "avg_basket": {
+            "day": avg_day,
+            "month": month_data.get("panier_moyen", 0.0),
+            "history": round(sum(float(r.get("price_final") or 0) for r in done) / len(done), 2) if done else 0.0,
+        },
         "stock_items": stocks,
         "low_stock": low_stock,
         "gifts_today": today_gifts,

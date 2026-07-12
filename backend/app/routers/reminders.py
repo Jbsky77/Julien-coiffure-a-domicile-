@@ -9,6 +9,7 @@ from app.dependencies import get_current_user
 from app.models.auth import User
 from app.services.settings import get_settings
 from app.utils.dates import parse_iso
+from app.utils.phone import phone_payload
 
 router = APIRouter()
 
@@ -42,11 +43,13 @@ async def reminders_tomorrow(user: User = Depends(get_current_user)):
             services=services_str,
             brand_name=settings.brand_name,
         )
+        phone = phone_payload(client.get("phone"))
         out.append({
             "appointment_id": r["id"],
             "client_id": r["client_id"],
             "client_name": r.get("client_name", ""),
             "phone": client.get("phone", ""),
+            **phone,
             "time": time_str,
             "services": services_str,
             "message": message,

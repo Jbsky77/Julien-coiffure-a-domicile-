@@ -12,7 +12,7 @@ from typing import Optional
 from app.db import db
 from app.services.routing import route
 from app.services.settings import get_settings
-from app.utils.dates import now_utc, parse_iso
+from app.utils.dates import PARIS_TZ, now_utc, paris_day_range, parse_iso
 
 
 async def build_tour(target_date: Optional[str] = None) -> dict:
@@ -20,7 +20,8 @@ async def build_tour(target_date: Optional[str] = None) -> dict:
     ba = getattr(settings, "business_address", None)
     biz_coords = (ba.lat, ba.lng) if (ba and ba.lat is not None and ba.lng is not None) else None
 
-    target = target_date or now_utc().strftime("%Y-%m-%d")
+    target = target_date or now_utc().astimezone(PARIS_TZ).date().isoformat()
+    day_start, day_end = paris_day_range(target)
     rdvs = await db.appointments.find(
         {"status": {"$in": ["scheduled", "done"]}}, {"_id": 0}
     ).to_list(2000)
@@ -30,9 +31,9 @@ async def build_tour(target_date: Optional[str] = None) -> dict:
         dt = parse_iso(r.get("date"))
         if dt is None:
             continue
-        if dt.strftime("%Y-%m-%d") == target:
+        if day_start <= dt < day_end:
             day_rdvs.append(r)
-    day_rdvs.sort(key=lambda r: r["date"])
+    day_rdvs.sort(key=lambda r: (parse_iso(r.get("date")), r.get("created_at") or ""))
 
     stops = []
     total_km = 0.0

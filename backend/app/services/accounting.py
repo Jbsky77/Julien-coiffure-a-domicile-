@@ -69,7 +69,8 @@ async def accounting_month_data(yyyymm: str) -> dict:
 
     # Marge nette (spec formula):
     # ca_total - urssaf - consommables - charges_fixes - frais_CB - carburant_réel
-    marge_nette = ca_brut - urssaf_ceil - consumables - fixed - fuel_real_cost - cb_fees_total
+    marge_avant_charges_fixes = ca_brut - urssaf_ceil - consumables - fuel_real_cost - cb_fees_total
+    marge_nette = marge_avant_charges_fixes - fixed
 
     decl = await db.urssaf_status.find_one({"month": yyyymm}, {"_id": 0}) or {"month": yyyymm, "declared": False, "paid": False}
     n_gifts = 0
@@ -99,6 +100,8 @@ async def accounting_month_data(yyyymm: str) -> dict:
         "urssaf_raw": round(urssaf_raw, 2),
         "urssaf_ceil": urssaf_ceil,
         "fixed_costs": fixed,
+        "panier_moyen": round(ca_brut / n_rdv, 2) if n_rdv else 0.0,
+        "marge_avant_charges_fixes": round(marge_avant_charges_fixes, 2),
         "marge_nette": round(marge_nette, 2),
         "cb_amount": round(cb_amount, 2),
         "cb_count": cb_count,

@@ -12,6 +12,7 @@ from app.services.client_status import compute_client_statuses
 from app.services.geocoding import auto_geocode
 from app.services.next_visit import compute_next_visit
 from app.services.referrals import compute_referral_info
+from app.utils.phone import phone_payload
 
 router = APIRouter()
 
@@ -26,6 +27,7 @@ async def clients_list(user: User = Depends(get_current_user)):
             counts[rb] = counts.get(rb, 0) + 1
     for r in rows:
         r["godchildren_count"] = counts.get(r["id"], 0)
+        r.update(phone_payload(r.get("phone")))
     return rows
 
 
@@ -76,6 +78,8 @@ async def clients_get(cid: str, user: User = Depends(get_current_user)):
     rdvs = await db.appointments.find({"client_id": cid}, {"_id": 0}).to_list(500)
     next_visit = await compute_next_visit(cid)
     referral = await compute_referral_info(cid)
+    doc.update(phone_payload(doc.get("phone")))
+    rdvs.sort(key=lambda r: (r.get("date") or "", r.get("created_at") or ""))
     return {"client": doc, "appointments": rdvs, "next_visit": next_visit, "referral": referral}
 
 
