@@ -10,6 +10,7 @@ from app.services.routing import compute_supplement
 from app.utils.dates import paris_day_range
 from app.utils.phone import format_french_phone, normalize_french_phone
 from app.db import get_active_company, reset_active_company, set_active_company
+from app.routers.public_booking import _family, _profile_category
 
 
 def test_paris_day_handles_summer_timezone():
@@ -53,3 +54,11 @@ def test_company_context_is_explicit_and_resettable():
         assert get_active_company() == "f74d2791-0a35-4299-93fc-fa2907d7c183"
     finally:
         reset_active_company(token)
+
+
+def test_public_site_profile_filter_keeps_family_pack():
+    assert _profile_category("homme") == "HOMME"
+    assert _profile_category("femme") == "FEMME"
+    assert _profile_category("enfant") == "ENFANT"
+    assert _family({"name": "Pack Famille", "category": "FORFAIT"})
+    assert not _family({"name": "Coupe Homme", "category": "HOMME"})
