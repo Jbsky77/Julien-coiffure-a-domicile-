@@ -93,11 +93,16 @@ async def pin_guard(request: Request, call_next):
     try:
         if is_public:
             parts = path.split("/")
-            public_token = parts[4] if len(parts) > 4 and parts[3] == "client" else None
-            resolved = await db.resolve_public_client(public_token or "")
-            if not resolved:
-                return JSONResponse({"detail": "Lien invalide ou expiré"}, status_code=404)
-            company_token = set_active_company(resolved[0])
+            if len(parts) > 4 and parts[3] == "client":
+                resolved = await db.resolve_public_client(parts[4])
+                company_id = resolved[0] if resolved else None
+            elif len(parts) > 4 and parts[3] == "sites":
+                company_id = await db.resolve_public_company(parts[4])
+            else:
+                company_id = None
+            if not company_id:
+                return JSONResponse({"detail": "Site ou lien public invalide"}, status_code=404)
+            company_token = set_active_company(company_id)
         elif is_api and not is_ical_feed:
             company_token, _ = await require_company_context(request)
 
