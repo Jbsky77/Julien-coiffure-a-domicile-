@@ -47,9 +47,30 @@ export default function AppointmentForm() {
   const [neighborId, setNeighborId] = useState(null);
   const [neighborSearch, setNeighborSearch] = useState("");
   const [neighborCheck, setNeighborCheck] = useState(null); // {valid, distance_km, discount, message, ...}
-  const [checkingNeighbor, setCheckingNeighbor] = useState(false);\n  const [serviceFilter, setServiceFilter] = useState("TOUS");\n  const [serviceSearch, setServiceSearch] = useState("");
+  const [checkingNeighbor, setCheckingNeighbor] = useState(false);
+  const [serviceFilter, setServiceFilter] = useState("TOUS");
+  const [serviceSearch, setServiceSearch] = useState("");
 
-  const selectedClient = useMemo(() => clients.find((client) => client.id === form.client_id) || null, [clients, form.client_id]);\n  const selectedGender = (selectedClient?.gender || "").toUpperCase();\n  const isFamilyPack = (service) => /famille/i.test(service?.name || "") || (service?.category || "").toUpperCase() === "FAMILLE";\n  const genderCompatibleServices = useMemo(() => services.filter((service) => {\n    if (form.services.some((picked) => picked.service_id === service.id)) return true;\n    if (isFamilyPack(service)) return true;\n    const category = (service.category || "").toUpperCase();\n    if (selectedGender === "H") return category === "HOMME";\n    if (selectedGender === "F") return category === "FEMME";\n    return true;\n  }), [services, selectedGender, form.services]);\n  const visibleServices = useMemo(() => genderCompatibleServices.filter((service) => {\n    const category = (service.category || "").toUpperCase();\n    const query = serviceSearch.trim().toLocaleLowerCase("fr-FR");\n    const matchesSearch = !query || `${service.name} ${service.category}`.toLocaleLowerCase("fr-FR").includes(query);\n    const matchesFilter = serviceFilter === "TOUS" || (serviceFilter === "FORFAITS" ? /forfait|pack/i.test(service.name || "") : category === serviceFilter);\n    return matchesSearch && matchesFilter;\n  }), [genderCompatibleServices, serviceFilter, serviceSearch]);\n\n  const isDone = rdv?.status === "done";
+  const selectedClient = useMemo(() => clients.find((client) => client.id === form.client_id) || null, [clients, form.client_id]);
+  const selectedGender = (selectedClient?.gender || "").toUpperCase();
+  const isFamilyPack = (service) => /famille/i.test(service?.name || "") || (service?.category || "").toUpperCase() === "FAMILLE";
+  const genderCompatibleServices = useMemo(() => services.filter((service) => {
+    if (form.services.some((picked) => picked.service_id === service.id)) return true;
+    if (isFamilyPack(service)) return true;
+    const category = (service.category || "").toUpperCase();
+    if (selectedGender === "H") return category === "HOMME";
+    if (selectedGender === "F") return category === "FEMME";
+    return true;
+  }), [services, selectedGender, form.services]);
+  const visibleServices = useMemo(() => genderCompatibleServices.filter((service) => {
+    const category = (service.category || "").toUpperCase();
+    const query = serviceSearch.trim().toLocaleLowerCase("fr-FR");
+    const matchesSearch = !query || `${service.name} ${service.category}`.toLocaleLowerCase("fr-FR").includes(query);
+    const matchesFilter = serviceFilter === "TOUS" || (serviceFilter === "FORFAITS" ? /forfait|pack/i.test(service.name || "") : category === serviceFilter);
+    return matchesSearch && matchesFilter;
+  }), [genderCompatibleServices, serviceFilter, serviceSearch]);
+
+  const isDone = rdv?.status === "done";
   const timerStatus = rdv?.timer_status || (rdv?.started_at ? "running" : "idle");
   const timerRunning = timerStatus === "running" && !!rdv?.started_at;
 
@@ -342,7 +363,8 @@ export default function AppointmentForm() {
     if (prestationsNames) lines.push(`Prestations : ${prestationsNames}`);
     lines.push(`Montant : ${Number(amount).toFixed(2).replace(".", ",")} €`);
     lines.push("", "À très vite,", "Julien Bouche");
-    return lines.join("\n");
+    return lines.join("
+");
   };
 
   const buildLinks = () => {
@@ -584,8 +606,19 @@ export default function AppointmentForm() {
 
       <div>
         <label className="text-[10px] tracking-widest uppercase text-slate-500">Prestations</label>
+        {selectedClient && (selectedGender === "H" || selectedGender === "F") && (
+          <div className="mt-2 text-xs text-slate-500">Prestations adaptées à {selectedGender === "H" ? "un homme" : "une femme"}. Le pack famille reste toujours disponible.</div>
+        )}
+        <input type="search" value={serviceSearch} onChange={(e) => setServiceSearch(e.target.value)} placeholder="Rechercher une prestation…" aria-label="Rechercher une prestation" className={`${fieldBase} mt-3`} data-testid="service-search" />
+        <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Filtrer les prestations">
+          {["TOUS", "HOMME", "FEMME", "ENFANT", "FORFAITS", "COULEUR", "MÈCHES"].map((filter) => (
+            <button key={filter} type="button" onClick={() => setServiceFilter(filter)} aria-pressed={serviceFilter === filter} className={`px-3 py-1.5 rounded-full text-xs ${serviceFilter === filter ? "bg-[#0A192F] text-white" : "border border-slate-200 text-slate-600"}`}>
+              {filter === "TOUS" ? "Tous" : filter.charAt(0) + filter.slice(1).toLocaleLowerCase("fr-FR")}
+            </button>
+          ))}
+        </div>
         <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {services.map((s) => {
+          {visibleServices.map((s) => {
             const picked = form.services.find((x) => x.service_id === s.id);
             const count = clientLoyalty[s.id] || 0;
             const giftEligible = count >= 5;
