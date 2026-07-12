@@ -48,6 +48,27 @@ export default function AppointmentForm() {
   const [neighborSearch, setNeighborSearch] = useState("");
   const [neighborCheck, setNeighborCheck] = useState(null); // {valid, distance_km, discount, message, ...}
   const [checkingNeighbor, setCheckingNeighbor] = useState(false);
+  const [serviceFilter, setServiceFilter] = useState("TOUS");
+  const [serviceSearch, setServiceSearch] = useState("");
+
+  const selectedClient = useMemo(() => clients.find((client) => client.id === form.client_id) || null, [clients, form.client_id]);
+  const selectedGender = (selectedClient?.gender || "").toUpperCase();
+  const isFamilyPack = (service) => /famille/i.test(service?.name || "") || (service?.category || "").toUpperCase() === "FAMILLE";
+  const genderCompatibleServices = useMemo(() => services.filter((service) => {
+    if (form.services.some((picked) => picked.service_id === service.id)) return true;
+    if (isFamilyPack(service)) return true;
+    const category = (service.category || "").toUpperCase();
+    if (selectedGender === "H") return category === "HOMME";
+    if (selectedGender === "F") return category === "FEMME";
+    return true;
+  }), [services, selectedGender, form.services]);
+  const visibleServices = useMemo(() => genderCompatibleServices.filter((service) => {
+    const category = (service.category || "").toUpperCase();
+    const query = serviceSearch.trim().toLocaleLowerCase("fr-FR");
+    const matchesSearch = !query || `${service.name} ${service.category}`.toLocaleLowerCase("fr-FR").includes(query);
+    const matchesFilter = serviceFilter === "TOUS" || (serviceFilter === "FORFAITS" ? /forfait|pack/i.test(service.name || "") : category === serviceFilter);
+    return matchesSearch && matchesFilter;
+  }), [genderCompatibleServices, serviceFilter, serviceSearch]);
 
   const isDone = rdv?.status === "done";
   const timerStatus = rdv?.timer_status || (rdv?.started_at ? "running" : "idle");
@@ -347,7 +368,7 @@ export default function AppointmentForm() {
 
   const buildLinks = () => {
     const client = clients.find((c) => c.id === form.client_id);
-    const phone = client?.phone?.replace(/\s/g, "") || "";
+    const phone = client?.phone_valid ? client.phone_normalized : "";
     const msg = buildRdvMessage();
     return {
       sms: phone ? `sms:${phone}?body=${encodeURIComponent(msg)}` : null,
@@ -454,7 +475,17 @@ export default function AppointmentForm() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label className="text-[10px] tracking-widest uppercase text-slate-500">Client</label>
-          <select disabled={readOnly} value={form.client_id} onChange={(e) => setForm({ ...form, client_id: e.target.value })} className={fieldBase} data-testid="rdv-client-select">
+          <select
+            disabled={readOnly}
+            value={form.client_id}
+            onChange={(e) => {
+              setForm((current) => ({ ...current, client_id: e.target.value, services: [] }));
+              setServiceFilter("TOUS");
+              setServiceSearch("");
+            }}
+            className={fieldBase}
+            data-testid="rdv-client-select"
+          >
             <option value="">— Sélectionner —</option>
             {clients.map((c) => <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>)}
           </select>
@@ -584,8 +615,19 @@ export default function AppointmentForm() {
 
       <div>
         <label className="text-[10px] tracking-widest uppercase text-slate-500">Prestations</label>
+        {selectedClient && (selectedGender === "H" || selectedGender === "F") && (
+          <div className="mt-2 text-xs text-slate-500">Prestations adaptées à {selectedGender === "H" ? "un homme" : "une femme"}. Le pack famille reste toujours disponible.</div>
+        )}
+        <input type="search" value={serviceSearch} onChange={(e) => setServiceSearch(e.target.value)} placeholder="Rechercher une prestation…" aria-label="Rechercher une prestation" className={`${fieldBase} mt-3`} data-testid="service-search" />
+        <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Filtrer les prestations">
+          {["TOUS", "HOMME", "FEMME", "ENFANT", "FORFAITS", "COULEUR", "MÈCHES"].map((filter) => (
+            <button key={filter} type="button" onClick={() => setServiceFilter(filter)} aria-pressed={serviceFilter === filter} className={`px-3 py-1.5 rounded-full text-xs ${serviceFilter === filter ? "bg-[#0A192F] text-white" : "border border-slate-200 text-slate-600"}`}>
+              {filter === "TOUS" ? "Tous" : filter.charAt(0) + filter.slice(1).toLocaleLowerCase("fr-FR")}
+            </button>
+          ))}
+        </div>
         <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {services.map((s) => {
+          {visibleServices.map((s) => {
             const picked = form.services.find((x) => x.service_id === s.id);
             const count = clientLoyalty[s.id] || 0;
             const giftEligible = count >= 5;
@@ -607,6 +649,11 @@ export default function AppointmentForm() {
             );
           })}
         </div>
+        {visibleServices.length === 0 && (
+          <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500" data-testid="service-empty-state">
+            Aucune prestation ne correspond à ce client et à ces filtres.
+          </div>
+        )}
       </div>
 
       {/* ---- Déplacement (auto + option Voisin) ---- */}
@@ -635,7 +682,9 @@ export default function AppointmentForm() {
             disabled={readOnly}
             onClick={() => { setNeighborOn(!neighborOn); if (neighborOn) { setNeighborId(null); setNeighborCheck(null); } }}
             data-testid="neighbor-toggle"
-            aria-label="Activer l'option Voisin"
+            role="switch"
+            aria-checked={neighborOn}
+            aria-label={neighborOn ? "Désactiver l'option Voisin" : "Activer l'option Voisin"}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${neighborOn ? "bg-[#D4AF37]" : "bg-slate-200"}`}
           >
             <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${neighborOn ? "translate-x-6" : "translate-x-1"}`} />
@@ -857,8 +906,13 @@ export default function AppointmentForm() {
 
       <div className="flex gap-3 items-center">
         {!isDone && (
-          <button onClick={save} data-testid="save-rdv-btn" className="bg-[#0A192F] text-white rounded-full px-8 py-3 font-medium hover:bg-[#1E3A8A]">
-            {id ? "Enregistrer les modifications" : "Créer le rendez-vous"}
+          <button
+            onClick={save}
+            disabled={form.services.length === 0}
+            data-testid="save-rdv-btn"
+            className="bg-[#0A192F] text-white rounded-full px-8 py-3 font-medium hover:bg-[#1E3A8A] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600"
+          >
+            {form.services.length === 0 ? "Sélectionnez une prestation" : id ? "Enregistrer les modifications" : "Créer le rendez-vous"}
           </button>
         )}
         {id && !isDone && rdv?.status !== "cancelled" && (

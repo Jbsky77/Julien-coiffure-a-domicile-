@@ -16,3 +16,16 @@ jobs:
           python-version: "3.12"
       - run: pip install -r backend/requirements.txt pytest
       - run: PYTHONPATH=backend pytest -q backend/tests/test_reliability_priority.py
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: yarn install --non-interactive
+      - run: yarn build
