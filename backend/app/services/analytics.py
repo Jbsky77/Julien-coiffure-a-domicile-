@@ -159,7 +159,7 @@ async def compute_period(start_iso: str, end_iso: str) -> dict:
     fuel_cost = math.ceil(fuel_brut) if real_km > 0 else 0
     consumables = n_rdv * settings.consumables_per_client
     urssaf = math.ceil(ca_total * settings.urssaf_rate)
-    cb_amount = sum(float(r.get(\"price_final\") or 0) for r in period if (r.get(\"payment_mode\") or \"\").upper() == \"CB\")
+    cb_amount = sum(float(r.get("price_final") or 0) for r in period if (r.get("payment_mode") or "").upper() == "CB")
     cb_fees = round(cb_amount * settings.cb_fee_rate, 2)
     marge_before_fixed = ca_total - urssaf - consumables - cb_fees - fuel_cost
     marge = marge_before_fixed - settings.fixed_costs_monthly
