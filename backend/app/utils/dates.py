@@ -1,6 +1,6 @@
 """Date helpers."""
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import date, datetime, time, timedelta, timezone
+from typing import Optional\nfrom zoneinfo import ZoneInfo\n\nPARIS_TZ = ZoneInfo(\"Europe/Paris\")
 
 
 def parse_iso(value: Optional[str]) -> Optional[datetime]:
