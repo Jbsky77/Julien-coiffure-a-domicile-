@@ -1,7 +1,10 @@
 """Analytics aggregation: top services / clients / seasonal / weekdays / gender / durations."""
+import math
 from datetime import datetime, timezone
+from typing import Optional
 
 from app.db import db
+from app.services.settings import get_settings
 from app.utils.dates import parse_iso
 
 MONTH_LABELS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc"]
@@ -121,6 +124,76 @@ async def _service_time_stats(rdvs: list) -> list:
         ),
         key=lambda x: -x["count"],
     )
+
+
+async def compute_period(start_iso: str, end_iso: str) -> dict:
+    """Compute financial+business KPIs for a period [start, end) (ISO date strings)."""
+    settings = await get_settings()
+    start = parse_iso(start_iso)
+    end = parse_iso(end_iso)
+    if not start or not end:
+        return {"error": "invalid_dates"}
+    rdvs_all = await db.appointments.find({"status": "done"}, {"_id": 0}).to_list(20000)
+    period = []
+    for r in rdvs_all:
+        dt = parse_iso(r.get("finished_at") or r.get("date"))
+        if dt and start <= dt < end:
+            period.append(r)
+    n_rdv = len(period)
+    ca_total = sum(r.get("price_final", 0) for r in period)
+    unique_clients = len({r["client_id"] for r in period})
+    avg_basket = round(ca_total / n_rdv, 2) if n_rdv else 0.0
+    billed_supp = sum(float(r.get("fuel_supplement", 0) or 0) for r in period)
+    theoretical_supp = sum(
+        float(r.get("theoretical_fuel_supplement") if r.get("theoretical_fuel_supplement") is not None else r.get("fuel_supplement", 0) or 0)
+        for r in period
+    )
+    neighbor_discounts = sum(float(r.get("neighbor_discount", 0) or 0) for r in period)
+    neighbor_count = sum(1 for r in period if r.get("is_neighbor"))
+    real_km = 0.0
+    for r in period:
+        d = r.get("distance_km_from_business")
+        real_km += (2 * float(d)) if d is not None else float(r.get("kilometrage") or 0)
+    fuel_brut = real_km / 100.0 * settings.consumption_l_per_100km * settings.fuel_price_per_liter
+    fuel_cost = math.ceil(fuel_brut) if real_km > 0 else 0
+    consumables = n_rdv * settings.consumables_per_client
+    urssaf = math.ceil(ca_total * settings.urssaf_rate)
+    marge = ca_total - urssaf - consumables - fuel_cost
+    return {
+        "start": start.isoformat(),
+        "end": end.isoformat(),
+        "ca_total": round(ca_total, 2),
+        "n_rdv": n_rdv,
+        "unique_clients": unique_clients,
+        "avg_basket": avg_basket,
+        "theoretical_supplements": round(theoretical_supp, 2),
+        "billed_supplements": round(billed_supp, 2),
+        "neighbor_discounts": round(neighbor_discounts, 2),
+        "neighbor_count": neighbor_count,
+        "real_km": round(real_km, 2),
+        "fuel_cost": fuel_cost,
+        "marge": round(marge, 2),
+    }
+
+
+def _delta(a: float, b: float) -> dict:
+    """Delta from b to a (period_a compared against period_b as baseline)."""
+    diff = round(a - b, 2)
+    pct = round(diff / b * 100, 1) if b else None
+    return {"abs": diff, "pct": pct}
+
+
+async def compare_periods(a_start: str, a_end: str, b_start: str, b_end: str) -> dict:
+    a = await compute_period(a_start, a_end)
+    b = await compute_period(b_start, b_end)
+    metrics = [
+        "ca_total", "n_rdv", "unique_clients", "avg_basket",
+        "theoretical_supplements", "billed_supplements",
+        "neighbor_discounts", "neighbor_count", "real_km",
+        "fuel_cost", "marge",
+    ]
+    deltas = {m: _delta(a.get(m, 0), b.get(m, 0)) for m in metrics}
+    return {"a": a, "b": b, "deltas": deltas}
 
 
 async def compute_analytics() -> dict:
