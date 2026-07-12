@@ -2,7 +2,7 @@
 import sys
 from pathlib import Path
 
-from fastapi import HTTPException
+from starlette.exceptions import HTTPException
 from fastapi.staticfiles import StaticFiles
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
