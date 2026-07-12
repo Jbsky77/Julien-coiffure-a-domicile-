@@ -131,10 +131,7 @@ async def neighbor_check(payload: Dict[str, Any], user: User = Depends(get_curre
         "source": r["source"],
         "distance_from_business": distance_from_biz,
         "theoretical_supplement": round(theoretical_supp, 2),
-        "message": (
-            f"Statut voisin refusé : les deux adresses sont distantes de {round(km, 2):.2f} km. "
-            f"Les frais normaux de {theoretical_supp:.2f} € restent applicables."
-        ).replace(".", ","),
+        "message": (\n            "Statut voisin refusé : les deux adresses sont distantes de "\n            + f"{km:.2f}".replace(".", ",")\n            + " km. Les frais normaux de "\n            + f"{theoretical_supp:.2f}".replace(".", ",")\n            + " € restent applicables."\n        ),
     }
 
 
