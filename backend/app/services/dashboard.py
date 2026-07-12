@@ -33,7 +33,11 @@ async def build_dashboard() -> dict:
             elif tomorrow_start <= dt < day_after:
                 upcoming_tomorrow.append(r)
 
-    upcoming_today.sort(key=lambda r: (parse_iso(r.get("date")), r.get("created_at") or ""))\n    upcoming_tomorrow.sort(key=lambda r: (parse_iso(r.get("date")), r.get("created_at") or ""))\n    all_upcoming.sort(key=lambda r: (parse_iso(r.get("date")), r.get("created_at") or ""))\n\n    clients = await db.clients.find({}, {"_id": 0}).to_list(5000)
+    upcoming_today.sort(key=lambda r: (parse_iso(r.get("date")), r.get("created_at") or ""))
+    upcoming_tomorrow.sort(key=lambda r: (parse_iso(r.get("date")), r.get("created_at") or ""))
+    all_upcoming.sort(key=lambda r: (parse_iso(r.get("date")), r.get("created_at") or ""))
+
+    clients = await db.clients.find({}, {"_id": 0}).to_list(5000)
     upcoming_birthdays = []
     for c in clients:
         bd = c.get("birthday")
@@ -107,7 +111,11 @@ async def build_dashboard() -> dict:
         "upcoming_amount": round(upcoming_amount, 2),
         "upcoming_birthdays": upcoming_birthdays,
         "unseen_clients": unseen,
-        "avg_basket": {\n            "day": avg_day,\n            "month": month_data.get("panier_moyen", 0.0),\n            "history": round(sum(float(r.get("price_final") or 0) for r in done) / len(done), 2) if done else 0.0,\n        },
+        "avg_basket": {
+            "day": avg_day,
+            "month": month_data.get("panier_moyen", 0.0),
+            "history": round(sum(float(r.get("price_final") or 0) for r in done) / len(done), 2) if done else 0.0,
+        },
         "stock_items": stocks,
         "low_stock": low_stock,
         "gifts_today": today_gifts,
