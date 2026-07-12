@@ -44,7 +44,7 @@ function ComparisonBlock() {
     }
   };
 
-  useEffect(() => { runCompare(); /* eslint-disable-next-line */ }, []);
+  // Initial comparison is intentionally run once on mount.\n  // eslint-disable-next-line react-hooks/exhaustive-deps\n  useEffect(() => { runCompare(); }, []);
 
   const applyPreset = (p) => {
     const aS = typeof p.a[0] === "function" ? p.a[0]() : p.a[0];
