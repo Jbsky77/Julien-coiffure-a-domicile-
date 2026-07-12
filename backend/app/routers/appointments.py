@@ -3,7 +3,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException
-from pymongo import ReturnDocument
 
 from app.db import db
 from app.dependencies import get_current_user
@@ -239,7 +238,7 @@ async def _next_invoice_number() -> str:
         {"_id": f"invoice_{year}"},
         {"$inc": {"seq": 1}},
         upsert=True,
-        return_document=ReturnDocument.AFTER,
+        return_document=True,
     )
     return f"F-{year}-{counter['seq']:04d}"
 
