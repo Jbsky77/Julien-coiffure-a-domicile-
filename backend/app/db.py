@@ -9,6 +9,7 @@ from __future__ import annotations
 import copy
 import os
 import uuid
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any, AsyncIterator
 
@@ -16,6 +17,22 @@ import httpx
 
 
 _MISSING = object()
+_active_company_id: ContextVar[str | None] = ContextVar("active_company_id", default=None)
+
+
+def set_active_company(company_id: str):
+    return _active_company_id.set(company_id)
+
+
+def reset_active_company(token) -> None:
+    _active_company_id.reset(token)
+
+
+def get_active_company() -> str:
+    company_id = _active_company_id.get()
+    if not company_id:
+        raise RuntimeError("Active company context is required")
+    return company_id
 
 
 def _get(doc: dict, path: str, default: Any = _MISSING) -> Any:
@@ -151,7 +168,7 @@ class Collection:
     async def _save(self, key: str, document: dict) -> None:
         await self.store.request(
             "POST",
-            json={"collection": self.name, "key": key, "document": document},
+            json={"company_id": get_active_company(), "collection": self.name, "key": key, "document": document},
             headers={"Prefer": "resolution=merge-duplicates,return=minimal"},
         )
 
@@ -207,7 +224,7 @@ class Collection:
         if not many:
             rows = rows[:1]
         for row in rows:
-            await self.store.request("DELETE", params={"collection": f"eq.{self.name}", "key": f"eq.{row['key']}"})
+            await self.store.request("DELETE", params={"company_id": f"eq.{get_active_company()}", "collection": f"eq.{self.name}", "key": f"eq.{row['key']}"})
         return WriteResult(deleted_count=len(rows))
 
     async def delete_one(self, query: dict) -> WriteResult:
