@@ -47,9 +47,9 @@ export default function AppointmentForm() {
   const [neighborId, setNeighborId] = useState(null);
   const [neighborSearch, setNeighborSearch] = useState("");
   const [neighborCheck, setNeighborCheck] = useState(null); // {valid, distance_km, discount, message, ...}
-  const [checkingNeighbor, setCheckingNeighbor] = useState(false);
+  const [checkingNeighbor, setCheckingNeighbor] = useState(false);\n  const [serviceFilter, setServiceFilter] = useState("TOUS");\n  const [serviceSearch, setServiceSearch] = useState("");
 
-  const isDone = rdv?.status === "done";
+  const selectedClient = useMemo(() => clients.find((client) => client.id === form.client_id) || null, [clients, form.client_id]);\n  const selectedGender = (selectedClient?.gender || "").toUpperCase();\n  const isFamilyPack = (service) => /famille/i.test(service?.name || "") || (service?.category || "").toUpperCase() === "FAMILLE";\n  const genderCompatibleServices = useMemo(() => services.filter((service) => {\n    if (form.services.some((picked) => picked.service_id === service.id)) return true;\n    if (isFamilyPack(service)) return true;\n    const category = (service.category || "").toUpperCase();\n    if (selectedGender === "H") return category === "HOMME";\n    if (selectedGender === "F") return category === "FEMME";\n    return true;\n  }), [services, selectedGender, form.services]);\n  const visibleServices = useMemo(() => genderCompatibleServices.filter((service) => {\n    const category = (service.category || "").toUpperCase();\n    const query = serviceSearch.trim().toLocaleLowerCase("fr-FR");\n    const matchesSearch = !query || `${service.name} ${service.category}`.toLocaleLowerCase("fr-FR").includes(query);\n    const matchesFilter = serviceFilter === "TOUS" || (serviceFilter === "FORFAITS" ? /forfait|pack/i.test(service.name || "") : category === serviceFilter);\n    return matchesSearch && matchesFilter;\n  }), [genderCompatibleServices, serviceFilter, serviceSearch]);\n\n  const isDone = rdv?.status === "done";
   const timerStatus = rdv?.timer_status || (rdv?.started_at ? "running" : "idle");
   const timerRunning = timerStatus === "running" && !!rdv?.started_at;
 
