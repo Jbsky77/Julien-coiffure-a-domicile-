@@ -27,7 +27,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: yarn
-          cache-dependency-path: frontend/yarn.lock
-      - run: yarn install --frozen-lockfile
+      - run: yarn install --non-interactive
       - run: yarn build
