@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 
-from app.db import client, reset_active_company, set_active_company
+from app.db import client, db, reset_active_company, set_active_company
 from app.routers import (
     accounting,
     analytics,
@@ -91,7 +91,14 @@ async def pin_guard(request: Request, call_next):
     is_ical_feed = path.startswith("/api/calendar/") and path.endswith(".ics")
 
     try:
-        if is_api and not is_public and not is_ical_feed:
+        if is_public:
+            parts = path.split("/")
+            public_token = parts[4] if len(parts) > 4 and parts[3] == "client" else None
+            resolved = await db.resolve_public_client(public_token or "")
+            if not resolved:
+                return JSONResponse({"detail": "Lien invalide ou expiré"}, status_code=404)
+            company_token = set_active_company(resolved[0])
+        elif is_api and not is_ical_feed:
             company_token, _ = await require_company_context(request)
 
         if is_api and not is_public and not is_ical_feed:
