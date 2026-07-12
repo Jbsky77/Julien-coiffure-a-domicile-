@@ -26,10 +26,39 @@ async def accounting_month_data(yyyymm: str) -> dict:
         pm_breakdown.setdefault(pm, {"count": 0, "amount": 0.0})
         pm_breakdown[pm]["count"] += 1
         pm_breakdown[pm]["amount"] += r["price_final"]
-    total_km = sum(r.get("kilometrage", 0) for r in in_month)
-    fuel_real_cost = (total_km / 100.0) * settings.consumption_l_per_100km * settings.fuel_price_per_liter
-    fuel_charged = sum(r.get("fuel_supplement", 0) for r in in_month)
-    fuel_balance = fuel_charged - fuel_real_cost
+
+    # ---- Real kilometers (routing-based) ----
+    # For each RDV: prefer 2 × distance_km_from_business (round-trip approx),
+    # fall back to legacy `kilometrage` if the new field is absent.
+    total_km_real = 0.0
+    for r in in_month:
+        d = r.get("distance_km_from_business")
+        if d is not None:
+            total_km_real += 2 * float(d)
+        else:
+            total_km_real += float(r.get("kilometrage") or 0)
+
+    # Fuel real cost: ceil on the monthly aggregated total (never per RDV)
+    fuel_brut = (total_km_real / 100.0) * settings.consumption_l_per_100km * settings.fuel_price_per_liter
+    fuel_real_cost = math.ceil(fuel_brut) if total_km_real > 0 else 0
+
+    # ---- Supplements & Voisin ----
+    billed_supplements = sum(float(r.get("fuel_supplement") or 0) for r in in_month)
+    theoretical_supplements = 0.0
+    neighbor_discounts_total = 0.0
+    neighbor_count = 0
+    for r in in_month:
+        theo = r.get("theoretical_fuel_supplement")
+        if theo is None:
+            theo = r.get("fuel_supplement") or 0
+        theoretical_supplements += float(theo)
+        neighbor_discounts_total += float(r.get("neighbor_discount") or 0)
+        if r.get("is_neighbor"):
+            neighbor_count += 1
+
+    ca_theoretical = round(ca_brut + neighbor_discounts_total, 2)
+    travel_result = round(billed_supplements - fuel_real_cost, 2)
+
     consumables = n_rdv * settings.consumables_per_client
     urssaf_raw = ca_brut * settings.urssaf_rate
     urssaf_ceil = math.ceil(urssaf_raw)
@@ -37,7 +66,11 @@ async def accounting_month_data(yyyymm: str) -> dict:
     cb_amount = pm_breakdown.get("CB", {}).get("amount", 0.0)
     cb_count = pm_breakdown.get("CB", {}).get("count", 0)
     cb_fees_total = round(cb_amount * settings.cb_fee_rate, 2)
-    marge_nette = ca_brut - urssaf_ceil - consumables - fixed - fuel_real_cost + fuel_charged - cb_fees_total
+
+    # Marge nette (spec formula):
+    # ca_total - urssaf - consommables - charges_fixes - frais_CB - carburant_réel
+    marge_nette = ca_brut - urssaf_ceil - consumables - fixed - fuel_real_cost - cb_fees_total
+
     decl = await db.urssaf_status.find_one({"month": yyyymm}, {"_id": 0}) or {"month": yyyymm, "declared": False, "paid": False}
     n_gifts = 0
     value_gifts = 0.0
@@ -49,12 +82,19 @@ async def accounting_month_data(yyyymm: str) -> dict:
     return {
         "month": yyyymm,
         "ca_brut": round(ca_brut, 2),
+        "ca_theoretical": ca_theoretical,
         "n_rdv": n_rdv,
         "payment_breakdown": pm_breakdown,
-        "total_km": total_km,
-        "fuel_real_cost": round(fuel_real_cost, 2),
-        "fuel_charged": round(fuel_charged, 2),
-        "fuel_balance": round(fuel_balance, 2),
+        "total_km": round(total_km_real, 2),
+        "fuel_real_cost": fuel_real_cost,
+        "fuel_brut": round(fuel_brut, 3),
+        "fuel_charged": round(billed_supplements, 2),
+        "fuel_balance": round(billed_supplements - fuel_real_cost, 2),
+        "theoretical_supplements": round(theoretical_supplements, 2),
+        "billed_supplements": round(billed_supplements, 2),
+        "neighbor_discounts": round(neighbor_discounts_total, 2),
+        "neighbor_count": neighbor_count,
+        "travel_result": travel_result,
         "consumables": round(consumables, 2),
         "urssaf_raw": round(urssaf_raw, 2),
         "urssaf_ceil": urssaf_ceil,

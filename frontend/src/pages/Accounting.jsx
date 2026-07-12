@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { api, money, money2, fmtMonth } from "@/lib/api";
 import { toast } from "sonner";
-import { ExternalLink, RefreshCcw, ChevronLeft, ChevronRight, Download, FileText, CreditCard, Pencil, Save } from "lucide-react";
+import { ExternalLink, RefreshCcw, ChevronLeft, ChevronRight, Download, FileText, CreditCard, Pencil, Save, Gift } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { PAYMENT_MODES } from "@/lib/api";
@@ -110,9 +110,13 @@ export default function Accounting() {
       ["Consommables €", money2(data.consumables)],
       ["Frais fixes €", money2(data.fixed_costs)],
       ["KM total", money2(data.total_km)],
-      ["Carburant facturé €", money2(data.fuel_charged)],
-      ["Carburant coût réel €", money2(data.fuel_real_cost)],
-      ["Carburant balance €", money2(data.fuel_balance)],
+      ["Suppléments théoriques €", money2(data.theoretical_supplements)],
+      ["Suppléments facturés €", money2(data.billed_supplements)],
+      ["Remises Voisin €", money2(data.neighbor_discounts)],
+      ["Nombre exonérations voisin", data.neighbor_count],
+      ["Carburant coût réel (↑) €", data.fuel_real_cost],
+      ["Résultat déplacements €", money2(data.travel_result)],
+      ["CA théorique (avant remises) €", money2(data.ca_theoretical)],
       ["Marge nette €", money2(data.marge_nette)],
       [""],
       ["Règlements par mode", "Nombre", "Montant €"],
@@ -147,9 +151,12 @@ export default function Accounting() {
         ["Consommables", `${money2(data.consumables)} €`],
         ["Frais fixes", `${money2(data.fixed_costs)} €`],
         ["KM parcourus", `${money2(data.total_km)} km`],
-        ["Carburant facturé", `${money2(data.fuel_charged)} €`],
-        ["Carburant coût réel", `${money2(data.fuel_real_cost)} €`],
-        ["Balance carburant", `${money2(data.fuel_balance)} €`],
+        ["Suppléments théoriques", `${money2(data.theoretical_supplements)} €`],
+        ["Suppléments facturés", `${money2(data.billed_supplements)} €`],
+        ["Remises Voisin", `−${money2(data.neighbor_discounts)} € (${data.neighbor_count} exo)`],
+        ["Carburant coût réel (↑)", `${data.fuel_real_cost} €`],
+        ["Résultat déplacements", `${money2(data.travel_result)} €`],
+        ["CA théorique (avant remises)", `${money2(data.ca_theoretical)} €`],
         ["Marge nette", `${money2(data.marge_nette)} €`],
       ],
       theme: "grid",
@@ -230,11 +237,37 @@ export default function Accounting() {
               <div className="space-y-1 text-sm">
                 <div className="flex justify-between"><span>Kilomètres parcourus</span><span className="font-medium">{money2(data.total_km)} km</span></div>
                 <div className="flex justify-between"><span>Facturé clients</span><span className="font-medium">{money2(data.fuel_charged)} €</span></div>
-                <div className="flex justify-between"><span>Coût réel</span><span className="font-medium">{money2(data.fuel_real_cost)} €</span></div>
-                <div className="flex justify-between pt-2 border-t border-slate-100"><span>Balance</span><span className={data.fuel_balance >= 0 ? "text-[#166534] font-medium" : "text-[#991B1B] font-medium"}>{data.fuel_balance >= 0 ? "+" : ""}{money2(data.fuel_balance)} €</span></div>
+                <div className="flex justify-between" title="Coût brut arrondi à l'euro supérieur sur le total mensuel"><span>Coût réel (↑)</span><span className="font-medium">{data.fuel_real_cost} €</span></div>
+                <div className="flex justify-between pt-2 border-t border-slate-100"><span>Résultat déplacements</span><span className={data.travel_result >= 0 ? "text-[#166534] font-medium" : "text-[#991B1B] font-medium"} data-testid="travel-result">{data.travel_result >= 0 ? "+" : ""}{money2(data.travel_result)} €</span></div>
                 <div className="flex justify-between pt-2"><span>Consommables (2€ × {data.n_rdv})</span><span className="font-medium">{money2(data.consumables)} €</span></div>
               </div>
             </div>
+          </div>
+
+          <div className="bg-[#D4AF37]/5 border border-[#D4AF37]/30 rounded-2xl p-6" data-testid="voisin-block">
+            <div className="flex items-center gap-2 mb-3">
+              <Gift className="w-4 h-4 text-[#C5A059]" />
+              <div className="text-[10px] tracking-widest uppercase text-[#8A6A1F]">Remises Voisin</div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-slate-500">Exonérations</div>
+                <div className="font-serif text-2xl text-[#0A192F]" data-testid="voisin-count">{data.neighbor_count}</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-slate-500">Montant offert</div>
+                <div className="font-serif text-2xl text-[#8A6A1F]" data-testid="voisin-amount">−{money2(data.neighbor_discounts)} €</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-slate-500">CA théorique</div>
+                <div className="font-serif text-2xl text-slate-500 line-through">{money2(data.ca_theoretical)} €</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-slate-500">CA réel</div>
+                <div className="font-serif text-2xl text-[#0A192F]">{money2(data.ca_brut)} €</div>
+              </div>
+            </div>
+            <div className="text-[10px] text-slate-500 mt-3">Suppléments théoriques {money2(data.theoretical_supplements)} € · réellement facturés {money2(data.billed_supplements)} €</div>
           </div>
 
           <div className="flex flex-wrap gap-3">
