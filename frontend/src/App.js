@@ -19,6 +19,7 @@ import ClientStatus from "@/pages/ClientStatus";
 import MapPage from "@/pages/Map";
 import ClientSpace from "@/pages/ClientSpace";
 import AppointmentRequests from "@/pages/AppointmentRequests";
+import Login from "@/pages/Login";
 import Layout from "@/components/app/Layout";
 import PinGate from "@/components/app/PinGate";
 
@@ -33,7 +34,6 @@ function Protected() {
 function RootRouter() {
   return (
     <Routes>
-      <Route path="/login" element={<Navigate to="/" replace />} />
       <Route element={<Protected />}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/rdv" element={<Appointments />} />
@@ -54,19 +54,21 @@ function RootRouter() {
   );
 }
 
-// Router: separates the public client space (no PIN required) from the admin app.
+function PrivateApp() {
+  const { user, loading, activeCompany } = useAuth();
+  if (loading) return <div className="min-h-screen flex items-center justify-center">Chargement…</div>;
+  if (!user) return <Navigate to="/login" replace />;
+  if (!activeCompany) return <div className="min-h-screen flex items-center justify-center p-6 text-center">Aucune entreprise active n’est associée à ce compte.</div>;
+  return <PinGate><RootRouter /></PinGate>;
+}
+
+// Router: public client space, login, then authenticated company application.
 function AppRouter() {
   return (
     <Routes>
       <Route path="/c/:token" element={<ClientSpace />} />
-      <Route
-        path="*"
-        element={
-          <PinGate>
-            <RootRouter />
-          </PinGate>
-        }
-      />
+      <Route path="/login" element={<Login />} />
+      <Route path="*" element={<PrivateApp />} />
     </Routes>
   );
 }
