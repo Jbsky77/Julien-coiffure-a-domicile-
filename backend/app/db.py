@@ -240,8 +240,21 @@ class Store:
         key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
         if not url or not key:
             raise RuntimeError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required")
+        self.base_url = url
         self.endpoint = f"{url}/rest/v1/app_documents"
         self.headers = {"apikey": key, "Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+
+    async def resolve_public_company(self, slug: str) -> str | None:
+        """Resolve a public site slug without accepting a browser supplied company UUID."""
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.get(
+                f"{self.base_url}/rest/v1/companies",
+                params={"slug": f"eq.{slug}", "status": "eq.active", "select": "id", "limit": "1"},
+                headers=self.headers,
+            )
+        response.raise_for_status()
+        rows = response.json()
+        return rows[0]["id"] if rows else None
 
     async def resolve_public_client(self, access_token: str) -> tuple[str, dict] | None:
         """Resolve a public client token and return its trusted company context."""
