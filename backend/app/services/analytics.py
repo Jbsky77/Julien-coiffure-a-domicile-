@@ -15,7 +15,8 @@ def _compute_age(bd: str):
     try:
         d = datetime.fromisoformat(bd)
         today = datetime.now(timezone.utc)
-        age = today.year - d.year - ((today.month, today.day) < (d.month, d.day))\n        return age if d <= today and 0 <= age <= 120 else None
+        age = today.year - d.year - ((today.month, today.day) < (d.month, d.day))
+        return age if d <= today and 0 <= age <= 120 else None
     except Exception:
         return None
 
@@ -158,7 +159,10 @@ async def compute_period(start_iso: str, end_iso: str) -> dict:
     fuel_cost = math.ceil(fuel_brut) if real_km > 0 else 0
     consumables = n_rdv * settings.consumables_per_client
     urssaf = math.ceil(ca_total * settings.urssaf_rate)
-    cb_amount = sum(float(r.get(\"price_final\") or 0) for r in period if (r.get(\"payment_mode\") or \"\").upper() == \"CB\")\n    cb_fees = round(cb_amount * settings.cb_fee_rate, 2)\n    marge_before_fixed = ca_total - urssaf - consumables - cb_fees - fuel_cost\n    marge = marge_before_fixed - settings.fixed_costs_monthly
+    cb_amount = sum(float(r.get(\"price_final\") or 0) for r in period if (r.get(\"payment_mode\") or \"\").upper() == \"CB\")
+    cb_fees = round(cb_amount * settings.cb_fee_rate, 2)
+    marge_before_fixed = ca_total - urssaf - consumables - cb_fees - fuel_cost
+    marge = marge_before_fixed - settings.fixed_costs_monthly
     return {
         "start": start.isoformat(),
         "end": end.isoformat(),
@@ -172,7 +176,9 @@ async def compute_period(start_iso: str, end_iso: str) -> dict:
         "neighbor_count": neighbor_count,
         "real_km": round(real_km, 2),
         "fuel_cost": fuel_cost,
-        "cb_fees": cb_fees,\n        "marge_before_fixed_costs": round(marge_before_fixed, 2),\n        "marge": round(marge, 2),
+        "cb_fees": cb_fees,
+        "marge_before_fixed_costs": round(marge_before_fixed, 2),
+        "marge": round(marge, 2),
     }
 
 
@@ -213,7 +219,9 @@ async def compute_analytics() -> dict:
         "total_clients": len(clients),
         "gender_stats": _gender_stats(clients, rdvs),
         "age_stats": age_stats,
-        "average_age": average_age,\n        "age_included_count": age_included,\n        "age_excluded_count": age_excluded,
+        "average_age": average_age,
+        "age_included_count": age_included,
+        "age_excluded_count": age_excluded,
         "average_duration_minutes": round(sum(durations) / len(durations), 1) if durations else None,
         "total_duration_minutes": sum(durations) if durations else 0,
         "service_time_stats": await _service_time_stats(rdvs),
