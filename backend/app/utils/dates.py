@@ -3,7 +3,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from typing import Optional
 from zoneinfo import ZoneInfo
 
-PARIS_TZ = ZoneInfo(\"Europe/Paris\")
+PARIS_TZ = ZoneInfo("Europe/Paris")
 
 
 def parse_iso(value: Optional[str]) -> Optional[datetime]:
