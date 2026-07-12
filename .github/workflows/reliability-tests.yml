@@ -2,7 +2,9 @@ name: Reliability tests
 on:
   push:
     branches: [codex/fiabilisation-prioritaire]
-  pull_request:\n    branches: [main]\n  workflow_dispatch:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
   critical-tests:
