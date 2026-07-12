@@ -1,4 +1,5 @@
 import axios from "axios";
+import { supabase } from "@/lib/supabase";
 
 const BACKEND_URL = (process.env.REACT_APP_BACKEND_URL || "").replace(/\/$/, "");
 export const API = `${BACKEND_URL}/api`;
@@ -30,12 +31,17 @@ export const api = axios.create({
   withCredentials: true,
 });
 
-api.interceptors.request.use((config) => {
-  const token = pinStorage.get();
-  if (token) {
-    config.headers = config.headers || {};
-    config.headers["X-Pin-Token"] = token;
-  }
+api.interceptors.request.use(async (config) => {
+  config.headers = config.headers || {};
+  const { data } = await supabase.auth.getSession();
+  const accessToken = data.session?.access_token;
+  if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`;
+
+  const pinToken = pinStorage.get();
+  if (pinToken) config.headers["X-Pin-Token"] = pinToken;
+
+  const companyId = localStorage.getItem("jb_active_company_id");
+  if (companyId) config.headers["X-Company-ID"] = companyId;
   return config;
 });
 
