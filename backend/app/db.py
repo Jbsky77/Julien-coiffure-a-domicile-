@@ -248,13 +248,13 @@ class Store:
         """Resolve a public site slug without accepting a browser supplied company UUID."""
         async with httpx.AsyncClient(timeout=20) as client:
             response = await client.get(
-                f"{self.base_url}/rest/v1/companies",
-                params={"slug": f"eq.{slug}", "status": "eq.active", "select": "id", "limit": "1"},
+                f"{self.base_url}/rest/v1/company_public_booking_settings",
+                params={"public_slug": f"eq.{slug}", "public_booking_enabled": "eq.true", "select": "company_id", "limit": "1"},
                 headers=self.headers,
             )
         response.raise_for_status()
         rows = response.json()
-        return rows[0]["id"] if rows else None
+        return rows[0]["company_id"] if rows else None
 
     async def resolve_public_client(self, access_token: str) -> tuple[str, dict] | None:
         """Resolve a public client token and return its trusted company context."""
