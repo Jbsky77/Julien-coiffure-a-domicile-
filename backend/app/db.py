@@ -243,6 +243,18 @@ class Store:
         self.endpoint = f"{url}/rest/v1/app_documents"
         self.headers = {"apikey": key, "Authorization": f"Bearer {key}", "Content-Type": "application/json"}
 
+    async def resolve_public_client(self, access_token: str) -> tuple[str, dict] | None:
+        """Resolve a public client token and return its trusted company context."""
+        rows = await self.request("GET", params={
+            "collection": "eq.clients",
+            "select": "company_id,document",
+            "limit": "50000",
+        })
+        for row in rows:
+            if row.get("document", {}).get("access_token") == access_token:
+                return row["company_id"], row["document"]
+        return None
+
     def __getattr__(self, name: str) -> Collection:
         return Collection(self, name)
 
