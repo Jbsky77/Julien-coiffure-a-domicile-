@@ -363,8 +363,7 @@ export default function AppointmentForm() {
     if (prestationsNames) lines.push(`Prestations : ${prestationsNames}`);
     lines.push(`Montant : ${Number(amount).toFixed(2).replace(".", ",")} €`);
     lines.push("", "À très vite,", "Julien Bouche");
-    return lines.join("
-");
+    return lines.join("\n");
   };
 
   const buildLinks = () => {
