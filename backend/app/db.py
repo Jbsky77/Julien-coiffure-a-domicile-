@@ -9,6 +9,7 @@ from __future__ import annotations
 import copy
 import os
 import uuid
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any, AsyncIterator
 
@@ -16,6 +17,22 @@ import httpx
 
 
 _MISSING = object()
+_active_company_id: ContextVar[str | None] = ContextVar("active_company_id", default=None)
+
+
+def set_active_company(company_id: str):
+    return _active_company_id.set(company_id)
+
+
+def reset_active_company(token) -> None:
+    _active_company_id.reset(token)
+
+
+def get_active_company() -> str:
+    company_id = _active_company_id.get()
+    if not company_id:
+        raise RuntimeError("Active company context is required")
+    return company_id
 
 
 def _get(doc: dict, path: str, default: Any = _MISSING) -> Any:
@@ -151,7 +168,7 @@ class Collection:
     async def _save(self, key: str, document: dict) -> None:
         await self.store.request(
             "POST",
-            json={"collection": self.name, "key": key, "document": document},
+            json={"company_id": get_active_company(), "collection": self.name, "key": key, "document": document},
             headers={"Prefer": "resolution=merge-duplicates,return=minimal"},
         )
 
@@ -207,7 +224,7 @@ class Collection:
         if not many:
             rows = rows[:1]
         for row in rows:
-            await self.store.request("DELETE", params={"collection": f"eq.{self.name}", "key": f"eq.{row['key']}"})
+            await self.store.request("DELETE", params={"company_id": f"eq.{get_active_company()}", "collection": f"eq.{self.name}", "key": f"eq.{row['key']}"})
         return WriteResult(deleted_count=len(rows))
 
     async def delete_one(self, query: dict) -> WriteResult:
@@ -223,8 +240,33 @@ class Store:
         key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
         if not url or not key:
             raise RuntimeError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required")
+        self.base_url = url
         self.endpoint = f"{url}/rest/v1/app_documents"
         self.headers = {"apikey": key, "Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+
+    async def resolve_public_company(self, slug: str) -> str | None:
+        """Resolve a public site slug without accepting a browser supplied company UUID."""
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.get(
+                f"{self.base_url}/rest/v1/company_public_booking_settings",
+                params={"public_slug": f"eq.{slug}", "public_booking_enabled": "eq.true", "select": "company_id", "limit": "1"},
+                headers=self.headers,
+            )
+        response.raise_for_status()
+        rows = response.json()
+        return rows[0]["company_id"] if rows else None
+
+    async def resolve_public_client(self, access_token: str) -> tuple[str, dict] | None:
+        """Resolve a public client token and return its trusted company context."""
+        rows = await self.request("GET", params={
+            "collection": "eq.clients",
+            "select": "company_id,document",
+            "limit": "50000",
+        })
+        for row in rows:
+            if row.get("document", {}).get("access_token") == access_token:
+                return row["company_id"], row["document"]
+        return None
 
     def __getattr__(self, name: str) -> Collection:
         return Collection(self, name)

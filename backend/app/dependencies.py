@@ -1,13 +1,16 @@
-"""Authentication dependency. Auth is currently disabled — returns the local user."""
-from typing import Optional
-from fastapi import Cookie, Header, Request
+"""Authenticated user dependency backed by the verified request company context."""
+from fastapi import HTTPException, Request
+
 from app.models.auth import User
 
 
-async def get_current_user(
-    request: Request,
-    session_token: Optional[str] = Cookie(default=None),
-    authorization: Optional[str] = Header(default=None),
-) -> User:
-    # Single-user local app — no auth required.
-    return User(user_id="local-julien", email="julien@local", name="Julien Bouche", picture="")
+async def get_current_user(request: Request) -> User:
+    context = getattr(request.state, "company", None)
+    if context is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return User(
+        user_id=context.user_id,
+        email=context.email,
+        name="Bouche Julien" if context.email.lower() == "julien46bouche@gmail.com" else context.email,
+        picture="",
+    )
