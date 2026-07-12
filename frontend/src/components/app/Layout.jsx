@@ -3,6 +3,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import { LayoutDashboard, CalendarClock, Users, Receipt, Package, Settings as SettingsIcon, Scissors, TrendingUp, Route, AlertCircle, Search, Lock, Map as MapIcon, Bell, ChevronDown } from "lucide-react";
 import { api, pinStorage } from "@/lib/api";
 import GlobalSearch from "@/components/app/GlobalSearch";
+import { useAuth } from "@/context/AuthContext";
 
 const NAV = [
   { to: "/", label: "Accueil", icon: LayoutDashboard, tid: "nav-dashboard" },
@@ -25,6 +26,7 @@ const ALL_MENUS = [...NAV, ...MORE];
 
 export default function Layout({ children }) {
   const location = useLocation();
+  const { activeCompany, activeCompanyId, companies, setActiveCompanyId } = useAuth();
   const [searchOpen, setSearchOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
@@ -81,9 +83,17 @@ export default function Layout({ children }) {
           <Scissors className="w-6 h-6 text-[#D4AF37]" strokeWidth={1.5} />
           <div>
             <div className="font-serif text-xl leading-none">Julien Bouche</div>
-            <div className="text-[9px] tracking-[0.25em] uppercase text-slate-400 mt-1">Coiffure à domicile</div>
+            <div className="text-[9px] tracking-[0.18em] uppercase text-slate-400 mt-1">{activeCompany?.name || "Entreprise active"}</div>
           </div>
         </div>
+        {companies.length > 1 && (
+          <div className="px-4 py-3 border-b border-slate-100">
+            <label className="text-[9px] tracking-widest uppercase text-slate-400">Entreprise active</label>
+            <select value={activeCompanyId || ""} onChange={(e) => setActiveCompanyId(e.target.value)} className="mt-1 w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-white">
+              {companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}
+            </select>
+          </div>
+        )}
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
           {ALL_MENUS.map((n) => (
             <NavLink key={n.to} to={n.to} end={n.to === "/"} data-testid={`${n.tid}-desktop`}
