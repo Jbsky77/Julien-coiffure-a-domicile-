@@ -171,17 +171,19 @@ async def public_respond_counter(token: str, rid: str, payload: Dict[str, Any]):
         final_date = req.get("counter_proposed_date") or req["requested_date"]
         service_ids = [s["service_id"] for s in (req.get("services") or [])]
         svc_input = [{"service_id": sid, "is_gift": False} for sid in service_ids]
-        svc_objs, _, fuel, base, final_price, family, gift = await compute_appointment_totals(svc_input, 0, None)
+        totals = await compute_appointment_totals(svc_input, 0, None, client_id=c["id"])
         rdv = Appointment(
             client_id=c["id"],
             client_name=req.get("client_name", ""),
             date=final_date,
-            services=[AppointmentService(**x) for x in svc_objs],
-            price_base=base,
-            fuel_supplement=fuel,
-            price_final=final_price,
-            family_pack_applied=family,
-            gift_applied=gift,
+            services=[AppointmentService(**x) for x in totals["services"]],
+            price_base=totals["price_base"],
+            fuel_supplement=totals["fuel_supplement"],
+            price_final=totals["price_final"],
+            family_pack_applied=totals["family_pack"],
+            gift_applied=totals["gift_applied"],
+            distance_km_from_business=totals["distance_km"],
+            theoretical_fuel_supplement=totals["theoretical_supplement"],
             notes=(req.get("comment") or ""),
         )
         await db.appointments.insert_one(rdv.model_dump())

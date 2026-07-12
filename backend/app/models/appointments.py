@@ -35,6 +35,18 @@ class Appointment(BaseModel):
     timer_seconds: float = 0  # accumulated elapsed seconds (pauses excluded)
     timer_status: Optional[str] = None  # None|"running"|"paused"|"stopped"
     finished_at: Optional[str] = None
+    # ---- Travel (Voisin) ----
+    distance_km_from_business: Optional[float] = None
+    theoretical_fuel_supplement: float = 0  # what would be billed from business address
+    is_neighbor: bool = False
+    neighbor_of_client_id: Optional[str] = None
+    neighbor_of_client_name: Optional[str] = None
+    neighbor_of_client_address: Optional[str] = None
+    neighbor_distance_km: Optional[float] = None
+    neighbor_verified_at: Optional[str] = None
+    neighbor_routing_source: Optional[str] = None  # "osrm" | "haversine"
+    neighbor_discount: float = 0  # remise voisin
+    supplement_manually_overridden: bool = False
 
 
 class AppointmentCreate(BaseModel):
@@ -44,6 +56,8 @@ class AppointmentCreate(BaseModel):
     kilometrage: float = 0
     notes: str = ""
     price_final_override: Optional[float] = None
+    is_neighbor: bool = False
+    neighbor_of_client_id: Optional[str] = None
 
 
 class AppointmentUpdate(BaseModel):
@@ -52,6 +66,8 @@ class AppointmentUpdate(BaseModel):
     kilometrage: Optional[float] = None
     notes: Optional[str] = None
     price_final_override: Optional[float] = None
+    is_neighbor: Optional[bool] = None
+    neighbor_of_client_id: Optional[str] = None
 
 
 class FinishAppointment(BaseModel):

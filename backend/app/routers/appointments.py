@@ -17,9 +17,43 @@ from app.models.appointments import (
 from app.models.auth import User
 from app.services.appointments import compute_appointment_totals
 from app.services.referrals import compute_referral_info
-from app.utils.dates import parse_iso
+from app.services.routing import route
+from app.utils.dates import now_utc, parse_iso
 
 router = APIRouter()
+
+
+async def _validate_and_apply_neighbor(client_id: str, is_neighbor: bool, neighbor_id):
+    """Server-side neighbor validation. Returns dict or None.
+
+    Structure: {valid, distance_km, neighbor_name, neighbor_address, verified_at, source}
+    """
+    if not is_neighbor or not neighbor_id:
+        return None
+    if neighbor_id == client_id:
+        return {"valid": False, "reason": "same_client"}
+    a = await db.clients.find_one({"id": client_id}, {"_id": 0, "lat": 1, "lng": 1})
+    b = await db.clients.find_one({"id": neighbor_id}, {"_id": 0})
+    if not a or not b:
+        return {"valid": False, "reason": "not_found"}
+    if a.get("lat") is None or b.get("lat") is None:
+        return {"valid": False, "reason": "missing_coords"}
+    r = await route((a["lat"], a["lng"]), (b["lat"], b["lng"]))
+    if r["km"] is None or r["km"] >= 1.0:
+        return {
+            "valid": False,
+            "reason": "too_far" if r["km"] is not None else "route_failed",
+            "distance_km": r["km"],
+        }
+    name = f"{b.get('first_name','')} {b.get('last_name','')}".strip()
+    return {
+        "valid": True,
+        "distance_km": round(r["km"], 3),
+        "neighbor_name": name,
+        "neighbor_address": b.get("address", ""),
+        "verified_at": now_utc().isoformat(),
+        "source": r["source"],
+    }
 
 
 @router.get("/appointments")
@@ -32,22 +66,41 @@ async def appointments_create(payload: AppointmentCreate, user: User = Depends(g
     client_doc = await db.clients.find_one({"id": payload.client_id}, {"_id": 0})
     if not client_doc:
         raise HTTPException(404, "Client not found")
-    svc_objs, _, fuel, base, final, family, gift = await compute_appointment_totals(
-        payload.services, payload.kilometrage, payload.price_final_override
+    # Neighbor validation (if requested) — fetches theoretical supp too
+    neighbor_meta = await _validate_and_apply_neighbor(
+        payload.client_id, payload.is_neighbor, payload.neighbor_of_client_id
+    )
+    totals = await compute_appointment_totals(
+        payload.services,
+        payload.kilometrage,
+        payload.price_final_override,
+        client_id=payload.client_id,
+        is_neighbor=neighbor_meta["valid"] if neighbor_meta else False,
+        neighbor_of_client_id=payload.neighbor_of_client_id if (neighbor_meta and neighbor_meta["valid"]) else None,
     )
     client_name = f"{client_doc.get('first_name','')} {client_doc.get('last_name','')}".strip()
     rdv = Appointment(
         client_id=payload.client_id,
         client_name=client_name,
         date=payload.date,
-        services=[AppointmentService(**x) for x in svc_objs],
+        services=[AppointmentService(**x) for x in totals["services"]],
         kilometrage=payload.kilometrage,
         notes=payload.notes,
-        price_base=base,
-        fuel_supplement=fuel,
-        price_final=final,
-        family_pack_applied=family,
-        gift_applied=gift,
+        price_base=totals["price_base"],
+        fuel_supplement=totals["fuel_supplement"],
+        price_final=totals["price_final"],
+        family_pack_applied=totals["family_pack"],
+        gift_applied=totals["gift_applied"],
+        distance_km_from_business=totals["distance_km"],
+        theoretical_fuel_supplement=totals["theoretical_supplement"],
+        is_neighbor=(neighbor_meta["valid"] if neighbor_meta else False),
+        neighbor_of_client_id=(payload.neighbor_of_client_id if (neighbor_meta and neighbor_meta["valid"]) else None),
+        neighbor_of_client_name=(neighbor_meta.get("neighbor_name") if neighbor_meta else None),
+        neighbor_of_client_address=(neighbor_meta.get("neighbor_address") if neighbor_meta else None),
+        neighbor_distance_km=(neighbor_meta.get("distance_km") if neighbor_meta else None),
+        neighbor_verified_at=(neighbor_meta.get("verified_at") if neighbor_meta else None),
+        neighbor_routing_source=(neighbor_meta.get("source") if neighbor_meta else None),
+        neighbor_discount=totals["neighbor_discount"],
     )
     await db.appointments.insert_one(rdv.model_dump())
     return rdv.model_dump()
@@ -64,17 +117,36 @@ async def appointments_update(rid: str, payload: AppointmentUpdate, user: User =
         {"service_id": s["service_id"], "is_gift": s.get("is_gift", False)} for s in current["services"]
     ]
     km = payload.kilometrage if payload.kilometrage is not None else current["kilometrage"]
-    svc_objs, _, fuel, base, final, family, gift = await compute_appointment_totals(
-        services_input, km, payload.price_final_override
+    # Neighbor state: use payload if provided else current
+    is_neighbor = payload.is_neighbor if payload.is_neighbor is not None else current.get("is_neighbor", False)
+    neighbor_id = payload.neighbor_of_client_id if payload.neighbor_of_client_id is not None else current.get("neighbor_of_client_id")
+    neighbor_meta = await _validate_and_apply_neighbor(current["client_id"], is_neighbor, neighbor_id) if is_neighbor else None
+    totals = await compute_appointment_totals(
+        services_input,
+        km,
+        payload.price_final_override,
+        client_id=current["client_id"],
+        is_neighbor=(neighbor_meta["valid"] if neighbor_meta else False),
+        neighbor_of_client_id=neighbor_id if (neighbor_meta and neighbor_meta["valid"]) else None,
     )
     update = {
-        "services": svc_objs,
+        "services": totals["services"],
         "kilometrage": km,
-        "price_base": base,
-        "fuel_supplement": fuel,
-        "price_final": final,
-        "family_pack_applied": family,
-        "gift_applied": gift,
+        "price_base": totals["price_base"],
+        "fuel_supplement": totals["fuel_supplement"],
+        "price_final": totals["price_final"],
+        "family_pack_applied": totals["family_pack"],
+        "gift_applied": totals["gift_applied"],
+        "distance_km_from_business": totals["distance_km"],
+        "theoretical_fuel_supplement": totals["theoretical_supplement"],
+        "is_neighbor": (neighbor_meta["valid"] if neighbor_meta else False),
+        "neighbor_of_client_id": neighbor_id if (neighbor_meta and neighbor_meta["valid"]) else None,
+        "neighbor_of_client_name": (neighbor_meta.get("neighbor_name") if neighbor_meta and neighbor_meta.get("valid") else None),
+        "neighbor_of_client_address": (neighbor_meta.get("neighbor_address") if neighbor_meta and neighbor_meta.get("valid") else None),
+        "neighbor_distance_km": (neighbor_meta.get("distance_km") if neighbor_meta and neighbor_meta.get("valid") else None),
+        "neighbor_verified_at": (neighbor_meta.get("verified_at") if neighbor_meta and neighbor_meta.get("valid") else None),
+        "neighbor_routing_source": (neighbor_meta.get("source") if neighbor_meta and neighbor_meta.get("valid") else None),
+        "neighbor_discount": totals["neighbor_discount"],
     }
     if payload.date is not None:
         update["date"] = payload.date
@@ -256,21 +328,26 @@ async def appointments_schedule_next(rid: str, payload: Dict[str, Any], user: Us
         raise HTTPException(400, "Date du RDV source invalide")
     new_date = (base_dt + timedelta(weeks=weeks)).isoformat()
     services_input = [{"service_id": s["service_id"], "is_gift": False} for s in rdv.get("services") or []]
-    svc_objs, _, fuel, base, final, family, gift = await compute_appointment_totals(
-        services_input, rdv.get("kilometrage", 0), None
+    totals = await compute_appointment_totals(
+        services_input,
+        rdv.get("kilometrage", 0),
+        None,
+        client_id=rdv["client_id"],
     )
     new_rdv = Appointment(
         client_id=rdv["client_id"],
         client_name=rdv.get("client_name", ""),
         date=new_date,
-        services=[AppointmentService(**x) for x in svc_objs],
+        services=[AppointmentService(**x) for x in totals["services"]],
         kilometrage=rdv.get("kilometrage", 0),
         notes="",
-        price_base=base,
-        fuel_supplement=fuel,
-        price_final=final,
-        family_pack_applied=family,
-        gift_applied=gift,
+        price_base=totals["price_base"],
+        fuel_supplement=totals["fuel_supplement"],
+        price_final=totals["price_final"],
+        family_pack_applied=totals["family_pack"],
+        gift_applied=totals["gift_applied"],
+        distance_km_from_business=totals["distance_km"],
+        theoretical_fuel_supplement=totals["theoretical_supplement"],
     )
     await db.appointments.insert_one(new_rdv.model_dump())
     return new_rdv.model_dump()

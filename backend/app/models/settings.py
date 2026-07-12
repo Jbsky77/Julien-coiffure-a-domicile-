@@ -2,6 +2,14 @@ from pydantic import BaseModel
 from typing import Optional
 
 
+class BusinessAddress(BaseModel):
+    address: str = ""
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    geocode_status: str = "pending"  # "ok" | "not_found" | "error" | "pending"
+    verified_at: Optional[str] = None
+
+
 class Settings(BaseModel):
     fuel_price_per_liter: float = 1.85
     urssaf_rate: float = 0.22
@@ -26,3 +34,6 @@ class Settings(BaseModel):
     review_sms_template: str = "Bonjour {first_name}, merci pour votre confiance ! Donnez votre avis sur votre coiffeur ici : {url} — {brand_name}"
     reminder_sms_template: str = "Bonjour {first_name}, petit rappel de votre rendez-vous demain à {time} ({services}). À demain ! — {brand_name}"
     invoice_brand_name: str = "Julien coiffeur à domicile"
+    business_address: BusinessAddress = BusinessAddress(
+        address="16 chemin de la Station Météo, 46300 Gourdon, France"
+    )

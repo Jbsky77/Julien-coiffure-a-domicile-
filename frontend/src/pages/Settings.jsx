@@ -1,7 +1,79 @@
 import React, { useEffect, useState } from "react";
 import { api, money, API } from "@/lib/api";
 import { toast } from "sonner";
-import { Plus, Trash2, Save, Copy, Calendar, Download } from "lucide-react";
+import { Plus, Trash2, Save, Copy, Calendar, Download, MapPin, CheckCircle2, AlertTriangle } from "lucide-react";
+
+function BusinessAddressBlock({ settings, setSettings, onSave }) {
+  const [checking, setChecking] = useState(false);
+  const [recalcOpen, setRecalcOpen] = useState(false);
+  const [recalcResult, setRecalcResult] = useState(null);
+  const ba = settings.business_address || { address: "", lat: null, lng: null, geocode_status: "pending", verified_at: null };
+  const geocode = async () => {
+    setChecking(true);
+    try {
+      const r = await api.post("/geocode/business");
+      setSettings((s) => ({ ...s, business_address: r.data.business_address }));
+      if (r.data.ok) toast.success("Adresse professionnelle vérifiée");
+      else toast.error("Adresse introuvable — vérifiez la saisie");
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Erreur");
+    } finally {
+      setChecking(false);
+    }
+  };
+  const recalc = async () => {
+    setRecalcOpen(false);
+    try {
+      const r = await api.post("/travel/recalc-future");
+      setRecalcResult(r.data);
+      toast.success(`${r.data.updated} rendez-vous futurs mis à jour`);
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Erreur");
+    }
+  };
+  const badge = ba.geocode_status === "ok"
+    ? <span className="inline-flex items-center gap-1 text-xs text-[#166534] bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5"><CheckCircle2 className="w-3 h-3" /> Vérifiée</span>
+    : <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5"><AlertTriangle className="w-3 h-3" /> Non vérifiée</span>;
+  const fb = "w-full bg-transparent border-b border-slate-300 rounded-none px-0 py-2 focus:border-[#0A192F] focus:outline-none text-base";
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 flex-wrap">
+        <MapPin className="w-4 h-4 text-[#D4AF37]" />
+        {badge}
+        {ba.lat !== null && ba.lng !== null && (
+          <span className="text-[10px] text-slate-500">lat {ba.lat.toFixed(5)}, lng {ba.lng.toFixed(5)}</span>
+        )}
+      </div>
+      <input
+        data-testid="business-address-input"
+        value={ba.address}
+        onChange={(e) => setSettings({ ...settings, business_address: { ...ba, address: e.target.value, geocode_status: "pending" } })}
+        className={fb}
+        placeholder="16 chemin de la Station Météo, 46300 Gourdon, France"
+      />
+      <div className="flex flex-wrap gap-2">
+        <button onClick={async () => { await onSave(); await geocode(); }} disabled={checking} data-testid="verify-business-btn" className="rounded-full px-4 py-2 bg-[#0A192F] text-white text-sm flex items-center gap-2 disabled:opacity-50">
+          <CheckCircle2 className="w-4 h-4" /> {checking ? "Vérification…" : "Enregistrer & vérifier"}
+        </button>
+        <button onClick={() => setRecalcOpen(true)} data-testid="recalc-future-btn" className="rounded-full px-4 py-2 border border-slate-200 text-sm">
+          Recalculer les futurs RDV non encaissés
+        </button>
+      </div>
+      {recalcOpen && (
+        <div className="text-sm bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 space-y-2">
+          <div>Cette action met à jour la distance et le supplément théorique des RDV futurs non encaissés. Les RDV déjà payés ne sont jamais modifiés.</div>
+          <div className="flex gap-2">
+            <button onClick={recalc} data-testid="recalc-confirm" className="rounded-full px-4 py-2 bg-[#991B1B] text-white text-sm">Confirmer</button>
+            <button onClick={() => setRecalcOpen(false)} className="rounded-full px-4 py-2 border border-slate-200 text-sm">Annuler</button>
+          </div>
+        </div>
+      )}
+      {recalcResult && (
+        <div className="text-xs text-slate-500">{recalcResult.updated} RDV recalculés · {recalcResult.skipped_paid} déjà encaissés ignorés</div>
+      )}
+    </div>
+  );
+}
 
 function IcalBlock() {
   const [url, setUrl] = useState("");
@@ -122,6 +194,12 @@ export default function Settings() {
         <div className="text-[10px] tracking-widest uppercase text-slate-500 mb-3">Synchronisation agenda (iCal)</div>
         <div className="text-sm text-slate-500 mb-4">Ajoutez cette URL dans Google Calendar (Autres agendas › À partir de l'URL) ou Apple Calendar (Fichier › Nouvelle souscription calendrier) pour voir vos RDV sur tous vos appareils.</div>
         <IcalBlock />
+      </section>
+
+      <section className="bg-white border border-slate-100 rounded-2xl p-6 shadow-premium" data-testid="business-address-section">
+        <div className="text-[10px] tracking-widest uppercase text-slate-500 mb-3">Adresse professionnelle (point de départ)</div>
+        <div className="text-sm text-slate-500 mb-4">Adresse utilisée pour calculer le supplément de déplacement de chaque client (distance routière réelle).</div>
+        <BusinessAddressBlock settings={settings} setSettings={setSettings} onSave={saveSettings} />
       </section>
 
       <section className="bg-white border border-slate-100 rounded-2xl p-6 shadow-premium">

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams, Link } from "react-router-dom";
 import { api, money, money2, PAYMENT_MODES, fmtDate, fmtTime } from "@/lib/api";
 import { toast } from "sonner";
-import { ArrowLeft, Gift, Send, Trash2, CheckCircle2, Pencil, Sparkles, Clock, Repeat, AlertTriangle, UserRound, Timer, Play, Pause, Square } from "lucide-react";
+import { ArrowLeft, Gift, Send, Trash2, CheckCircle2, Pencil, Sparkles, Clock, Repeat, AlertTriangle, UserRound, Timer, Play, Pause, Square, MapPin } from "lucide-react";
 
 const STYLISTS = ["Julien", "Marley"];
 
@@ -41,6 +41,13 @@ export default function AppointmentForm() {
   const [useReferral, setUseReferral] = useState(false);
   const [nowTick, setNowTick] = useState(Date.now());
   const [confirmRestart, setConfirmRestart] = useState(false);
+  // ---- Voisin / Déplacement automatisé ----
+  const [travelInfo, setTravelInfo] = useState(null); // {distance_km, supplement, source, error}
+  const [neighborOn, setNeighborOn] = useState(false);
+  const [neighborId, setNeighborId] = useState(null);
+  const [neighborSearch, setNeighborSearch] = useState("");
+  const [neighborCheck, setNeighborCheck] = useState(null); // {valid, distance_km, discount, message, ...}
+  const [checkingNeighbor, setCheckingNeighbor] = useState(false);
 
   const isDone = rdv?.status === "done";
   const timerStatus = rdv?.timer_status || (rdv?.started_at ? "running" : "idle");
@@ -96,6 +103,24 @@ export default function AppointmentForm() {
           setStylists(Object.fromEntries(existing.services.map((x) => [x.service_id, x.stylist || "Julien"])));
           setPaymentMode(existing.payment_mode || "CB");
           setDuration(existing.duration_minutes || "");
+          setNeighborOn(!!existing.is_neighbor);
+          setNeighborId(existing.neighbor_of_client_id || null);
+          if (existing.is_neighbor && existing.neighbor_distance_km !== null) {
+            setNeighborCheck({
+              valid: true,
+              distance_km: existing.neighbor_distance_km,
+              discount: existing.neighbor_discount,
+              billed_supplement: 0,
+              theoretical_supplement: existing.theoretical_fuel_supplement,
+              neighbor: {
+                id: existing.neighbor_of_client_id,
+                first_name: (existing.neighbor_of_client_name || "").split(" ")[0] || "",
+                last_name: (existing.neighbor_of_client_name || "").split(" ").slice(1).join(" "),
+                address: existing.neighbor_of_client_address || "",
+              },
+              message: `Voisin validé — distance : ${existing.neighbor_distance_km?.toFixed(2)} km`.replace(".", ","),
+            });
+          }
           setEditMode(false);
         }
       }
@@ -118,23 +143,60 @@ export default function AppointmentForm() {
         } catch (e) {
           console.warn("load client info:", e);
         }
+        try {
+          const t = await api.post("/travel/preview", { client_id: form.client_id });
+          setTravelInfo(t.data);
+        } catch {
+          setTravelInfo(null);
+        }
       })();
     } else {
       setClientRisk(null);
+      setTravelInfo(null);
     }
   }, [form.client_id]);
 
+  const runNeighborCheck = async (nid) => {
+    if (!form.client_id || !nid) return;
+    setCheckingNeighbor(true);
+    try {
+      const r = await api.post("/travel/neighbor-check", {
+        client_id: form.client_id,
+        neighbor_of_client_id: nid,
+      });
+      setNeighborCheck(r.data);
+      if (r.data.valid) toast.success(r.data.message);
+      else if (r.data.error === "same_client") toast.error(r.data.message);
+      else if (r.data.error === "missing_coords") toast.error(r.data.message);
+      else toast.info(r.data.message || "Voisinage refusé");
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Erreur");
+    } finally {
+      setCheckingNeighbor(false);
+    }
+  };
+
   // Live preview
   useEffect(() => {
-    const picked = form.services.map((fs) => services.find((s) => s.id === fs.service_id)).filter(Boolean);
     const nonGift = form.services.filter((s) => !s.is_gift).map((fs) => services.find((s) => s.id === fs.service_id)).filter(Boolean);
     let subtotal = nonGift.reduce((a, b) => a + b.price, 0);
     const cats = new Set(nonGift.map((x) => x.category));
     const family = ["HOMME", "FEMME", "ENFANT"].every((c) => cats.has(c));
     if (family) subtotal = 45;
-    const fuel = Math.floor((form.kilometrage || 0) / 10) * 2.5;
-    setPreview({ base: subtotal + fuel, fuel, final: form.price_final_override ?? subtotal + fuel, family });
-  }, [form.services, form.kilometrage, form.price_final_override, services]);
+    // Theoretical from geocoded distance if available, else manual km
+    const theoretical = travelInfo?.supplement ?? Math.floor((form.kilometrage || 0) / 10) * 2.5;
+    const isValidNeighbor = neighborOn && neighborCheck?.valid;
+    const billed = isValidNeighbor ? 0 : theoretical;
+    const discount = isValidNeighbor ? theoretical : 0;
+    setPreview({
+      base: subtotal + billed,
+      fuel: billed,
+      theoretical,
+      discount,
+      final: form.price_final_override ?? subtotal + billed,
+      family,
+    });
+  }, [form.services, form.kilometrage, form.price_final_override, services, travelInfo, neighborOn, neighborCheck]);
 
   const toggleService = (sid) => {
     if (isDone) return;
@@ -160,6 +222,8 @@ export default function AppointmentForm() {
         ...form,
         date: new Date(form.date).toISOString(),
         price_final_override: form.price_final_override === "" ? null : form.price_final_override,
+        is_neighbor: neighborOn && !!neighborCheck?.valid,
+        neighbor_of_client_id: neighborOn && neighborCheck?.valid ? neighborId : null,
       };
       if (id) {
         await api.put(`/appointments/${id}`, payload);
@@ -496,12 +560,95 @@ export default function AppointmentForm() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <label className="text-[10px] tracking-widest uppercase text-slate-500">Kilométrage</label>
-          <input disabled={readOnly} type="number" step="0.1" value={form.kilometrage} onChange={(e) => setForm({ ...form, kilometrage: parseFloat(e.target.value) || 0 })} className={fieldBase} data-testid="rdv-km-input" />
-          <div className="text-xs text-slate-500 mt-1">Supplément : {money(preview.fuel)} ({Math.floor((form.kilometrage || 0) / 10)} tranche(s))</div>
+      {/* ---- Déplacement (auto + option Voisin) ---- */}
+      <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-premium space-y-3" data-testid="travel-card">
+        <div className="text-[10px] tracking-widest uppercase text-slate-500 flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-[#D4AF37]" /> Déplacement</div>
+        {travelInfo?.error === "business_address_not_geocoded" ? (
+          <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+            L&apos;adresse professionnelle n&apos;est pas vérifiée. Rendez-vous dans Réglages → Adresse professionnelle pour la géocoder.
+          </div>
+        ) : travelInfo?.error === "client_address_not_geocoded" ? (
+          <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+            L&apos;adresse du client n&apos;est pas géocodée. Ouvrez sa fiche pour la corriger.
+          </div>
+        ) : travelInfo && travelInfo.distance_km !== null ? (
+          <div className="text-sm text-slate-600" data-testid="travel-info">
+            Distance depuis l&apos;adresse pro : <span className="font-medium">{travelInfo.distance_km.toFixed(2).replace(".", ",")} km</span>
+            {" — "}Supplément théorique : <span className="font-medium">{money(preview.theoretical)}</span>
+          </div>
+        ) : (
+          <div className="text-xs text-slate-500">Calcul de la distance…</div>
+        )}
+        {/* Toggle Voisin */}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            disabled={readOnly}
+            onClick={() => { setNeighborOn(!neighborOn); if (neighborOn) { setNeighborId(null); setNeighborCheck(null); } }}
+            data-testid="neighbor-toggle"
+            aria-label="Activer l'option Voisin"
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${neighborOn ? "bg-[#D4AF37]" : "bg-slate-200"}`}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${neighborOn ? "translate-x-6" : "translate-x-1"}`} />
+          </button>
+          <div className="text-sm">
+            <div className="font-medium">Voisin</div>
+            <div className="text-xs text-slate-500">Exonération si &lt; 1 km d&apos;un autre client</div>
+          </div>
         </div>
+        {neighborOn && (
+          <div className="space-y-2" data-testid="neighbor-picker">
+            <label className="text-[10px] tracking-widest uppercase text-slate-500">De quel client est-il voisin ?</label>
+            <input
+              type="text"
+              placeholder="Nom, prénom, téléphone, commune…"
+              value={neighborSearch}
+              onChange={(e) => setNeighborSearch(e.target.value)}
+              data-testid="neighbor-search-input"
+              className={fieldBase}
+            />
+            {neighborSearch && (
+              <div className="max-h-40 overflow-auto rounded-xl border border-slate-100 divide-y divide-slate-100">
+                {clients
+                  .filter((c) => c.id !== form.client_id)
+                  .filter((c) => {
+                    const q = neighborSearch.toLowerCase();
+                    return [c.first_name, c.last_name, c.phone, c.address].filter(Boolean).some((v) => String(v).toLowerCase().includes(q));
+                  })
+                  .slice(0, 8)
+                  .map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      data-testid={`neighbor-option-${c.id}`}
+                      onClick={() => { setNeighborId(c.id); setNeighborSearch(`${c.first_name} ${c.last_name}`); runNeighborCheck(c.id); }}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+                    >
+                      <div className="font-medium">{c.first_name} {c.last_name}</div>
+                      <div className="text-xs text-slate-500">{c.address || "— pas d'adresse —"}</div>
+                    </button>
+                  ))}
+              </div>
+            )}
+            {checkingNeighbor && <div className="text-xs text-slate-500">Vérification en cours…</div>}
+            {neighborCheck && (
+              <div
+                data-testid="neighbor-result"
+                className={`text-sm rounded-xl px-3 py-2 border ${neighborCheck.valid ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-red-50 border-red-200 text-[#991B1B]"}`}
+              >
+                {neighborCheck.message}
+                {neighborCheck.valid && (
+                  <div className="text-xs text-emerald-700 mt-1">
+                    Remise voisin : −{money(neighborCheck.discount || 0)} · Supplément facturé : {money(0)}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label className="text-[10px] tracking-widest uppercase text-slate-500">Prix final (écrasable)</label>
           <input disabled={readOnly} type="number" step="0.01" value={form.price_final_override ?? ""} placeholder={String(preview.base)} onChange={(e) => setForm({ ...form, price_final_override: e.target.value === "" ? null : parseFloat(e.target.value) })} className={fieldBase} data-testid="rdv-price-input" />
@@ -521,7 +668,14 @@ export default function AppointmentForm() {
         </div>
         <div className="text-right text-xs text-slate-500">
           <div>Base : {money(preview.base - preview.fuel)}</div>
-          <div>Carburant : {money(preview.fuel)}</div>
+          {preview.discount > 0 ? (
+            <>
+              <div className="line-through text-slate-400">Supplément théorique : {money(preview.theoretical)}</div>
+              <div className="text-[#166534]">Remise voisin : −{money(preview.discount)}</div>
+            </>
+          ) : (
+            <div>Déplacement : {money(preview.fuel)}</div>
+          )}
         </div>
       </div>
 

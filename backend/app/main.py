@@ -28,6 +28,7 @@ from app.routers import (
     slots,
     stock,
     tour,
+    travel,
 )
 from app.routers.pin import _token_is_valid, _read_security
 from app.routers.services import ensure_default_services, migrate_service_durations
@@ -62,6 +63,7 @@ ROUTERS = [
     prospection.router,
     backup.router,
     reminders.router,
+    travel.router,
 ]
 for r in ROUTERS:
     app.include_router(r, prefix="/api")
