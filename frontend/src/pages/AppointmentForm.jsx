@@ -369,7 +369,7 @@ export default function AppointmentForm() {
 
   const buildLinks = () => {
     const client = clients.find((c) => c.id === form.client_id);
-    const phone = client?.phone?.replace(/\s/g, "") || "";
+    const phone = client?.phone_valid ? client.phone_normalized : "";
     const msg = buildRdvMessage();
     return {
       sms: phone ? `sms:${phone}?body=${encodeURIComponent(msg)}` : null,
@@ -476,7 +476,17 @@ export default function AppointmentForm() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label className="text-[10px] tracking-widest uppercase text-slate-500">Client</label>
-          <select disabled={readOnly} value={form.client_id} onChange={(e) => setForm({ ...form, client_id: e.target.value })} className={fieldBase} data-testid="rdv-client-select">
+          <select
+            disabled={readOnly}
+            value={form.client_id}
+            onChange={(e) => {
+              setForm((current) => ({ ...current, client_id: e.target.value, services: [] }));
+              setServiceFilter("TOUS");
+              setServiceSearch("");
+            }}
+            className={fieldBase}
+            data-testid="rdv-client-select"
+          >
             <option value="">— Sélectionner —</option>
             {clients.map((c) => <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>)}
           </select>
@@ -640,6 +650,11 @@ export default function AppointmentForm() {
             );
           })}
         </div>
+        {visibleServices.length === 0 && (
+          <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500" data-testid="service-empty-state">
+            Aucune prestation ne correspond à ce client et à ces filtres.
+          </div>
+        )}
       </div>
 
       {/* ---- Déplacement (auto + option Voisin) ---- */}
@@ -668,7 +683,9 @@ export default function AppointmentForm() {
             disabled={readOnly}
             onClick={() => { setNeighborOn(!neighborOn); if (neighborOn) { setNeighborId(null); setNeighborCheck(null); } }}
             data-testid="neighbor-toggle"
-            aria-label="Activer l'option Voisin"
+            role="switch"
+            aria-checked={neighborOn}
+            aria-label={neighborOn ? "Désactiver l'option Voisin" : "Activer l'option Voisin"}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${neighborOn ? "bg-[#D4AF37]" : "bg-slate-200"}`}
           >
             <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${neighborOn ? "translate-x-6" : "translate-x-1"}`} />
@@ -890,8 +907,13 @@ export default function AppointmentForm() {
 
       <div className="flex gap-3 items-center">
         {!isDone && (
-          <button onClick={save} data-testid="save-rdv-btn" className="bg-[#0A192F] text-white rounded-full px-8 py-3 font-medium hover:bg-[#1E3A8A]">
-            {id ? "Enregistrer les modifications" : "Créer le rendez-vous"}
+          <button
+            onClick={save}
+            disabled={form.services.length === 0}
+            data-testid="save-rdv-btn"
+            className="bg-[#0A192F] text-white rounded-full px-8 py-3 font-medium hover:bg-[#1E3A8A] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600"
+          >
+            {form.services.length === 0 ? "Sélectionnez une prestation" : id ? "Enregistrer les modifications" : "Créer le rendez-vous"}
           </button>
         )}
         {id && !isDone && rdv?.status !== "cancelled" && (
