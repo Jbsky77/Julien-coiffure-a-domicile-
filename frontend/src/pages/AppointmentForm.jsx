@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams, Link } from "react-router-dom";
 import { api, money, money2, PAYMENT_MODES, fmtDate, fmtTime } from "@/lib/api";
 import { toast } from "sonner";
-import { ArrowLeft, Gift, Send, Trash2, CheckCircle2, Pencil, Sparkles, Clock, Repeat, AlertTriangle, UserRound, Timer, Play, Pause, Square, MapPin } from "lucide-react";
+import { ArrowLeft, Gift, Send, Trash2, CheckCircle2, Pencil, Sparkles, Clock, Repeat, AlertTriangle, UserRound, Timer, Play, Pause, Square, MapPin, Phone, MessageSquare } from "lucide-react";
 
 const STYLISTS = ["Julien", "Marley"];
 
@@ -473,6 +473,55 @@ export default function AppointmentForm() {
           <input disabled={readOnly} type="datetime-local" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className={fieldBase} data-testid="rdv-date-input" />
         </div>
       </div>
+
+      {/* Client contact info — visible sur la fiche RDV */}
+      {(() => {
+        const c = clients.find((x) => x.id === form.client_id);
+        if (!c) return null;
+        const hasContact = c.address || c.phone;
+        if (!hasContact) return null;
+        const fmtPhone = (p) => {
+          const clean = (p || "").replace(/[\s.\-()]/g, "");
+          return { display: p, tel: clean };
+        };
+        const ph = c.phone ? fmtPhone(c.phone) : null;
+        const mapsUrl = c.address ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(c.address)}` : null;
+        return (
+          <div className="bg-white border border-slate-100 rounded-2xl p-4 space-y-2" data-testid="client-contact-card">
+            <div className="text-[10px] tracking-widest uppercase text-slate-500 mb-1">Contact client</div>
+            {c.address && (
+              <a
+                href={mapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="client-address-link"
+                className="flex items-start gap-2 text-sm text-slate-700 hover:text-[#0A192F] transition"
+              >
+                <MapPin className="w-4 h-4 mt-0.5 text-[#D4AF37] flex-shrink-0" />
+                <span className="underline decoration-dotted underline-offset-2">{c.address}</span>
+              </a>
+            )}
+            {ph && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <a
+                  href={`tel:${ph.tel}`}
+                  data-testid="client-phone-call"
+                  className="flex items-center gap-2 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-1.5 text-sm hover:bg-emerald-100 transition"
+                >
+                  <Phone className="w-3.5 h-3.5" /> {ph.display}
+                </a>
+                <a
+                  href={`sms:${ph.tel}`}
+                  data-testid="client-phone-sms"
+                  className="flex items-center gap-1.5 rounded-full border border-slate-200 text-slate-600 px-3 py-1.5 text-xs hover:bg-slate-50 transition"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" /> SMS
+                </a>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Client risk warning: no-shows / deposit */}
       {form.client_id && clientRisk && (clientRisk.cancelled > 0 || clientRisk.deposit_required) && (
