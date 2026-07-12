@@ -20,7 +20,8 @@ async def build_tour(target_date: Optional[str] = None) -> dict:
     ba = getattr(settings, "business_address", None)
     biz_coords = (ba.lat, ba.lng) if (ba and ba.lat is not None and ba.lng is not None) else None
 
-    target = target_date or now_utc().astimezone(PARIS_TZ).date().isoformat()\n    day_start, day_end = paris_day_range(target)
+    target = target_date or now_utc().astimezone(PARIS_TZ).date().isoformat()
+    day_start, day_end = paris_day_range(target)
     rdvs = await db.appointments.find(
         {"status": {"$in": ["scheduled", "done"]}}, {"_id": 0}
     ).to_list(2000)
