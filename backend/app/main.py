@@ -124,7 +124,7 @@ async def pin_guard(request: Request, call_next):
         elif is_api and not is_ical_feed:
             company_token, company_context = await require_company_context(request)
 
-        if _requires_pin_token(path) and not (company_context and company_context.is_platform_admin):
+        if _requires_pin_token(path) and not is_platform_admin_api and not (company_context and company_context.is_platform_admin):
             sec = await _read_security()
             if sec.get("hash"):
                 token = request.headers.get("x-pin-token")
