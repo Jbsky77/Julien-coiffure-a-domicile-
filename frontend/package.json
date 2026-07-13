@@ -66,7 +66,8 @@
     "test": "craco test",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
-    "test:e2e:report": "playwright show-report tests/e2e/report"
+    "test:e2e:report": "playwright show-report tests/e2e/report",
+    "postbuild": "node scripts/version-build-assets.js"
   },
   "browserslist": {
     "production": [
