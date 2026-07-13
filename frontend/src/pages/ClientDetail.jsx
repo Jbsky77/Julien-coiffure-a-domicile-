@@ -6,6 +6,8 @@ import { ArrowLeft, MapPin, Phone, Cake, Plus, Trash2, Save, Gift, Users as User
 import { toast } from "sonner";
 import ClientPhotos from "@/components/app/ClientPhotos";
 
+const PUBLIC_APP_ORIGIN = (process.env.REACT_APP_PUBLIC_APP_URL || "https://julien-coiffure-domicile.vercel.app").replace(/\/$/, "");
+
 function LoyaltyRow({ count, label, price }) {
   const slots = Array.from({ length: 5 }, (_, i) => i < Math.min(count, 5));
   const giftDone = count >= 5;
@@ -128,7 +130,8 @@ export default function ClientDetail() {
   })();
   const reviewDisabledReason = !c.phone ? "Ajoutez un téléphone à la fiche client" : !reviewUrl ? "Configurez votre lien d'avis dans Réglages" : null;
 
-  const spaceUrl = c.access_token ? `${window.location.origin}/c/${c.access_token}` : null;
+  // Toujours envoyer le domaine public, même si la fiche est ouverte depuis une prévisualisation Vercel.
+  const spaceUrl = c.access_token ? `${PUBLIC_APP_ORIGIN}/c/${c.access_token}` : null;
   const cardSmsHref = (() => {
     if (!c.phone || !spaceUrl) return null;
     const body = `Bonjour ${c.first_name || ""}, voici votre espace personnel avec votre carte de fidélité : ${spaceUrl} — ${settings.brand_name || "Julien"}`;
