@@ -3,12 +3,14 @@ import { Scissors } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Navigate } from "react-router-dom";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
 
 export default function Login() {
   const { user, loading, signIn } = useAuth();
   const [email, setEmail] = useState("julien46bouche@gmail.com");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">Chargement…</div>;
   if (user) return <Navigate to="/" replace />;
@@ -23,6 +25,26 @@ export default function Login() {
       toast.error(error.message || "Connexion impossible");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const forgotPassword = async () => {
+    if (!email.trim()) {
+      toast.error("Saisissez d’abord votre adresse e-mail.");
+      return;
+    }
+
+    setResetting(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      toast.success("Si un compte existe, un e-mail de réinitialisation a été envoyé.");
+    } catch (error) {
+      toast.error(error.message || "Impossible d’envoyer l’e-mail de réinitialisation.");
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -50,7 +72,12 @@ export default function Login() {
             <p className="text-slate-500">Connectez-vous avec votre compte professionnel.</p>
           </div>
           <label className="block text-sm"><span className="text-slate-600">Adresse e-mail</span><input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-2 w-full border-b border-slate-300 py-3 outline-none focus:border-[#0A192F]" /></label>
-          <label className="block text-sm"><span className="text-slate-600">Mot de passe</span><input type="password" required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-2 w-full border-b border-slate-300 py-3 outline-none focus:border-[#0A192F]" /></label>
+          <div>
+            <label className="block text-sm"><span className="text-slate-600">Mot de passe</span><input type="password" required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-2 w-full border-b border-slate-300 py-3 outline-none focus:border-[#0A192F]" /></label>
+            <button type="button" onClick={forgotPassword} disabled={resetting} data-testid="forgot-password-btn" className="mt-3 text-sm text-[#1E3A8A] hover:underline disabled:opacity-50">
+              {resetting ? "Envoi en cours…" : "Mot de passe oublié ?"}
+            </button>
+          </div>
           <button disabled={submitting} data-testid="login-btn" className="w-full bg-[#0A192F] text-white rounded-full px-8 py-4 font-medium hover:bg-[#1E3A8A] disabled:opacity-50">
             {submitting ? "Connexion…" : "Se connecter"}
           </button>
