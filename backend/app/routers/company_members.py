@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 import os
+import re
 from typing import Literal
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 from app.tenancy import CompanyContext, require_role
 
@@ -14,7 +15,7 @@ router = APIRouter(prefix="/company/members", tags=["company-members"])
 
 
 class MemberInvite(BaseModel):
-    email: EmailStr
+    email: str
     role: Literal["admin", "employee"] = "employee"
 
 
@@ -97,6 +98,8 @@ async def invite_member(payload: MemberInvite, request: Request):
         raise HTTPException(status_code=403, detail="Un administrateur peut uniquement ajouter un employé")
 
     email = str(payload.email).strip().lower()
+    if not re.fullmatch(r"[^@\\s]+@[^@\\s]+\\.[^@\\s]+", email):
+        raise HTTPException(status_code=400, detail="Adresse e-mail invalide")
     url, secret = _config()
     headers = _admin_headers(secret)
     public_url = os.environ.get("PUBLIC_APP_URL", "https://julien-coiffure-domicile.vercel.app").rstrip("/")
