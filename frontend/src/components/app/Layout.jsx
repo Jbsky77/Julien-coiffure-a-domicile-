@@ -4,6 +4,7 @@ import { LayoutDashboard, CalendarClock, Users, Receipt, Package, Settings as Se
 import { api, pinStorage } from "@/lib/api";
 import GlobalSearch from "@/components/app/GlobalSearch";
 import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/AuthContext";
 
 const NAV = [
   { to: "/", label: "Accueil", icon: LayoutDashboard, tid: "nav-dashboard" },
@@ -26,6 +27,7 @@ const ALL_MENUS = [...NAV, ...MORE];
 
 export default function Layout({ children }) {
   const location = useLocation();
+  const { activeCompany, isImpersonating, stopImpersonation } = useAuth();
   const { activeCompany, activeCompanyId, companies, setActiveCompanyId } = useAuth();
   const [searchOpen, setSearchOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -80,9 +82,13 @@ export default function Layout({ children }) {
       {/* ===== Desktop sidebar (lg+) ===== */}
       <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 w-64 flex-col bg-white/90 backdrop-blur-xl border-r border-slate-200 z-40" data-testid="desktop-sidebar">
         <div className="px-6 py-6 flex items-center gap-3 border-b border-slate-100">
-          <Scissors className="w-6 h-6 text-[#D4AF37]" strokeWidth={1.5} />
+          {activeCompany?.logo_url ? (
+            <img src={activeCompany.logo_url} alt="" className="w-10 h-10 rounded-xl object-contain border border-slate-100" />
+          ) : (
+            <Scissors className="w-6 h-6 text-[#D4AF37]" strokeWidth={1.5} />
+          )}
           <div>
-            <div className="font-serif text-xl leading-none">Julien Bouche</div>
+            <div className="font-serif text-xl leading-none">{activeCompany?.name || "Entreprise"}</div>
             <div className="text-[9px] tracking-[0.18em] uppercase text-slate-400 mt-1">{activeCompany?.name || "Entreprise active"}</div>
           </div>
         </div>
@@ -123,13 +129,23 @@ export default function Layout({ children }) {
 
       {/* ===== Main column ===== */}
       <div className="lg:pl-64 min-h-screen flex flex-col">
+        {isImpersonating && (
+          <div className="bg-amber-100 border-b border-amber-200 px-5 py-2.5 flex items-center justify-center gap-3 text-sm text-amber-950" data-testid="admin-support-banner">
+            <span><strong>Mode assistance :</strong> {activeCompany?.name}</span>
+            <button type="button" onClick={stopImpersonation} className="bg-white border border-amber-300 rounded-full px-4 py-1.5 font-medium">Retour au pilotage</button>
+          </div>
+        )}
         {/* Top bar (mobile + tablet) */}
         <header className="lg:hidden sticky top-0 z-40 bg-white/95 backdrop-blur-xl border-b border-slate-100 px-5 py-4 flex items-center justify-between" ref={menuRef}>
           <div className="flex items-center gap-2">
-            <Scissors className="w-5 h-5 text-[#D4AF37]" strokeWidth={1.5} />
+            {activeCompany?.logo_url ? (
+              <img src={activeCompany.logo_url} alt="" className="w-9 h-9 rounded-xl object-contain border border-slate-100" />
+            ) : (
+              <Scissors className="w-5 h-5 text-[#D4AF37]" strokeWidth={1.5} />
+            )}
             <div>
-              <div className="font-serif text-lg leading-none">Julien Bouche</div>
-              <div className="text-[9px] tracking-[0.25em] uppercase text-slate-400 mt-1">Coiffure à domicile</div>
+              <div className="font-serif text-lg leading-none">{activeCompany?.name || "Entreprise"}</div>
+              <div className="text-[9px] tracking-[0.25em] uppercase text-slate-400 mt-1">Espace professionnel</div>
             </div>
           </div>
           <div className="flex items-center gap-1">
