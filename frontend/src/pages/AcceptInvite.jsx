@@ -53,7 +53,7 @@ export default function AcceptInvite() {
       <div className="w-full max-w-md bg-white rounded-3xl border border-slate-100 shadow-premium p-7 md:p-9">
         <div className="flex items-center gap-3 mb-8">
           <Scissors className="w-6 h-6 text-[#D4AF37]" strokeWidth={1.5} />
-          <div className="font-serif text-2xl">Julien Bouche</div>
+          <div className="font-serif text-2xl">Coiffure Pro</div>
         </div>
         <div className="w-12 h-12 rounded-full bg-[#0A192F] text-white flex items-center justify-center mb-5">
           <KeyRound className="w-5 h-5" />
