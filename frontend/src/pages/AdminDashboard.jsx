@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Building2,
   CalendarDays,
@@ -64,11 +64,11 @@ function CompanyCard({ company, onOpen, onSave, saving }) {
     blocked_reason: company.subscription?.blocked_reason || null,
   });
 
-  const changed = useMemo(() => (
+  const changed = (
     form.plan_code !== (company.subscription?.plan_code || "starter")
     || form.billing_cycle !== (company.subscription?.billing_cycle || "monthly")
     || form.status !== (company.subscription?.status || "incomplete")
-  ), [company, form]);
+  );
 
   return (
     <article className="bg-white border border-slate-100 rounded-3xl p-5 md:p-6 shadow-sm" data-testid={`admin-company-${company.id}`}>
@@ -141,7 +141,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const response = await api.get("/platform-admin/overview");
@@ -151,9 +151,9 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   const openCompany = async (company) => {
     try {
