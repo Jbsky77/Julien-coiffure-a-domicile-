@@ -72,8 +72,8 @@ export default function CompanyProfile() {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    if (!["image/png", "image/jpeg", "image/webp", "image/svg+xml"].includes(file.type)) {
-      toast.error("Utilisez une image PNG, JPG, WebP ou SVG");
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      toast.error("Utilisez une image PNG, JPG ou WebP");
       return;
     }
     if (file.size > 2 * 1024 * 1024) {
@@ -128,10 +128,10 @@ export default function CompanyProfile() {
           )}
           <div className="flex-1">
             <div className="font-medium">Logo de l’entreprise</div>
-            <div className="text-xs text-slate-500 mt-1 mb-4">PNG, JPG, WebP ou SVG · 2 Mo maximum</div>
+            <div className="text-xs text-slate-500 mt-1 mb-4">PNG, JPG ou WebP · 2 Mo maximum</div>
             <label className="inline-flex cursor-pointer border border-slate-200 bg-white rounded-full px-5 py-2.5 text-sm font-medium">
               {uploading ? "Envoi en cours…" : "Choisir un logo"}
-              <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={uploadLogo} disabled={uploading} className="sr-only" data-testid="company-logo-input" />
+              <input type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadLogo} disabled={uploading} className="sr-only" data-testid="company-logo-input" />
             </label>
           </div>
         </div>
