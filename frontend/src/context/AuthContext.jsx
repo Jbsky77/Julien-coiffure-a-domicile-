@@ -4,38 +4,91 @@ import { pinStorage } from "@/lib/api";
 
 const Ctx = createContext(null);
 const COMPANY_KEY = "jb_active_company_id";
+const IMPERSONATION_KEY = "jb_admin_impersonating";
+
+const attachSubscriptions = async (companies) => {
+  const ids = companies.map((company) => company.id).filter(Boolean);
+  if (!ids.length) return companies;
+  const { data, error } = await supabase
+    .from("company_subscriptions")
+    .select("company_id,plan_code,billing_cycle,status,current_period_start,current_period_end,trial_ends_at,cancel_at_period_end,blocked_reason")
+    .in("company_id", ids);
+  if (error) throw error;
+  const byCompany = Object.fromEntries((data || []).map((subscription) => [subscription.company_id, subscription]));
+  return companies.map((company) => ({
+    ...company,
+    subscription: byCompany[company.id] || {
+      plan_code: "starter",
+      billing_cycle: "monthly",
+      status: "incomplete",
+      blocked_reason: "Abonnement non configuré",
+    },
+  }));
+};
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [user, setUser] = useState(null);
   const [companies, setCompanies] = useState([]);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [activeCompanyId, setActiveCompanyIdState] = useState(localStorage.getItem(COMPANY_KEY));
   const [loading, setLoading] = useState(true);
 
   const loadCompanies = useCallback(async (authUser) => {
     if (!authUser) {
       setCompanies([]);
+      setIsPlatformAdmin(false);
       return;
     }
-    const { data, error } = await supabase
-      .from("company_members")
-      .select("company_id,role,status,company:companies(id,name,slug,locale,timezone,status)")
+
+    const { data: adminRows, error: adminError } = await supabase
+      .from("platform_admins")
+      .select("user_id")
       .eq("user_id", authUser.id)
-      .eq("status", "active");
-    if (error) throw error;
-    const available = (data || []).map((item) => ({
-      ...item.company,
-      role: item.role,
-      membershipStatus: item.status,
-    })).filter(Boolean);
+      .limit(1);
+    if (adminError) throw adminError;
+    const platformAdmin = Boolean(adminRows?.length);
+    setIsPlatformAdmin(platformAdmin);
+
+    let available = [];
+    if (platformAdmin) {
+      const { data, error } = await supabase
+        .from("companies")
+        .select("id,name,slug,legal_name,siret,email,phone,city,logo_url,locale,timezone,status,created_at")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      available = await attachSubscriptions((data || []).map((company) => ({
+        ...company,
+        role: "platform_admin",
+        membershipStatus: "platform_admin",
+      })));
+    } else {
+      const { data, error } = await supabase
+        .from("company_members")
+        .select("company_id,role,status,company:companies(id,name,slug,legal_name,siret,email,phone,city,logo_url,locale,timezone,status,created_at)")
+        .eq("user_id", authUser.id)
+        .eq("status", "active");
+      if (error) throw error;
+      available = await attachSubscriptions((data || []).map((item) => ({
+        ...item.company,
+        role: item.role,
+        membershipStatus: item.status,
+      })).filter(Boolean));
+    }
+
     setCompanies(available);
     const stored = localStorage.getItem(COMPANY_KEY);
-    const selected = available.find((company) => company.id === stored) || (available.length === 1 ? available[0] : null);
-    if (selected) {
-      localStorage.setItem(COMPANY_KEY, selected.id);
-      setActiveCompanyIdState(selected.id);
+    const storedCompany = available.find((company) => company.id === stored);
+    const impersonating = localStorage.getItem(IMPERSONATION_KEY) === "1";
+
+    if (storedCompany && (!platformAdmin || impersonating)) {
+      setActiveCompanyIdState(storedCompany.id);
+    } else if (!platformAdmin && available.length === 1) {
+      localStorage.setItem(COMPANY_KEY, available[0].id);
+      setActiveCompanyIdState(available[0].id);
     } else {
       localStorage.removeItem(COMPANY_KEY);
+      if (platformAdmin) localStorage.removeItem(IMPERSONATION_KEY);
       setActiveCompanyIdState(null);
     }
   }, []);
@@ -58,7 +111,6 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     let mounted = true;
-
     const bootstrap = async () => {
       try {
         const { data, error } = await supabase.auth.getSession();
@@ -70,6 +122,7 @@ export function AuthProvider({ children }) {
           setSession(null);
           setUser(null);
           setCompanies([]);
+          setIsPlatformAdmin(false);
           setLoading(false);
         }
       }
@@ -77,8 +130,6 @@ export function AuthProvider({ children }) {
 
     bootstrap();
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      // Supabase recommends returning from this callback immediately. Deferring
-      // company loading prevents an authentication lock that can freeze startup.
       window.setTimeout(() => {
         if (mounted) applySession(nextSession).catch((error) => {
           console.error("Impossible d'actualiser la session", error);
@@ -100,6 +151,7 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     pinStorage.clear();
     localStorage.removeItem(COMPANY_KEY);
+    localStorage.removeItem(IMPERSONATION_KEY);
     setActiveCompanyIdState(null);
     await supabase.auth.signOut();
   };
@@ -108,8 +160,17 @@ export function AuthProvider({ children }) {
     if (!companies.some((company) => company.id === companyId)) return;
     pinStorage.clear();
     localStorage.setItem(COMPANY_KEY, companyId);
+    if (isPlatformAdmin) localStorage.setItem(IMPERSONATION_KEY, "1");
     setActiveCompanyIdState(companyId);
     window.location.assign("/");
+  };
+
+  const stopImpersonation = () => {
+    pinStorage.clear();
+    localStorage.removeItem(COMPANY_KEY);
+    localStorage.removeItem(IMPERSONATION_KEY);
+    setActiveCompanyIdState(null);
+    window.location.assign("/admin");
   };
 
   return (
@@ -117,9 +178,13 @@ export function AuthProvider({ children }) {
       session,
       user,
       companies,
+      isPlatformAdmin,
       activeCompanyId,
       activeCompany: companies.find((company) => company.id === activeCompanyId) || null,
+      isImpersonating: isPlatformAdmin && Boolean(activeCompanyId),
       setActiveCompanyId,
+      stopImpersonation,
+      refreshCompanies: () => loadCompanies(session?.user || null),
       loading,
       signIn,
       logout,
