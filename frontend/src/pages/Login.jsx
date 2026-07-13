@@ -54,18 +54,18 @@ export default function Login() {
         <img src="https://images.pexels.com/photos/13068360/pexels-photo-13068360.jpeg" alt="" className="absolute inset-0 w-full h-full object-cover" />
         <div className="absolute inset-0 bg-[#0A192F]/70" />
         <div className="relative z-10 p-16 flex flex-col justify-between text-white w-full">
-          <div className="flex items-center gap-3"><Scissors className="w-6 h-6 text-[#D4AF37]" strokeWidth={1.25} /><div className="font-serif text-2xl">Julien Bouche</div></div>
+          <div className="flex items-center gap-3"><Scissors className="w-6 h-6 text-[#D4AF37]" strokeWidth={1.25} /><div className="font-serif text-2xl">Coiffure Pro</div></div>
           <div>
-            <div className="text-[11px] tracking-[0.3em] uppercase text-[#D4AF37] mb-4">La coiffure à votre domicile</div>
-            <h1 className="font-serif text-5xl leading-[1.05] tracking-tight mb-6">Une coiffure sur mesure,<br /><span className="italic text-[#D4AF37]">chez vous.</span></h1>
-            <p className="text-white/70 max-w-md text-base leading-relaxed">Votre application métier sécurisée, avec une isolation complète des données de chaque entreprise.</p>
+            <div className="text-[11px] tracking-[0.3em] uppercase text-[#D4AF37] mb-4">Votre activité, simplement</div>
+            <h1 className="font-serif text-5xl leading-[1.05] tracking-tight mb-6">Pilotez votre entreprise,<br /><span className="italic text-[#D4AF37]">en toute sérénité.</span></h1>
+            <p className="text-white/70 max-w-md text-base leading-relaxed">Une plateforme sécurisée pour gérer votre activité, votre équipe et vos clients.</p>
           </div>
           <div className="text-[10px] tracking-[0.3em] uppercase text-white/40">Premium · Mobile · Sécurisé</div>
         </div>
       </div>
       <div className="flex-1 flex items-center justify-center px-6 py-16">
         <form onSubmit={submit} className="w-full max-w-md space-y-6">
-          <div className="md:hidden flex items-center gap-2 mb-10"><Scissors className="w-6 h-6 text-[#D4AF37]" strokeWidth={1.25} /><div className="font-serif text-2xl">Julien Bouche</div></div>
+          <div className="md:hidden flex items-center gap-2 mb-10"><Scissors className="w-6 h-6 text-[#D4AF37]" strokeWidth={1.25} /><div className="font-serif text-2xl">Coiffure Pro</div></div>
           <div>
             <div className="text-[10px] tracking-[0.3em] uppercase text-slate-500 mb-3">Espace professionnel sécurisé</div>
             <h2 className="font-serif text-4xl md:text-5xl tracking-tight mb-5">Bienvenue</h2>
