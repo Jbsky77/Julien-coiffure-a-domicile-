@@ -3,6 +3,7 @@ import { api, money, API } from "@/lib/api";
 import { toast } from "sonner";
 import { Plus, Trash2, Save, Copy, Calendar, Download, MapPin, CheckCircle2, AlertTriangle } from "lucide-react";
 import EmployeeManagement from "@/components/settings/EmployeeManagement";
+import CompanyProfile from "@/components/settings/CompanyProfile";
 
 function BusinessAddressBlock({ settings, setSettings, onSave }) {
   const [checking, setChecking] = useState(false);
@@ -182,6 +183,8 @@ export default function Settings() {
         <div className="text-[10px] tracking-[0.3em] uppercase text-slate-500 mb-2">Paramètres</div>
         <h1 className="font-serif text-4xl md:text-5xl tracking-tight">Réglages</h1>
       </div>
+
+      <CompanyProfile />
 
       <EmployeeManagement />
 

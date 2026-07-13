@@ -22,6 +22,7 @@ from app.routers import (
     insights,
     photos,
     pin,
+    platform_admin,
     prospection,
     public,
     public_booking,
@@ -37,7 +38,7 @@ from app.routers.pin import _token_is_valid, _read_security
 from app.routers.services import ensure_default_services, migrate_service_durations
 from app.services.migrations import backfill_client_access_tokens, remove_legacy_referrals
 from app.services.settings import get_settings
-from app.tenancy import require_company_context
+from app.tenancy import require_company_context, require_platform_admin_context
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -48,6 +49,7 @@ app = FastAPI()
 ROUTERS = [
     auth.router,
     pin.router,
+    platform_admin.router,
     settings_router.router,
     services_router.router,
     company_members.router,
@@ -98,8 +100,10 @@ def _requires_pin_token(path: str) -> bool:
 async def pin_guard(request: Request, call_next):
     path = request.url.path
     company_token = None
+    company_context = None
     is_api = path.startswith("/api/")
     is_public = path.startswith("/api/public/")
+    is_platform_admin_api = path.startswith("/api/platform-admin")
     is_ical_feed = path.startswith("/api/calendar/") and path.endswith(".ics")
 
     try:
@@ -115,10 +119,12 @@ async def pin_guard(request: Request, call_next):
             if not company_id:
                 return JSONResponse({"detail": "Site ou lien public invalide"}, status_code=404)
             company_token = set_active_company(company_id)
+        elif is_platform_admin_api:
+            await require_platform_admin_context(request)
         elif is_api and not is_ical_feed:
-            company_token, _ = await require_company_context(request)
+            company_token, company_context = await require_company_context(request)
 
-        if _requires_pin_token(path):
+        if _requires_pin_token(path) and not is_platform_admin_api and not (company_context and company_context.is_platform_admin):
             sec = await _read_security()
             if sec.get("hash"):
                 token = request.headers.get("x-pin-token")
