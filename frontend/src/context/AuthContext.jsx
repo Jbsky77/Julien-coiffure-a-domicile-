@@ -57,11 +57,39 @@ export function AuthProvider({ children }) {
   }, [loadCompanies]);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => applySession(data.session));
+    let mounted = true;
+
+    const bootstrap = async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        if (mounted) await applySession(data.session);
+      } catch (error) {
+        console.error("Impossible de restaurer la session", error);
+        if (mounted) {
+          setSession(null);
+          setUser(null);
+          setCompanies([]);
+          setLoading(false);
+        }
+      }
+    };
+
+    bootstrap();
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      applySession(nextSession);
+      // Supabase recommends returning from this callback immediately. Deferring
+      // company loading prevents an authentication lock that can freeze startup.
+      window.setTimeout(() => {
+        if (mounted) applySession(nextSession).catch((error) => {
+          console.error("Impossible d'actualiser la session", error);
+          setLoading(false);
+        });
+      }, 0);
     });
-    return () => listener.subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      listener.subscription.unsubscribe();
+    };
   }, [applySession]);
 
   const signIn = async (email, password) => {
