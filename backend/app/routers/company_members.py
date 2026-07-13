@@ -85,6 +85,7 @@ async def list_members(request: Request):
                 "email": user.get("email") or "",
                 "name": metadata.get("full_name") or metadata.get("name") or user.get("email") or "Employé",
                 "is_current_user": membership["user_id"] == context.user_id,
+                "invitation_pending": bool(user.get("invited_at") and not user.get("last_sign_in_at")),
             })
     return {"members": result, "current_role": context.role}
 
@@ -106,7 +107,7 @@ async def invite_member(payload: MemberInvite, request: Request):
         if user is None:
             response = await client.post(
                 f"{url}/auth/v1/invite",
-                params={"redirect_to": f"{public_url}/login"},
+                params={"redirect_to": f"{public_url}/accept-invite"},
                 json={"email": email, "data": {"invited_to_company": context.company_id}},
                 headers=headers,
             )
