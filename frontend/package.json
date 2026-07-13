@@ -62,7 +62,7 @@
   },
   "scripts": {
     "start": "craco start",
-    "build": "craco build",
+    "build": "node -e \"const fs=require('fs');for(const p of ['node_modules/.cache','build'])fs.rmSync(p,{recursive:true,force:true})\" && craco build",
     "test": "craco test",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
