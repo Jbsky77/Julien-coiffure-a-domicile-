@@ -118,6 +118,7 @@ test.describe('Espace client & Demandes RDV', () => {
     const href = await btn.getAttribute('href');
     expect(href.startsWith('sms:')).toBe(true);
     expect(href).toContain('0611223344');
-    expect(decodeURIComponent(href)).toContain('/c/' + accessToken);
+    const decodedHref = decodeURIComponent(href);
+    expect(decodedHref).toContain('https://julien-coiffure-domicile.vercel.app/c/' + accessToken);
   });
 });
