@@ -86,6 +86,14 @@ _OPEN_PATHS = {
 }
 
 
+def _requires_pin_token(path: str) -> bool:
+    """Return whether this API path must already include an unlocked PIN token."""
+    is_api = path.startswith("/api/")
+    is_public = path.startswith("/api/public/")
+    is_ical_feed = path.startswith("/api/calendar/") and path.endswith(".ics")
+    return is_api and not is_public and not is_ical_feed and path not in _OPEN_PATHS
+
+
 @app.middleware("http")
 async def pin_guard(request: Request, call_next):
     path = request.url.path
@@ -110,7 +118,7 @@ async def pin_guard(request: Request, call_next):
         elif is_api and not is_ical_feed:
             company_token, _ = await require_company_context(request)
 
-        if is_api and not is_public and not is_ical_feed:
+        if _requires_pin_token(path):
             sec = await _read_security()
             if sec.get("hash"):
                 token = request.headers.get("x-pin-token")
