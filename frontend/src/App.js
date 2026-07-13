@@ -1,9 +1,7 @@
 import React from "react";
-import { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import "@/App.css";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
-import { api } from "@/lib/api";
 import { Toaster } from "sonner";
 import Dashboard from "@/pages/Dashboard";
 import Appointments from "@/pages/Appointments";
@@ -21,6 +19,7 @@ import ClientSpace from "@/pages/ClientSpace";
 import AppointmentRequests from "@/pages/AppointmentRequests";
 import Login from "@/pages/Login";
 import AcceptInvite from "@/pages/AcceptInvite";
+import ResetPassword from "@/pages/ResetPassword";
 import Layout from "@/components/app/Layout";
 import PinGate from "@/components/app/PinGate";
 
@@ -63,12 +62,13 @@ function PrivateApp() {
   return <PinGate><RootRouter /></PinGate>;
 }
 
-// Router: public client space, login, then authenticated company application.
+// Router: public client space, login, password recovery, then authenticated company application.
 function AppRouter() {
   return (
     <Routes>
       <Route path="/c/:token" element={<ClientSpace />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/accept-invite" element={<AcceptInvite />} />
       <Route path="*" element={<PrivateApp />} />
     </Routes>
