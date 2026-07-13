@@ -37,6 +37,9 @@ let webpackConfig = {
       '@': path.resolve(__dirname, 'src'),
     },
     configure: (webpackConfig) => {
+      // Vercel previously reused an obsolete JavaScript bundle after source changes.
+      // Disable webpack filesystem caching so production always reflects GitHub.
+      webpackConfig.cache = false;
 
       // Add ignored patterns to reduce watched directories
         webpackConfig.watchOptions = {
