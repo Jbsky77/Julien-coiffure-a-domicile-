@@ -4,6 +4,7 @@ import "@/App.css";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { Toaster } from "sonner";
 import Dashboard from "@/pages/Dashboard";
+import AdminDashboard from "@/pages/AdminDashboard";
 import Appointments from "@/pages/Appointments";
 import AppointmentForm from "@/pages/AppointmentForm";
 import Clients from "@/pages/Clients";
@@ -22,6 +23,7 @@ import AcceptInvite from "@/pages/AcceptInvite";
 import ResetPassword from "@/pages/ResetPassword";
 import Layout from "@/components/app/Layout";
 import PinGate from "@/components/app/PinGate";
+import SubscriptionGate from "@/components/app/SubscriptionGate";
 
 function Protected() {
   return (
@@ -54,15 +56,35 @@ function RootRouter() {
   );
 }
 
-function PrivateApp() {
-  const { user, loading, activeCompany } = useAuth();
+function AdminRoute() {
+  const { user, loading, isPlatformAdmin, activeCompany } = useAuth();
   if (loading) return <div className="min-h-screen flex items-center justify-center">Chargement…</div>;
   if (!user) return <Navigate to="/login" replace />;
-  if (!activeCompany) return <div className="min-h-screen flex items-center justify-center p-6 text-center">Aucune entreprise active n’est associée à ce compte.</div>;
-  return <PinGate><RootRouter /></PinGate>;
+  if (!isPlatformAdmin) return <Navigate to="/" replace />;
+  if (activeCompany) return <Navigate to="/" replace />;
+  return <AdminDashboard />;
 }
 
-// Router: public client space, login, password recovery, then authenticated company application.
+function PrivateApp() {
+  const { user, loading, activeCompany, isPlatformAdmin } = useAuth();
+  if (loading) return <div className="min-h-screen flex items-center justify-center">Chargement…</div>;
+  if (!user) return <Navigate to="/login" replace />;
+  if (isPlatformAdmin && !activeCompany) return <Navigate to="/admin" replace />;
+  if (!activeCompany) return <div className="min-h-screen flex items-center justify-center p-6 text-center">Aucune entreprise active n’est associée à ce compte.</div>;
+
+  if (isPlatformAdmin) {
+    return <RootRouter />;
+  }
+
+  return (
+    <SubscriptionGate>
+      <PinGate>
+        <RootRouter />
+      </PinGate>
+    </SubscriptionGate>
+  );
+}
+
 function AppRouter() {
   return (
     <Routes>
@@ -70,6 +92,7 @@ function AppRouter() {
       <Route path="/login" element={<Login />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/accept-invite" element={<AcceptInvite />} />
+      <Route path="/admin" element={<AdminRoute />} />
       <Route path="*" element={<PrivateApp />} />
     </Routes>
   );
