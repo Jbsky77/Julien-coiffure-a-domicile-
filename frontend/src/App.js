@@ -20,6 +20,7 @@ import MapPage from "@/pages/Map";
 import ClientSpace from "@/pages/ClientSpace";
 import AppointmentRequests from "@/pages/AppointmentRequests";
 import Login from "@/pages/Login";
+import AcceptInvite from "@/pages/AcceptInvite";
 import Layout from "@/components/app/Layout";
 import PinGate from "@/components/app/PinGate";
 
@@ -68,6 +69,7 @@ function AppRouter() {
     <Routes>
       <Route path="/c/:token" element={<ClientSpace />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/accept-invite" element={<AcceptInvite />} />
       <Route path="*" element={<PrivateApp />} />
     </Routes>
   );
