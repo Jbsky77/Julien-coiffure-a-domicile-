@@ -4,7 +4,6 @@ import { LayoutDashboard, CalendarClock, Users, Receipt, Package, Settings as Se
 import { api, pinStorage } from "@/lib/api";
 import GlobalSearch from "@/components/app/GlobalSearch";
 import { useAuth } from "@/context/AuthContext";
-import { useAuth } from "@/context/AuthContext";
 
 const NAV = [
   { to: "/", label: "Accueil", icon: LayoutDashboard, tid: "nav-dashboard" },
@@ -27,8 +26,7 @@ const ALL_MENUS = [...NAV, ...MORE];
 
 export default function Layout({ children }) {
   const location = useLocation();
-  const { activeCompany, isImpersonating, stopImpersonation } = useAuth();
-  const { activeCompany, activeCompanyId, companies, setActiveCompanyId } = useAuth();
+  const { activeCompany, activeCompanyId, companies, setActiveCompanyId, isImpersonating, stopImpersonation } = useAuth();
   const [searchOpen, setSearchOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
