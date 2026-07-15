@@ -165,7 +165,15 @@ class Collection:
         self.store, self.name = store, name
 
     async def _all(self) -> list[dict]:
-        return await self.store.request("GET", params={"collection": f"eq.{self.name}", "select": "key,document", "limit": "50000"})
+        return await self.store.request(
+            "GET",
+            params={
+                "company_id": f"eq.{get_active_company()}",
+                "collection": f"eq.{self.name}",
+                "select": "key,document",
+                "limit": "50000",
+            },
+        )
 
     async def _save(self, key: str, document: dict) -> None:
         await self.store.request(

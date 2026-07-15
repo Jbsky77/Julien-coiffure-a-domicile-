@@ -26,6 +26,7 @@ from app.routers import (
     insights,
     photos,
     pin,
+    payroll,
     platform_admin,
     prospection,
     public,
@@ -65,6 +66,7 @@ ROUTERS = [
     insights.router,
     appointments.router,
     accounting.router,
+    payroll.router,
     analytics.router,
     calendar.router,
     stock.router,
@@ -189,6 +191,8 @@ async def pin_guard(request: Request, call_next):
             if request.method != "GET" and (path.startswith("/api/settings") or path.startswith("/api/services")):
                 require_role(request, "owner", "admin")
             if path.startswith("/api/accounting/reset"):
+                require_role(request, "owner", "admin")
+            if path.startswith("/api/payroll"):
                 require_role(request, "owner", "admin")
             if path.startswith("/api/appointment-requests"):
                 require_permission(request, "appointments_all")

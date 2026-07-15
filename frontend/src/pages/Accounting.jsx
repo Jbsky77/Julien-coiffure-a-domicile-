@@ -5,6 +5,7 @@ import { ExternalLink, RefreshCcw, ChevronLeft, ChevronRight, Download, FileText
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { PAYMENT_MODES } from "@/lib/api";
+import PayrollModule from "@/components/accounting/PayrollModule";
 
 function currentYYYYMM() {
   const d = new Date();
@@ -186,7 +187,7 @@ export default function Accounting() {
       </div>
 
       <div className="flex gap-2 flex-wrap">
-        {[{ id: "summary", l: "Mois en cours" }, { id: "payments", l: "Paiements" }, { id: "cb", l: "Frais CB" }, { id: "urssaf", l: "URSSAF" }, { id: "reset", l: "Réinitialiser" }, { id: "all", l: "Historique" }].map((t) => (
+        {[{ id: "summary", l: "Mois en cours" }, { id: "payments", l: "Paiements" }, { id: "cb", l: "Frais CB" }, { id: "urssaf", l: "URSSAF" }, { id: "employees", l: "Fiches de paie / factures employés" }, { id: "reset", l: "Réinitialiser" }, { id: "all", l: "Historique" }].map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)} data-testid={`tab-${t.id}`} className={`px-4 py-2 rounded-full text-sm ${tab === t.id ? "bg-[#0A192F] text-white" : "border border-slate-200 text-slate-600"}`}>{t.l}</button>
         ))}
       </div>
@@ -451,6 +452,8 @@ export default function Accounting() {
           </div>
         </div>
       )}
+
+      {tab === "employees" && <PayrollModule />}
 
       {tab === "all" && (
         <div className="bg-white border border-slate-100 rounded-2xl p-6 space-y-3">
