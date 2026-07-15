@@ -52,14 +52,16 @@ api.interceptors.response.use(
       pinStorage.clear();
       // Broadcast so the app can re-render the lock screen.
       window.dispatchEvent(new CustomEvent("jb:locked"));
+    } else if (err.response?.status === 401) {
+      window.dispatchEvent(new CustomEvent("jb:session-expired"));
     }
     return Promise.reject(err);
   }
 );
 
 export const money = (n) => {
-  if (n === null || n === undefined || Number.isNaN(Number(n))) return "0,00 €";
-  return `${Number(n).toFixed(2).replace(".", ",")} €`;
+  if (n === null || n === undefined || Number.isNaN(Number(n))) return "0,00 â‚¬";
+  return `${Number(n).toFixed(2).replace(".", ",")} â‚¬`;
 };
 
 export const money2 = (n) => {
@@ -87,8 +89,8 @@ export const fmtMonth = (yyyymm) => {
 
 export const PAYMENT_MODES = [
   { id: "CB", label: "Carte Bancaire" },
-  { id: "CHEQUE", label: "Chèque" },
-  { id: "ESPECES", label: "Espèces" },
+  { id: "CHEQUE", label: "ChÃ¨que" },
+  { id: "ESPECES", label: "EspÃ¨ces" },
   { id: "VIREMENT", label: "Virement" },
 ];
 
