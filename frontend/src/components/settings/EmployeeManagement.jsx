@@ -14,6 +14,7 @@ const PERMISSIONS = [
 export default function EmployeeManagement() {
   const { activeCompany, user } = useAuth();
   const canManage = ["owner", "admin"].includes(activeCompany?.role);
+  const companyId = activeCompany?.id;
   const [members, setMembers] = useState([]);
   const [form, setForm] = useState({
     email: "", name: "", role: "employee",
@@ -23,7 +24,7 @@ export default function EmployeeManagement() {
   const [inviting, setInviting] = useState(false);
 
   const load = useCallback(async () => {
-    if (!canManage) return;
+    if (!canManage || !companyId) return;
     setLoading(true);
     try {
       const response = await api.get("/company/members");
@@ -31,7 +32,7 @@ export default function EmployeeManagement() {
     } catch (error) {
       toast.error(error.response?.data?.detail || "Impossible de charger l'équipe");
     } finally { setLoading(false); }
-  }, [activeCompany?.id, canManage]);
+  }, [canManage, companyId]);
 
   useEffect(() => { load(); }, [load]);
   if (!canManage) return <div className="rounded-2xl bg-amber-50 border border-amber-200 p-5">Vous n'avez pas la permission de gérer l'équipe.</div>;
