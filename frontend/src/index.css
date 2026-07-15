@@ -67,6 +67,29 @@
 .dark .shadow-premium { box-shadow: 0 12px 35px rgba(0, 0, 0, .32); }
 .dark .divider { background: linear-gradient(90deg, transparent, #475569, transparent); }
 .dark ::-webkit-scrollbar-thumb { border-color: #07101f; background: #475569; }
+.dark html, html.dark, .dark body, .dark #root { background-color: #07101f !important; }
+.dark .bg-slate-200, .dark .bg-slate-300 { background-color: #243247 !important; }
+.dark .bg-emerald-50, .dark .bg-emerald-100, .dark .bg-green-100 { background-color: #123027 !important; }
+.dark .bg-violet-50, .dark .bg-violet-100, .dark .bg-purple-50 { background-color: #28203f !important; }
+.dark .bg-rose-50, .dark .bg-rose-100, .dark .bg-pink-100 { background-color: #351b2b !important; }
+.dark .bg-orange-50, .dark .bg-yellow-50 { background-color: #36250f !important; }
+.dark [class~="bg-white/60"] { background-color: rgba(15, 27, 45, .94) !important; }
+.dark [class~="bg-blue-50/50"], .dark [class~="bg-blue-50/60"], .dark [class~="bg-blue-50/70"] { background-color: rgba(16, 35, 65, .92) !important; }
+.dark [class~="bg-red-50/60"] { background-color: rgba(53, 21, 28, .92) !important; }
+.dark [class~="bg-orange-50/50"], .dark [class~="bg-yellow-50/50"] { background-color: rgba(54, 37, 15, .92) !important; }
+.dark [class~="bg-pink-50/50"], .dark [class~="bg-rose-50/50"] { background-color: rgba(53, 27, 43, .92) !important; }
+.dark [class~="bg-green-50/50"] { background-color: rgba(18, 48, 39, .92) !important; }
+.dark .text-emerald-700, .dark .text-emerald-800, .dark .text-green-800 { color: #86efac !important; }
+.dark .text-blue-700, .dark .text-blue-800 { color: #93c5fd !important; }
+.dark .text-pink-700, .dark .text-pink-800, .dark .text-rose-700, .dark .text-rose-800 { color: #f9a8d4 !important; }
+.dark .text-violet-700, .dark .text-violet-800, .dark .text-purple-700, .dark .text-purple-800 { color: #c4b5fd !important; }
+.dark .text-amber-700, .dark .text-amber-800 { color: #fde68a !important; }
+.dark .border-emerald-200, .dark .border-green-200, .dark .border-blue-200, .dark .border-pink-200, .dark .border-violet-200, .dark .border-rose-200, .dark .border-amber-300 { border-color: #475569 !important; }
+.dark .hover\:bg-slate-100:hover { background-color: #26364d !important; }
+.dark .hover\:bg-blue-50:hover { background-color: #172d4f !important; }
+.dark .hover\:bg-amber-50:hover { background-color: #403015 !important; }
+.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: #334155 !important; }
+
 
 @layer base {
   :root {

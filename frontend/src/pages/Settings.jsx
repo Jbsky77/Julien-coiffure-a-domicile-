@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { api, money, API } from "@/lib/api";
 import { toast } from "sonner";
-import { Plus, Trash2, Save, Copy, Calendar, Download, MapPin, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, Save, Copy, Calendar, Download, MapPin, CheckCircle2, AlertTriangle, ChevronDown, ChevronRight } from "lucide-react";
 import EmployeeManagement from "@/components/settings/EmployeeManagement";
 import CompanyProfile from "@/components/settings/CompanyProfile";
 
@@ -115,7 +115,19 @@ function IcalBlock() {
   );
 }
 
-const CATS = ["HOMME", "FEMME", "ENFANT", "AUTRE"];
+const SERVICE_CATEGORIES = [
+  { id: "HOMME", label: "Hommes", color: "bg-blue-100 text-blue-700" },
+  { id: "FEMME", label: "Femmes", color: "bg-pink-100 text-pink-700" },
+  { id: "ENFANT", label: "Enfants", color: "bg-green-100 text-green-700" },
+  { id: "FAMILLE", label: "Pack famille", color: "bg-amber-100 text-amber-800" },
+];
+const CATS = SERVICE_CATEGORIES.map((category) => category.id);
+const serviceCategory = (service) => {
+  if (/famille|pack/i.test(service?.name || "")) return "FAMILLE";
+  const category = (service?.category || "").toUpperCase();
+  if (CATS.includes(category)) return category;
+  return "FAMILLE";
+};
 const THEMES = [
   { id: "VENTE_PRODUITS", label: "Vente de produits", color: "bg-emerald-100 text-emerald-800 border-emerald-200" },
   { id: "COLORATIONS", label: "Colorations", color: "bg-violet-100 text-violet-800 border-violet-200" },
@@ -139,6 +151,7 @@ export default function Settings() {
   const [services, setServices] = useState([]);
   const [addForm, setAddForm] = useState({ name: "", price: 0, category: "HOMME", theme: "COUPES_COIFFAGE", duration_minutes: 30 });
   const [exporting, setExporting] = useState(false);
+  const [collapsedServiceCategories, setCollapsedServiceCategories] = useState({});
 
   const exportBackup = async () => {
     setExporting(true);
@@ -190,6 +203,13 @@ export default function Settings() {
     await api.delete(`/services/${id}`);
     load();
   };
+
+  const groupedServices = useMemo(() => {
+    const groups = Object.fromEntries(SERVICE_CATEGORIES.map((category) => [category.id, []]));
+    services.forEach((service) => groups[serviceCategory(service)].push(service));
+    Object.values(groups).forEach((items) => items.sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr")));
+    return groups;
+  }, [services]);
 
   if (!settings) return <div>…</div>;
   const fb = "w-full bg-transparent border-b border-slate-300 rounded-none px-0 py-2 focus:border-[#0A192F] focus:outline-none text-base";
@@ -330,7 +350,7 @@ export default function Settings() {
               <input data-testid="svc-add-duration" type="number" step="5" min="5" className={fb} value={addForm.duration_minutes} onChange={(e) => setAddForm({ ...addForm, duration_minutes: parseInt(e.target.value) || 0 })} />
             </div>
           </div>
-          <div className="text-[10px] text-slate-500 -mt-2">{addForm.category === "HOMME" ? "Apparaîtra dans les fiches M." : addForm.category === "FEMME" ? "Apparaîtra dans les fiches Mme" : addForm.category === "ENFANT" ? "Apparaîtra dans les fiches < 18 ans" : "Apparaîtra dans toutes les fiches"}</div>
+          <div className="text-[10px] text-slate-500 -mt-2">{addForm.category === "HOMME" ? "Apparaîtra dans les prestations Homme" : addForm.category === "FEMME" ? "Apparaîtra dans les prestations Femme" : addForm.category === "ENFANT" ? "Apparaîtra dans les prestations Enfant" : "Apparaîtra dans Pack famille et restera accessible pour tous les clients"}</div>
           <div>
             <label className="text-[10px] uppercase tracking-widest text-slate-500">Thème</label>
             <div className="flex flex-wrap gap-2 mt-2" data-testid="svc-theme-picker">
@@ -354,7 +374,7 @@ export default function Settings() {
                 { id: "HOMME", l: "Homme", color: "bg-blue-500" },
                 { id: "FEMME", l: "Femme", color: "bg-pink-500" },
                 { id: "ENFANT", l: "Enfant", color: "bg-green-500" },
-                { id: "AUTRE", l: "Tous", color: "bg-slate-500" },
+                { id: "FAMILLE", l: "Pack famille", color: "bg-amber-500" },
               ].map((c) => (
                 <button
                   key={c.id}
@@ -377,45 +397,67 @@ export default function Settings() {
           </button>
         </div>
 
-        <ul className="divide-y divide-slate-100">
-          {services.map((s) => {
-            const catColor = s.category === "HOMME" ? "bg-blue-100 text-blue-700" : s.category === "FEMME" ? "bg-pink-100 text-pink-700" : s.category === "ENFANT" ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-700";
-            const theme = themeInfo(s);
+        <div className="space-y-3" data-testid="service-category-groups">
+          {SERVICE_CATEGORIES.map((group) => {
+            const items = groupedServices[group.id] || [];
+            const collapsed = !!collapsedServiceCategories[group.id];
             return (
-              <li key={s.id} className="py-3" data-testid={`svc-row-${s.id}`}>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`text-[9px] tracking-wider uppercase px-2 py-0.5 rounded-full ${catColor}`}>{s.category}</span>
-                  <input className="flex-1 min-w-[140px] bg-transparent border-b border-slate-200 py-1 focus:border-[#0A192F] focus:outline-none" defaultValue={s.name} onBlur={(e) => e.target.value !== s.name && updateService(s.id, { name: e.target.value })} />
-                  <select className="text-xs bg-transparent border-b border-slate-200 py-1 focus:border-[#0A192F] focus:outline-none" defaultValue={s.category} onChange={(e) => updateService(s.id, { category: e.target.value })}>
-                    {CATS.map((c) => <option key={c}>{c}</option>)}
-                  </select>
-                  <span className={`text-[9px] px-2 py-1 rounded-full border ${theme.color}`}>{theme.label}</span>
-                  <select
-                    aria-label="Thème de la prestation"
-                    className="text-xs bg-transparent border-b border-slate-200 py-1 focus:border-[#0A192F] focus:outline-none"
-                    value={inferTheme(s)}
-                    onChange={(e) => updateService(s.id, { theme: e.target.value })}
-                  >
-                    {THEMES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-                  </select>
-                  <button onClick={() => deleteService(s.id)} className="text-[#991B1B] hover:bg-red-50 p-2 rounded-full" data-testid={`svc-del-${s.id}`}><Trash2 className="w-4 h-4" /></button>
-                </div>
-                <div className="mt-2 flex items-center gap-4 text-xs text-slate-500 pl-1">
-                  <label className="flex items-center gap-1">
-                    Prix
-                    <input data-testid={`svc-price-${s.id}`} type="number" step="0.5" className="w-20 text-right bg-transparent border-b border-slate-200 py-0.5 focus:border-[#0A192F] focus:outline-none" defaultValue={s.price} onBlur={(e) => parseFloat(e.target.value) !== s.price && updateService(s.id, { price: parseFloat(e.target.value) || 0 })} />
-                    <span>€</span>
-                  </label>
-                  <label className="flex items-center gap-1">
-                    Durée
-                    <input data-testid={`svc-duration-${s.id}`} type="number" step="5" min="5" className="w-16 text-right bg-transparent border-b border-slate-200 py-0.5 focus:border-[#0A192F] focus:outline-none" defaultValue={s.duration_minutes ?? 45} onBlur={(e) => { const v = parseInt(e.target.value) || 0; if (v !== s.duration_minutes) updateService(s.id, { duration_minutes: v }); }} />
-                    <span>min</span>
-                  </label>
-                </div>
-              </li>
+              <section key={group.id} className="rounded-2xl border border-slate-200 overflow-hidden" data-testid={"svc-group-" + group.id.toLowerCase()}>
+                <button
+                  type="button"
+                  onClick={() => setCollapsedServiceCategories((current) => ({ ...current, [group.id]: !current[group.id] }))}
+                  aria-expanded={!collapsed}
+                  className="w-full px-4 py-3 flex items-center gap-3 text-left bg-slate-50 hover:bg-slate-100 transition-colors"
+                >
+                  {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  <span className="font-medium flex-1">{group.label}</span>
+                  <span className={"text-xs rounded-full px-2.5 py-1 " + group.color}>{items.length}</span>
+                </button>
+                {!collapsed && (
+                  <ul className="divide-y divide-slate-100 px-4">
+                    {items.length === 0 && <li className="py-4 text-sm text-slate-500">Aucune prestation dans cette catégorie.</li>}
+                    {items.map((s) => {
+                      const theme = themeInfo(s);
+                      return (
+                        <li key={s.id} className="py-3" data-testid={"svc-row-" + s.id}>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className={"text-[9px] tracking-wider uppercase px-2 py-0.5 rounded-full " + group.color}>{group.label}</span>
+                            <input aria-label={"Nom de la prestation " + s.name} className="flex-1 min-w-[140px] bg-transparent border-b border-slate-200 py-1 focus:border-[#0A192F] focus:outline-none" defaultValue={s.name} onBlur={(e) => e.target.value !== s.name && updateService(s.id, { name: e.target.value })} />
+                            <select aria-label={"Catégorie de " + s.name} className="text-xs bg-transparent border-b border-slate-200 py-1 focus:border-[#0A192F] focus:outline-none" value={serviceCategory(s)} onChange={(e) => updateService(s.id, { category: e.target.value })}>
+                              {SERVICE_CATEGORIES.map((category) => <option key={category.id} value={category.id}>{category.label}</option>)}
+                            </select>
+                            <span className={"text-[9px] px-2 py-1 rounded-full border " + theme.color}>{theme.label}</span>
+                            <select
+                              aria-label="Thème de la prestation"
+                              className="text-xs bg-transparent border-b border-slate-200 py-1 focus:border-[#0A192F] focus:outline-none"
+                              value={inferTheme(s)}
+                              onChange={(e) => updateService(s.id, { theme: e.target.value })}
+                            >
+                              {THEMES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+                            </select>
+                            <button type="button" aria-label={"Supprimer " + s.name} onClick={() => deleteService(s.id)} className="text-[#991B1B] hover:bg-red-50 p-2 rounded-full" data-testid={"svc-del-" + s.id}><Trash2 className="w-4 h-4" /></button>
+                          </div>
+                          <div className="mt-2 flex items-center gap-4 text-xs text-slate-500 pl-1">
+                            <label className="flex items-center gap-1">
+                              Prix
+                              <input data-testid={"svc-price-" + s.id} type="number" step="0.5" className="w-20 text-right bg-transparent border-b border-slate-200 py-0.5 focus:border-[#0A192F] focus:outline-none" defaultValue={s.price} onBlur={(e) => parseFloat(e.target.value) !== s.price && updateService(s.id, { price: parseFloat(e.target.value) || 0 })} />
+                              <span>€</span>
+                            </label>
+                            <label className="flex items-center gap-1">
+                              Durée
+                              <input data-testid={"svc-duration-" + s.id} type="number" step="5" min="5" className="w-16 text-right bg-transparent border-b border-slate-200 py-0.5 focus:border-[#0A192F] focus:outline-none" defaultValue={s.duration_minutes ?? 45} onBlur={(e) => { const value = parseInt(e.target.value) || 0; if (value !== s.duration_minutes) updateService(s.id, { duration_minutes: value }); }} />
+                              <span>min</span>
+                            </label>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </section>
             );
           })}
-        </ul>
+        </div>
       </section>
     </div>
   );
