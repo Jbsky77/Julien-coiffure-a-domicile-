@@ -55,6 +55,7 @@ function parseVCF(txt) {
 export default function Clients() {
   const [list, setList] = useState([]);
   const [q, setQ] = useState("");
+  const [audience, setAudience] = useState("all");
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ first_name: "", last_name: "", phone: "", address: "", comment: "", birthday: "", referred_by: "" });
   const [addressParts, setAddressParts] = useState(emptyParts);
@@ -103,7 +104,13 @@ export default function Clients() {
   const filtered = list
     .filter((c) => {
       const s = `${c.first_name} ${c.last_name} ${c.phone}`.toLowerCase();
-      return s.includes(q.toLowerCase());
+      const age = computeAge(c.birthday);
+      const isChild = age !== null && age < 18;
+      const matchesAudience = audience === "all"
+        || (audience === "child" && isChild)
+        || (audience === "male" && !isChild && c.gender === "H")
+        || (audience === "female" && !isChild && c.gender === "F");
+      return matchesAudience && s.includes(q.toLowerCase());
     })
     .sort((a, b) =>
       `${a.last_name || ""} ${a.first_name || ""}`.trim().localeCompare(
@@ -164,6 +171,16 @@ export default function Clients() {
       <div className="relative">
         <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
         <input data-testid="clients-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher un client…" className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-full focus:outline-none focus:border-[#0A192F] bg-white" />
+      </div>
+
+      <div className="flex flex-wrap gap-2" aria-label="Filtrer les clients">
+        {[
+          ["all", "Tous"], ["male", "Hommes"], ["female", "Femmes"], ["child", "Enfants"],
+        ].map(([value, label]) => (
+          <button key={value} type="button" onClick={() => setAudience(value)} data-testid={`clients-filter-${value}`} aria-pressed={audience === value} className={`rounded-full px-4 py-2 text-sm border transition-colors ${audience === value ? "bg-[#0A192F] text-white border-[#0A192F]" : "bg-white text-slate-700 border-slate-200 hover:border-slate-400"}`}>
+            {label}
+          </button>
+        ))}
       </div>
 
       <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
