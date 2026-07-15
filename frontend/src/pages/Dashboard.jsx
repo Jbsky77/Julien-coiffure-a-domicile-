@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api, money, fmtDate, fmtTime, fmtMonth, money2 } from "@/lib/api";
 import { CalendarClock, Cake, Gift, Gauge, TrendingUp, Package, Users, Wallet, Bell, Plus, Navigation, Lightbulb, Target, AlertCircle, MessageSquare, Check, X, Eye } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { useAuth } from "@/context/AuthContext";
 
 const PIE_COLORS = ["#0A192F", "#1E3A8A", "#D4AF37", "#94A3B8", "#CBD5E1", "#64748B"];
 
@@ -31,6 +32,7 @@ function Widget({ title, children, actionLabel, onAction, tid, color }) {
 }
 
 export default function Dashboard() {
+  const { activeCompany } = useAuth();
   const [d, setD] = useState(null);
   const [months, setMonths] = useState([]);
   const [tour, setTour] = useState(null);
@@ -131,7 +133,7 @@ export default function Dashboard() {
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
           <div className="text-[10px] tracking-[0.3em] uppercase text-slate-500 mb-2">Tableau de bord</div>
-          <h1 className="font-serif text-3xl tracking-tight">Bonjour Julien.</h1>
+          <h1 className="font-serif text-3xl tracking-tight">Bonjour, {activeCompany?.name || "votre entreprise"}.</h1>
           <div className="text-xs text-slate-500 mt-1">Activité de <span className="italic">{fmtMonth(d.month)}</span>.</div>
         </div>
         <button onClick={() => navigate("/rdv/nouveau")} data-testid="dashboard-new-rdv" className="bg-[#0A192F] text-white rounded-full px-5 py-2.5 text-xs font-medium hover:bg-[#1E3A8A] flex items-center gap-2 self-start">

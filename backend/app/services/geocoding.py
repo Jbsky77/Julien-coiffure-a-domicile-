@@ -21,7 +21,7 @@ from app.utils.formatting import normalize_address
 logger = logging.getLogger(__name__)
 
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
-USER_AGENT = "JulienBoucheApp/1.0 (contact: julien@local)"
+USER_AGENT = os.environ.get("GEOCODING_USER_AGENT", "CoiffurePro/1.0")
 DEFAULT_TTL_DAYS = int(os.environ.get("GEOCODE_TTL_DAYS", "90"))
 HTTP_TIMEOUT = float(os.environ.get("GEOCODE_HTTP_TIMEOUT", "8"))
 

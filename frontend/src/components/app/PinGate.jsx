@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { api, pinStorage } from "@/lib/api";
+import axios from "axios";
+import { API, pinStorage } from "@/lib/api";
 import PinLock from "@/components/app/PinLock";
 import { Scissors } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 const INACTIVITY_MS = 15 * 60 * 1000; // 15 minutes
 
@@ -14,6 +16,8 @@ const INACTIVITY_MS = 15 * 60 * 1000; // 15 minutes
  *   that re-locks after INACTIVITY_MS.
  */
 export default function PinGate({ children }) {
+  const { activeCompany } = useAuth();
+  const companyName = activeCompany?.name || "Mon entreprise";
   const [status, setStatus] = useState({ loading: true, configured: false, error: false });
   const [unlocked, setUnlocked] = useState(false);
   const [loadingElapsed, setLoadingElapsed] = useState(0); // seconds since load started
@@ -25,7 +29,7 @@ export default function PinGate({ children }) {
     let lastErr = null;
     for (let attempt = 0; attempt < 12; attempt += 1) {
       try {
-        const r = await api.get("/pin/status", { timeout: 8000 });
+        const r = await axios.get(`${API}/pin/status`, { timeout: 8000 });
         const configured = !!r.data?.configured;
         const now = Date.now();
         const stillValid = configured && pinStorage.get() && pinStorage.expiresAt() > now;
@@ -97,8 +101,8 @@ export default function PinGate({ children }) {
         <div className="w-16 h-16 rounded-full border border-[#D4AF37]/40 flex items-center justify-center mb-6">
           <Scissors className="w-6 h-6 text-[#D4AF37] animate-pulse" strokeWidth={1.5} />
         </div>
-        <div className="text-[10px] tracking-[0.3em] uppercase text-white/50 mb-2">Julien Bouche</div>
-        <div className="font-serif text-xl mb-6">Coiffure à domicile</div>
+        <div className="text-[10px] tracking-[0.3em] uppercase text-white/50 mb-2">Espace professionnel</div>
+        <div className="font-serif text-xl mb-6">{companyName}</div>
         <div className="flex items-center gap-2 text-white/80 text-sm mb-2">
           <span className="inline-block w-2 h-2 rounded-full bg-[#D4AF37] animate-ping" />
           <span data-testid="loading-message">{msg}</span>

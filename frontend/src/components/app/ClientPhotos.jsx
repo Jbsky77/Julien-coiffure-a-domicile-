@@ -170,7 +170,7 @@ async function generateSocialImage(pair, brandName, format = "square") {
 
   ctx.fillStyle = "#D4AF37";
   ctx.font = "600 56px Georgia, serif";
-  ctx.fillText(brandName || "Julien", W / 2, footerY + 80);
+  ctx.fillText(brandName || "Mon entreprise", W / 2, footerY + 80);
 
   return canvas.toDataURL("image/jpeg", 0.92);
 }
@@ -181,11 +181,11 @@ export default function ClientPhotos({ clientId, clientName }) {
   const [form, setForm] = useState({ before: null, after: null, note: "", date: new Date().toISOString().slice(0, 10) });
   const beforeRef = useRef(null);
   const afterRef = useRef(null);
-  const [brandName, setBrandName] = useState("Julien");
+  const [brandName, setBrandName] = useState("Mon entreprise");
   const [socialPreview, setSocialPreview] = useState(null); // { dataUrl, format, pairId }
 
   useEffect(() => {
-    api.get("/settings").then((r) => setBrandName(r.data.brand_name || "Julien")).catch(() => {});
+    api.get("/settings").then((r) => setBrandName(r.data.brand_name || "Mon entreprise")).catch(() => {});
   }, []);
 
   const load = useCallback(async () => {
@@ -225,7 +225,7 @@ export default function ClientPhotos({ clientId, clientName }) {
     const files = [];
     if (pair.before) files.push(new File([dataUrlToBlob(pair.before)], `avant-${pair.id}.jpg`, { type: "image/jpeg" }));
     if (pair.after) files.push(new File([dataUrlToBlob(pair.after)], `apres-${pair.id}.jpg`, { type: "image/jpeg" }));
-    const text = `Avant / Après — ${clientName}${pair.note ? "\n" + pair.note : ""} · Julien Bouche`;
+    const text = `Avant / Après — ${clientName}${pair.note ? "\n" + pair.note : ""} · ${brandName}`;
     if (navigator.canShare && navigator.canShare({ files })) {
       try {
         await navigator.share({ files, title: "Avant / Après", text });
@@ -236,7 +236,7 @@ export default function ClientPhotos({ clientId, clientName }) {
   };
 
   const shareWhatsApp = (pair) => {
-    const text = encodeURIComponent(`Avant / Après — ${clientName}${pair.note ? "\n" + pair.note : ""}\nJulien Bouche`);
+    const text = encodeURIComponent(`Avant / Après — ${clientName}${pair.note ? "\n" + pair.note : ""}\n${brandName}`);
     window.open(`https://wa.me/?text=${text}`, "_blank", "noopener,noreferrer");
   };
 

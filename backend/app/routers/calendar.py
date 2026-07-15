@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response as FResponse
 
 from app.db import db
+from app.services.settings import get_settings
 from app.utils.dates import parse_iso
 
 router = APIRouter()
@@ -51,12 +52,15 @@ async def ical_feed(token: str):
     if not doc or doc.get("token") != token:
         raise HTTPException(401, "Invalid token")
     rdvs = await db.appointments.find({"status": {"$in": ["scheduled", "done"]}}, {"_id": 0}).to_list(5000)
+    settings = await get_settings()
+    brand_name = settings.brand_name or "Mon entreprise"
+    calendar_id = "".join(ch.lower() if ch.isalnum() else "-" for ch in brand_name).strip("-") or "entreprise"
     lines = [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
-        "PRODID:-//Julien Bouche//FR",
+        f"PRODID:-//{brand_name}//FR",
         "CALSCALE:GREGORIAN",
-        "X-WR-CALNAME:Julien Bouche · RDV",
+        f"X-WR-CALNAME:{brand_name} · RDV",
     ]
     for r in rdvs:
         dt = parse_iso(r.get("date"))
@@ -67,7 +71,7 @@ async def ical_feed(token: str):
         summary = f"{r.get('client_name','RDV')} · {', '.join([s['name'] for s in r['services']])}"
         lines += [
             "BEGIN:VEVENT",
-            f"UID:{r['id']}@julienbouche",
+            f"UID:{r['id']}@{calendar_id}",
             f"DTSTAMP:{start}",
             f"DTSTART:{start}",
             f"DTEND:{end}",

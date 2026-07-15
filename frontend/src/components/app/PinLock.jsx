@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api, pinStorage } from "@/lib/api";
 import { Lock, Delete } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/context/AuthContext";
 
 const PIN_LENGTH = 6;
 
@@ -56,6 +57,8 @@ function Dots({ length, count, shake }) {
 }
 
 export default function PinLock({ mode = "unlock", onSuccess }) {
+  const { activeCompany } = useAuth();
+  const companyName = activeCompany?.name || "Mon entreprise";
   // mode: "unlock" | "setup"
   const [phase, setPhase] = useState(mode === "setup" ? "new" : "unlock"); // "new" | "confirm" | "unlock"
   const [pin, setPin] = useState("");
@@ -116,7 +119,7 @@ export default function PinLock({ mode = "unlock", onSuccess }) {
   const title =
     phase === "new" ? "Créez votre PIN"
     : phase === "confirm" ? "Confirmez votre PIN"
-    : "Coiffure à domicile";
+    : companyName;
   const subtitle =
     phase === "new" ? "6 chiffres pour verrouiller votre app"
     : phase === "confirm" ? "Saisissez-le à nouveau"
@@ -133,7 +136,7 @@ export default function PinLock({ mode = "unlock", onSuccess }) {
           <Lock className="w-6 h-6 text-[#D4AF37]" />
         </div>
         <div className="text-center">
-          <div className="text-[10px] tracking-[0.3em] uppercase text-white/50 mb-2">Julien Bouche</div>
+          <div className="text-[10px] tracking-[0.3em] uppercase text-white/50 mb-2">{companyName}</div>
           <h1 className="font-serif text-3xl mb-2" data-testid="pin-title">{title}</h1>
           <div className="text-sm text-white/70" data-testid="pin-subtitle">{subtitle}</div>
         </div>

@@ -7,10 +7,12 @@ PostgreSQL JSONB table.  Only the server-side Supabase secret is used here.
 from __future__ import annotations
 
 import copy
+import hashlib
 import os
 import uuid
 from contextvars import ContextVar
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, AsyncIterator
 
 import httpx
@@ -268,15 +270,59 @@ class Store:
 
     async def resolve_public_client(self, access_token: str) -> tuple[str, dict] | None:
         """Resolve a public client token and return its trusted company context."""
-        rows = await self.request("GET", params={
-            "collection": "eq.clients",
-            "select": "company_id,document",
-            "limit": "50000",
-        })
-        for row in rows:
-            if row.get("document", {}).get("access_token") == access_token:
-                return row["company_id"], row["document"]
-        return None
+        token_hash = hashlib.sha256(access_token.encode("utf-8")).hexdigest()
+        async with httpx.AsyncClient(timeout=20) as client:
+            token_response = await client.get(
+                f"{self.base_url}/rest/v1/client_public_tokens",
+                params={
+                    "token_hash": f"eq.{token_hash}", "revoked_at": "is.null",
+                    "select": "company_id,client_id,expires_at", "limit": 1,
+                },
+                headers=self.headers,
+            )
+            token_response.raise_for_status()
+            tokens = token_response.json()
+            if not tokens:
+                return None
+            token_row = tokens[0]
+            if token_row.get("expires_at") and datetime.fromisoformat(token_row["expires_at"].replace("Z", "+00:00")) <= datetime.now(timezone.utc):
+                return None
+            document_response = await client.get(
+                self.endpoint,
+                params={
+                    "company_id": f"eq.{token_row['company_id']}", "collection": "eq.clients",
+                    "key": f"eq.{token_row['client_id']}", "select": "document", "limit": 1,
+                },
+                headers=self.headers,
+            )
+            document_response.raise_for_status()
+            documents = document_response.json()
+        return (token_row["company_id"], documents[0]["document"]) if documents else None
+
+    async def sync_public_client_token(self, document: dict) -> None:
+        access_token = document.get("access_token")
+        client_id = document.get("id")
+        if not access_token or not client_id:
+            return
+        token_hash = hashlib.sha256(access_token.encode("utf-8")).hexdigest()
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.post(
+                f"{self.base_url}/rest/v1/client_public_tokens",
+                params={"on_conflict": "company_id,client_id"},
+                json={"token_hash": token_hash, "company_id": get_active_company(), "client_id": client_id, "revoked_at": None},
+                headers={**self.headers, "Prefer": "resolution=merge-duplicates,return=minimal"},
+            )
+        response.raise_for_status()
+
+    async def revoke_public_client_token(self, client_id: str) -> None:
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.patch(
+                f"{self.base_url}/rest/v1/client_public_tokens",
+                params={"company_id": f"eq.{get_active_company()}", "client_id": f"eq.{client_id}"},
+                json={"revoked_at": datetime.now(timezone.utc).isoformat()},
+                headers=self.headers,
+            )
+        response.raise_for_status()
 
     def __getattr__(self, name: str) -> Collection:
         return Collection(self, name)

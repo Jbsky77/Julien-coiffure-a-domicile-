@@ -99,7 +99,7 @@ async def public_distance_estimate(site_slug: str, payload: dict[str, Any]):
         "estimatedTotal": round(services_total + travel_fee, 2),
         "estimatedDurationMinutes": duration,
         "serviceAreaAccepted": True,
-        "message": "Estimation calculée depuis l’adresse professionnelle de Julien.",
+        "message": f"Estimation calculée depuis l’adresse professionnelle de {settings.brand_name}.",
     }
 
 
@@ -140,12 +140,14 @@ async def public_create_booking_request(site_slug: str, payload: dict[str, Any],
             "phone": phone,
             "email": (customer.get("email") or "").strip(),
             "gender": {"homme": "H", "femme": "F"}.get((payload.get("profile") or "").lower()),
+            "access_token": secrets.token_urlsafe(24),
             "address": address,
             "lat": geocoded.get("lat"),
             "lng": geocoded.get("lng"),
             "created_at": datetime.now(PARIS).isoformat(),
         }
         await db.clients.insert_one(client)
+        await db.sync_public_client_token(client)
         customer_created = True
 
     request_id = f"req_{uuid.uuid4().hex[:10]}"
@@ -177,7 +179,7 @@ async def public_create_booking_request(site_slug: str, payload: dict[str, Any],
         "status": "received",
         "customerMatched": not customer_created,
         "customerCreated": customer_created,
-        "message": "Votre demande a bien été transmise à Julien.",
+        "message": "Votre demande a bien été transmise à l’entreprise.",
     }
 
 
@@ -216,5 +218,5 @@ async def public_alternative_response(site_slug: str, payload: dict[str, Any]):
         return {"success": True, "status": "confirmed", "message": "Créneau accepté."}
     if response == "refused":
         await db.appointment_requests.update_one({"id": booking["id"]}, {"$set": {"status": "pending", "counter_proposed_date": None, "updated_at": datetime.now(PARIS).isoformat()}})
-        return {"success": True, "status": "received", "message": "Créneau refusé. Julien vous recontactera."}
+        return {"success": True, "status": "received", "message": "Créneau refusé. L’entreprise vous recontactera."}
     raise HTTPException(400, "Réponse invalide")

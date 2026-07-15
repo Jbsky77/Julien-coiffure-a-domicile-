@@ -6,13 +6,17 @@
     <meta name="theme-color" content="#0A192F" />
     <meta name="description" content="Gestion de l'activité Julien Bouche · Coiffure à domicile" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Julien Bouche" />
     <title>Julien Bouche · Coiffure à domicile</title>
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+      }
+    </script>
   </head>
-  <!-- Publication du correctif PIN -->
   <body>
     <noscript>JavaScript doit être activé pour utiliser cette application.</noscript>
     <div id="root"></div>

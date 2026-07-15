@@ -4,20 +4,20 @@ import { api, money, money2, PAYMENT_MODES, fmtDate, fmtTime } from "@/lib/api";
 import { toast } from "sonner";
 import { ArrowLeft, Gift, Send, Trash2, CheckCircle2, Pencil, Sparkles, Clock, Repeat, AlertTriangle, UserRound, Timer, Play, Pause, Square, MapPin, Phone, MessageSquare } from "lucide-react";
 import ProductUsageEditor from "@/components/ProductUsageEditor";
+import { useAuth } from "@/context/AuthContext";
 
-const STYLISTS = ["Julien", "Marley"];
 const SERVICE_THEMES = [
   { id: "VENTE_PRODUITS", label: "Produits", active: "bg-emerald-600 text-white", idle: "border-emerald-200 text-emerald-800 bg-emerald-50" },
   { id: "COLORATIONS", label: "Colorations", active: "bg-violet-600 text-white", idle: "border-violet-200 text-violet-800 bg-violet-50" },
-  { id: "BALAYAGES_MECHES", label: "Balayages & mÃ¨ches", active: "bg-amber-500 text-white", idle: "border-amber-200 text-amber-800 bg-amber-50" },
+  { id: "BALAYAGES_MECHES", label: "Balayages & mèches", active: "bg-amber-500 text-white", idle: "border-amber-200 text-amber-800 bg-amber-50" },
   { id: "COUPES_COIFFAGE", label: "Coupes & coiffage", active: "bg-blue-600 text-white", idle: "border-blue-200 text-blue-800 bg-blue-50" },
   { id: "FORFAITS", label: "Forfaits", active: "bg-rose-600 text-white", idle: "border-rose-200 text-rose-800 bg-rose-50" },
 ];
 const getServiceTheme = (service) => {
   if (service?.theme) return service.theme;
   const name = (service?.name || "").toLocaleLowerCase("fr-FR");
-  if (/produit|shampoing|soin Ã  vendre/.test(name)) return "VENTE_PRODUITS";
-  if (/balayage|mÃ¨che/.test(name)) return "BALAYAGES_MECHES";
+  if (/produit|shampoing|soin à vendre/.test(name)) return "VENTE_PRODUITS";
+  if (/balayage|mèche/.test(name)) return "BALAYAGES_MECHES";
   if (/couleur|coloration|patine/.test(name)) return "COLORATIONS";
   if (/forfait|pack/.test(name)) return "FORFAITS";
   return "COUPES_COIFFAGE";
@@ -29,6 +29,7 @@ const isoToLocalInput = (iso) => {
 };
 
 export default function AppointmentForm() {
+  const { activeCompany, user } = useAuth();
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -56,12 +57,12 @@ export default function AppointmentForm() {
   const [suggestions, setSuggestions] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [recurWeeks, setRecurWeeks] = useState(5);
-  const [stylists, setStylists] = useState({}); // service_id -> "Julien" | "Marley"
+  const [stylists, setStylists] = useState({}); // service_id -> employee display name
   const [clientReferral, setClientReferral] = useState(null);
   const [useReferral, setUseReferral] = useState(false);
   const [nowTick, setNowTick] = useState(Date.now());
   const [confirmRestart, setConfirmRestart] = useState(false);
-  // ---- Voisin / DÃ©placement automatisÃ© ----
+  // ---- Voisin / Déplacement automatisé ----
   const [travelInfo, setTravelInfo] = useState(null); // {distance_km, supplement, source, error}
   const [neighborOn, setNeighborOn] = useState(false);
   const [neighborId, setNeighborId] = useState(null);
@@ -146,7 +147,8 @@ export default function AppointmentForm() {
             price_final_override: existing.price_final,
             product_usages: (existing.product_usages || []).map((usage) => ({ ...usage, previous_used_stock_units: usage.used_stock_units })),
           });
-          setStylists(Object.fromEntries(existing.services.map((x) => [x.service_id, x.stylist || "Julien"])));
+          const assignedName = existing.assigned_employee_name || (m.data.members || []).find((member) => member.user_id === existing.assigned_employee_id)?.name || "";
+          setStylists(Object.fromEntries(existing.services.map((x) => [x.service_id, x.stylist || assignedName])));
           setPaymentMode(existing.payment_mode || "CB");
           setDuration(existing.duration_minutes || "");
           setNeighborOn(!!existing.is_neighbor);
@@ -164,7 +166,7 @@ export default function AppointmentForm() {
                 last_name: (existing.neighbor_of_client_name || "").split(" ").slice(1).join(" "),
                 address: existing.neighbor_of_client_address || "",
               },
-              message: `Voisin validÃ© â€” distance : ${existing.neighbor_distance_km?.toFixed(2)} km`.replace(".", ","),
+              message: `Voisin validé — distance : ${existing.neighbor_distance_km?.toFixed(2)} km`.replace(".", ","),
             });
           }
           setEditMode(false);
@@ -214,7 +216,7 @@ export default function AppointmentForm() {
       if (r.data.valid) toast.success(r.data.message);
       else if (r.data.error === "same_client") toast.error(r.data.message);
       else if (r.data.error === "missing_coords") toast.error(r.data.message);
-      else toast.info(r.data.message || "Voisinage refusÃ©");
+      else toast.info(r.data.message || "Voisinage refusé");
     } catch (e) {
       toast.error(e.response?.data?.detail || "Erreur");
     } finally {
@@ -261,7 +263,7 @@ export default function AppointmentForm() {
   };
 
   const save = async () => {
-    if (!form.client_id) return toast.error("SÃ©lectionnez un client.");
+    if (!form.client_id) return toast.error("Sélectionnez un client.");
     if (form.services.length === 0) return toast.error("Ajoutez au moins une prestation.");
     try {
       const payload = {
@@ -273,10 +275,10 @@ export default function AppointmentForm() {
       };
       if (id) {
         await api.put(`/appointments/${id}`, payload);
-        toast.success("Rendez-vous modifiÃ©");
+        toast.success("Rendez-vous modifié");
       } else {
         await api.post("/appointments", payload);
-        toast.success("Rendez-vous crÃ©Ã©");
+        toast.success("Rendez-vous créé");
       }
       navigate("/rdv");
     } catch (e) {
@@ -288,18 +290,18 @@ export default function AppointmentForm() {
     try {
       let useReward = useReferral;
       if (!useReward && clientReferral?.rewards_available > 0) {
-        useReward = window.confirm("Ce client dispose d'une coupe offerte obtenue grÃ¢ce au parrainage. Souhaitez-vous l'appliquer Ã  cette prestation ?");
+        useReward = window.confirm("Ce client dispose d'une coupe offerte obtenue grâce au parrainage. Souhaitez-vous l'appliquer à cette prestation ?");
       }
       const payload = {
         payment_mode: paymentMode,
         price_final: form.price_final_override ?? preview.final,
         duration_minutes: duration === "" ? null : parseInt(duration),
-        stylists: Object.fromEntries(form.services.map((fs) => [fs.service_id, stylists[fs.service_id] || "Julien"])),
+        stylists: Object.fromEntries(form.services.map((fs) => [fs.service_id, stylists[fs.service_id] || rdv?.assigned_employee_name || user?.name || ""])),
         use_referral_reward: useReward,
         product_usages: form.product_usages,
       };
       await api.post(`/appointments/${id}/finish`, payload);
-      toast.success(useReward ? "Coupe offerte appliquÃ©e. Rendez-vous terminÃ©." : "Paiement confirmÃ©. Rendez-vous terminÃ©.");
+      toast.success(useReward ? "Coupe offerte appliquée. Rendez-vous terminé." : "Paiement confirmé. Rendez-vous terminé.");
       navigate("/rdv");
     } catch (e) {
       toast.error(e.response?.data?.detail || "Erreur");
@@ -309,7 +311,7 @@ export default function AppointmentForm() {
   const remove = async () => {
     if (!window.confirm("Supprimer ce rendez-vous ?")) return;
     await api.delete(`/appointments/${id}`);
-    toast.success("SupprimÃ©");
+    toast.success("Supprimé");
     navigate("/rdv");
   };
 
@@ -320,7 +322,7 @@ export default function AppointmentForm() {
       const r = await api.put(`/appointments/${id}/products`, form.product_usages || []);
       setRdv(r.data);
       setForm((current) => ({ ...current, product_usages: (r.data.product_usages || []).map((usage) => ({ ...usage, previous_used_stock_units: usage.used_stock_units })) }));
-      toast.success(isDone ? "Formule corrigÃ©e et stock mis Ã  jour" : "Formule enregistrÃ©e");
+      toast.success(isDone ? "Formule corrigée et stock mis à jour" : "Formule enregistrée");
     } catch (e) {
       toast.error(e.response?.data?.detail || "Impossible d'enregistrer la formule");
     } finally { setSavingFormula(false); }
@@ -343,7 +345,7 @@ export default function AppointmentForm() {
         lng: c.lng || null,
       });
       setSuggestions(r.data.suggestions || []);
-      if ((r.data.suggestions || []).length === 0) toast.info("Aucun crÃ©neau disponible ce jour.");
+      if ((r.data.suggestions || []).length === 0) toast.info("Aucun créneau disponible ce jour.");
     } catch (e) {
       toast.error("Erreur de suggestion");
     } finally {
@@ -358,13 +360,13 @@ export default function AppointmentForm() {
     const local = new Date(dt.getTime() - tz * 60000);
     setForm((f) => ({ ...f, date: local.toISOString().slice(0, 16) }));
     setSuggestions([]);
-    toast.success("CrÃ©neau sÃ©lectionnÃ©");
+    toast.success("Créneau sélectionné");
   };
 
   const cancel = async () => {
-    if (!window.confirm("Marquer ce rendez-vous comme annulÃ© (no-show) ?")) return;
+    if (!window.confirm("Marquer ce rendez-vous comme annulé (no-show) ?")) return;
     await api.post(`/appointments/${id}/cancel`);
-    toast.success("Rendez-vous annulÃ©");
+    toast.success("Rendez-vous annulé");
     navigate("/rdv");
   };
 
@@ -372,7 +374,7 @@ export default function AppointmentForm() {
     try {
       const r = await api.post(`/appointments/${id}/schedule-next`, { weeks: recurWeeks });
       const d = new Date(r.data.date);
-      toast.success(`Prochain RDV crÃ©Ã© le ${d.toLocaleDateString("fr-FR")} Ã  ${d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`);
+      toast.success(`Prochain RDV créé le ${d.toLocaleDateString("fr-FR")} à ${d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`);
       navigate(`/rdv/${r.data.id}`);
     } catch (e) {
       toast.error(e.response?.data?.detail || "Erreur");
@@ -395,13 +397,13 @@ export default function AppointmentForm() {
     const lines = [
       `Bonjour ${firstName},`,
       "",
-      "C'est Julien, votre coiffeur.",
-      `Je vous confirme votre rendez-vous du ${jour} Ã  ${heure}.`,
+      `C'est ${rdv?.assigned_employee_name || user?.name || activeCompany?.name || "votre professionnel"}.`,
+      `Je vous confirme votre rendez-vous du ${jour} à ${heure}.`,
       "",
     ];
     if (prestationsNames) lines.push(`Prestations : ${prestationsNames}`);
-    lines.push(`Montant : ${Number(amount).toFixed(2).replace(".", ",")} â‚¬`);
-    lines.push("", "Ã€ trÃ¨s vite,", "Julien Bouche");
+    lines.push(`Montant : ${Number(amount).toFixed(2).replace(".", ",")} €`);
+    lines.push("", "À très vite,", activeCompany?.name || "Votre entreprise");
     return lines.join("\n");
   };
 
@@ -433,10 +435,238 @@ export default function AppointmentForm() {
         )}
       </div>
 
-      {isDone && <div className="bg-[#166534]/10 border border-[#166534]/30 rounded-2xl px-6 py-3 text-[#166534] text-sm flex items-center gap-2"><CheckCircle2 className="w-4 h-4" /> Rendez-vous terminÃ© â€…3384 tokens truncated…Gender === "H" || selectedGender === "F") && (
-          <div className="mt-2 text-xs text-slate-500">Prestations adaptÃ©es Ã  {selectedGender === "H" ? "un homme" : "une femme"}. Le pack famille reste toujours disponible.</div>
+      {isDone && <div className="bg-[#166534]/10 border border-[#166534]/30 rounded-2xl px-6 py-3 text-[#166534] text-sm flex items-center gap-2"><CheckCircle2 className="w-4 h-4" /> Rendez-vous terminé — {rdv.payment_mode}{rdv.duration_minutes ? ` · ${rdv.duration_minutes} min` : ""}{rdv.invoice_number ? ` · Facture ${rdv.invoice_number}` : ""}</div>}
+      {rdv?.status === "cancelled" && <div className="bg-red-50 border border-red-200 rounded-2xl px-6 py-3 text-[#991B1B] text-sm">Rendez-vous annulé (no-show)</div>}
+
+      {/* Timer: start manually on arrival, stops automatically at payment */}
+      {id && rdv && !isDone && rdv.status !== "cancelled" && (
+        <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-premium space-y-4" data-testid="timer-card">
+          {timerStatus === "idle" ? (
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <div className="text-[10px] tracking-widest uppercase text-slate-500 flex items-center gap-1.5"><Timer className="w-3.5 h-3.5 text-[#D4AF37]" /> Chronométrage</div>
+                <div className="text-xs text-slate-500 mt-1">Démarrez en arrivant chez le client. Le chrono s'arrêtera automatiquement à l'encaissement.</div>
+              </div>
+              <button onClick={() => timerAction("start", "Chronomètre démarré")} data-testid="start-timer-btn" className="bg-[#0A192F] text-white rounded-full px-5 py-3 text-sm font-medium flex items-center gap-2 hover:bg-[#1E3A8A] flex-shrink-0">
+                <Play className="w-4 h-4" /> Démarrer la prestation
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="text-[10px] tracking-widest uppercase text-slate-500 flex items-center gap-1.5">
+                    <Timer className="w-3.5 h-3.5 text-[#D4AF37]" />
+                    {timerStatus === "running" ? "Prestation en cours" : timerStatus === "paused" ? "Chronomètre en pause" : "Chronomètre arrêté"}
+                    {timerStatus === "running" && <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse ml-1" />}
+                    {timerStatus === "paused" && <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 normal-case tracking-normal ml-1">Pause</span>}
+                  </div>
+                  <div className="font-serif text-3xl text-[#0A192F] tabular-nums mt-1" data-testid="timer-elapsed">{elapsedLabel}</div>
+                  <div className="text-xs text-slate-500 mt-1">
+                    {timerStatus === "stopped"
+                      ? `Durée retenue : ${Math.max(1, Math.round(elapsedSecs / 60))} min — enregistrée à l'encaissement.`
+                      : "Les pauses ne comptent pas dans le temps enregistré."}
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {timerStatus === "running" && (
+                  <>
+                    <button onClick={() => timerAction("pause", "Chronomètre en pause")} data-testid="pause-timer-btn" className="flex-1 border border-amber-300 text-amber-700 rounded-full px-4 py-2.5 text-sm font-medium flex items-center justify-center gap-2 hover:bg-amber-50">
+                      <Pause className="w-4 h-4" /> Pause
+                    </button>
+                    <button onClick={() => timerAction("stop", "Chronomètre arrêté — durée retenue")} data-testid="stop-timer-btn" className="flex-1 border border-red-200 text-[#991B1B] rounded-full px-4 py-2.5 text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-50">
+                      <Square className="w-3.5 h-3.5" /> Stop
+                    </button>
+                  </>
+                )}
+                {timerStatus === "paused" && (
+                  <>
+                    <button onClick={() => timerAction("resume", "Chronomètre relancé")} data-testid="resume-timer-btn" className="flex-1 bg-[#0A192F] text-white rounded-full px-4 py-2.5 text-sm font-medium flex items-center justify-center gap-2 hover:bg-[#1E3A8A]">
+                      <Play className="w-4 h-4" /> Reprendre
+                    </button>
+                    <button onClick={() => timerAction("stop", "Chronomètre arrêté — durée retenue")} data-testid="stop-timer-btn" className="flex-1 border border-red-200 text-[#991B1B] rounded-full px-4 py-2.5 text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-50">
+                      <Square className="w-3.5 h-3.5" /> Stop
+                    </button>
+                  </>
+                )}
+                {timerStatus === "stopped" && (
+                  <button
+                    onClick={() => {
+                      if (!confirmRestart) {
+                        setConfirmRestart(true);
+                        setTimeout(() => setConfirmRestart(false), 4000);
+                        return;
+                      }
+                      setConfirmRestart(false);
+                      timerAction("start", "Chronomètre redémarré");
+                    }}
+                    data-testid="restart-timer-btn"
+                    className={`flex-1 rounded-full px-4 py-2.5 text-sm flex items-center justify-center gap-2 border ${confirmRestart ? "border-red-300 bg-red-50 text-[#991B1B]" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+                  >
+                    <Play className="w-4 h-4" /> {confirmRestart ? "Confirmer — repartir de zéro" : "Redémarrer à zéro"}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div>
+          <label className="text-[10px] tracking-widest uppercase text-slate-500">Client</label>
+          <select
+            disabled={readOnly}
+            value={form.client_id}
+            onChange={(e) => {
+              setForm((current) => ({ ...current, client_id: e.target.value, services: [] }));
+              setServiceFilter("TOUS");
+              setServiceSearch("");
+            }}
+            className={fieldBase}
+            data-testid="rdv-client-select"
+          >
+            <option value="">— Sélectionner —</option>
+            {clients.map((c) => <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>)}
+          </select>
+          {form.client_id && (
+            <Link
+              to={`/clients/${form.client_id}`}
+              data-testid="open-client-file-btn"
+              className="mt-2 inline-flex items-center gap-1.5 text-xs px-3.5 py-1.5 rounded-full border border-[#D4AF37]/50 text-[#8A6A1F] hover:bg-[#D4AF37]/10 transition"
+            >
+              <UserRound className="w-3.5 h-3.5" /> Fiche client
+            </Link>
+          )}
+        </div>
+        <div>
+          <label className="text-[10px] tracking-widest uppercase text-slate-500">Employé attribué</label>
+          <select disabled={readOnly} value={form.assigned_employee_id || ""} onChange={(e) => setForm({ ...form, assigned_employee_id: e.target.value || null })} className={fieldBase} data-testid="rdv-employee-select">
+            <option value="">Non attribué</option>
+            {employees.map((member) => <option key={member.user_id} value={member.user_id}>{member.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-[10px] tracking-widest uppercase text-slate-500">Date & heure</label>
+          <input disabled={readOnly} type="datetime-local" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className={fieldBase} data-testid="rdv-date-input" />
+        </div>
+      </div>
+
+      {/* Client contact info — visible sur la fiche RDV */}
+      {(() => {
+        const c = clients.find((x) => x.id === form.client_id);
+        if (!c) return null;
+        const hasContact = c.address || c.phone;
+        if (!hasContact) return null;
+        const fmtPhone = (p) => {
+          const clean = (p || "").replace(/[\s.\-()]/g, "");
+          return { display: p, tel: clean };
+        };
+        const ph = c.phone ? fmtPhone(c.phone) : null;
+        const mapsUrl = c.address ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(c.address)}` : null;
+        return (
+          <div className="bg-white border border-slate-100 rounded-2xl p-4 space-y-2" data-testid="client-contact-card">
+            <div className="text-[10px] tracking-widest uppercase text-slate-500 mb-1">Contact client</div>
+            {c.address && (
+              <a
+                href={mapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="client-address-link"
+                className="flex items-start gap-2 text-sm text-slate-700 hover:text-[#0A192F] transition"
+              >
+                <MapPin className="w-4 h-4 mt-0.5 text-[#D4AF37] flex-shrink-0" />
+                <span className="underline decoration-dotted underline-offset-2">{c.address}</span>
+              </a>
+            )}
+            {ph && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <a
+                  href={`tel:${ph.tel}`}
+                  data-testid="client-phone-call"
+                  className="flex items-center gap-2 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-1.5 text-sm hover:bg-emerald-100 transition"
+                >
+                  <Phone className="w-3.5 h-3.5" /> {ph.display}
+                </a>
+                <a
+                  href={`sms:${ph.tel}`}
+                  data-testid="client-phone-sms"
+                  className="flex items-center gap-1.5 rounded-full border border-slate-200 text-slate-600 px-3 py-1.5 text-xs hover:bg-slate-50 transition"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" /> SMS
+                </a>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* Client risk warning: no-shows / deposit */}
+      {form.client_id && clientRisk && (clientRisk.cancelled > 0 || clientRisk.deposit_required) && (
+        <div className="bg-orange-50 border border-orange-200 rounded-2xl px-5 py-3 text-sm text-orange-800 flex items-start gap-2.5" data-testid="client-risk-banner">
+          <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          <div>
+            {clientRisk.cancelled > 0 && <div>{clientRisk.cancelled} annulation{clientRisk.cancelled > 1 ? "s" : ""} (no-show) au compteur.</div>}
+            {clientRisk.deposit_required && <div className="font-medium">Acompte requis pour ce client{clientRisk.deposit_note ? ` — ${clientRisk.deposit_note}` : ""}.</div>}
+          </div>
+        </div>
+      )}
+
+      {!readOnly && form.client_id && (
+        <div className="bg-gradient-to-br from-[#D4AF37]/5 to-white border border-[#D4AF37]/30 rounded-2xl p-4 space-y-3" data-testid="smart-slots-card">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-[10px] tracking-[0.25em] uppercase text-slate-500 mb-0.5 flex items-center gap-1.5"><Sparkles className="w-3 h-3 text-[#D4AF37]" /> Suggestions intelligentes</div>
+              <div className="text-xs text-slate-600">
+                Trouve les meilleurs créneaux selon la tournée et le trajet.
+                {(() => {
+                  const total = form.services.reduce((acc, fs) => {
+                    const svc = services.find((s) => s.id === fs.service_id);
+                    return acc + (svc?.duration_minutes || 0);
+                  }, 0);
+                  if (total > 0) return <span className="ml-1 text-[#C5A059]">Durée prévue : {total} min.</span>;
+                  return <span className="ml-1 italic text-slate-400">Sélectionnez des prestations pour préciser la durée.</span>;
+                })()}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={fetchSlots}
+              disabled={loadingSlots}
+              data-testid="suggest-slots-btn"
+              className="bg-[#0A192F] text-white text-xs px-4 py-2 rounded-full whitespace-nowrap hover:bg-[#1E3A8A] disabled:opacity-50"
+            >
+              {loadingSlots ? "…" : "Suggérer"}
+            </button>
+          </div>
+          {suggestions.length > 0 && (
+            <div className="flex flex-wrap gap-2 pt-1">
+              {suggestions.map((s, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => pickSlot(s.datetime)}
+                  data-testid={`slot-pick-${i}`}
+                  className="group flex flex-col items-start gap-0.5 px-3 py-2 rounded-xl bg-white border border-slate-200 hover:border-[#D4AF37] transition-colors text-left"
+                >
+                  <div className="flex items-center gap-1.5 font-medium text-sm">
+                    <Clock className="w-3 h-3 text-[#1E3A8A]" /> {s.label}
+                  </div>
+                  <div className="text-[10px] text-slate-500">{s.reasons[0]}</div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div>
+        <label className="text-[10px] tracking-widest uppercase text-slate-500">Prestations</label>
+        {selectedClient && (selectedGender === "H" || selectedGender === "F") && (
+          <div className="mt-2 text-xs text-slate-500">Prestations adaptées à {selectedGender === "H" ? "un homme" : "une femme"}. Le pack famille reste toujours disponible.</div>
         )}
-        <input type="search" value={serviceSearch} onChange={(e) => setServiceSearch(e.target.value)} placeholder="Rechercher une prestationâ€¦" aria-label="Rechercher une prestation" className={`${fieldBase} mt-3`} data-testid="service-search" />
+        <input type="search" value={serviceSearch} onChange={(e) => setServiceSearch(e.target.value)} placeholder="Rechercher une prestation…" aria-label="Rechercher une prestation" className={`${fieldBase} mt-3`} data-testid="service-search" />
         <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Filtrer les prestations">
           <button type="button" onClick={() => setServiceFilter("TOUS")} aria-pressed={serviceFilter === "TOUS"} className={`px-3 py-1.5 rounded-full text-xs ${serviceFilter === "TOUS" ? "bg-[#0A192F] text-white" : "border border-slate-200 text-slate-600"}`}>
             Tous
@@ -463,13 +693,13 @@ export default function AppointmentForm() {
                 <button disabled={readOnly} onClick={() => toggleService(s.id)} data-testid={`svc-toggle-${s.id}`} className="w-full text-left flex items-center justify-between">
                   <div>
                     <div className="font-medium">{s.name}</div>
-                    <div className="text-xs text-slate-500">{SERVICE_THEMES.find((item) => item.id === getServiceTheme(s))?.label || "Coupes & coiffage"} Â· {s.category} Â· {money(s.price)}{isDone && picked ? ` Â· par ${(rdv?.services.find((x) => x.service_id === s.id)?.stylist) || "Julien"}` : ""}</div>
+                    <div className="text-xs text-slate-500">{SERVICE_THEMES.find((item) => item.id === getServiceTheme(s))?.label || "Coupes & coiffage"} · {s.category} · {money(s.price)}{isDone && picked ? ` · par ${(rdv?.services.find((x) => x.service_id === s.id)?.stylist) || rdv?.assigned_employee_name || ""}` : ""}</div>
                   </div>
                   <div className="text-xs text-slate-400">{count}/5</div>
                 </button>
                 {picked && giftEligible && (
                   <button onClick={() => applyGift(s.id)} disabled={readOnly} data-testid={`apply-gift-${s.id}`} className={`mt-3 w-full text-xs flex items-center justify-center gap-2 px-3 py-2 rounded-full ${picked.is_gift ? "bg-gold-gradient text-white" : "border border-[#D4AF37] text-[#C5A059]"}`}>
-                    <Gift className="w-3.5 h-3.5" /> {picked.is_gift ? "GratuitÃ© appliquÃ©e" : "Appliquer gratuitÃ© (6Ã¨me offerte)"}
+                    <Gift className="w-3.5 h-3.5" /> {picked.is_gift ? "Gratuité appliquée" : "Appliquer gratuité (6ème offerte)"}
                   </button>
                 )}
               </div>
@@ -478,29 +708,29 @@ export default function AppointmentForm() {
         </div>
         {visibleServices.length === 0 && (
           <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500" data-testid="service-empty-state">
-            Aucune prestation ne correspond Ã  ce client et Ã  ces filtres.
+            Aucune prestation ne correspond à ce client et à ces filtres.
           </div>
         )}
       </div>
 
-      {/* ---- DÃ©placement (auto + option Voisin) ---- */}
+      {/* ---- Déplacement (auto + option Voisin) ---- */}
       <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-premium space-y-3" data-testid="travel-card">
-        <div className="text-[10px] tracking-widest uppercase text-slate-500 flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-[#D4AF37]" /> DÃ©placement</div>
+        <div className="text-[10px] tracking-widest uppercase text-slate-500 flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-[#D4AF37]" /> Déplacement</div>
         {travelInfo?.error === "business_address_not_geocoded" ? (
           <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-            L&apos;adresse professionnelle n&apos;est pas vÃ©rifiÃ©e. Rendez-vous dans RÃ©glages â†’ Adresse professionnelle pour la gÃ©ocoder.
+            L&apos;adresse professionnelle n&apos;est pas vérifiée. Rendez-vous dans Réglages → Adresse professionnelle pour la géocoder.
           </div>
         ) : travelInfo?.error === "client_address_not_geocoded" ? (
           <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-            L&apos;adresse du client n&apos;est pas gÃ©ocodÃ©e. Ouvrez sa fiche pour la corriger.
+            L&apos;adresse du client n&apos;est pas géocodée. Ouvrez sa fiche pour la corriger.
           </div>
         ) : travelInfo && travelInfo.distance_km !== null ? (
           <div className="text-sm text-slate-600" data-testid="travel-info">
             Distance depuis l&apos;adresse pro : <span className="font-medium">{travelInfo.distance_km.toFixed(2).replace(".", ",")} km</span>
-            {" â€” "}SupplÃ©ment thÃ©orique : <span className="font-medium">{money(preview.theoretical)}</span>
+            {" — "}Supplément théorique : <span className="font-medium">{money(preview.theoretical)}</span>
           </div>
         ) : (
-          <div className="text-xs text-slate-500">Calcul de la distanceâ€¦</div>
+          <div className="text-xs text-slate-500">Calcul de la distance…</div>
         )}
         {/* Toggle Voisin */}
         <div className="flex items-center gap-3">
@@ -511,14 +741,14 @@ export default function AppointmentForm() {
             data-testid="neighbor-toggle"
             role="switch"
             aria-checked={neighborOn}
-            aria-label={neighborOn ? "DÃ©sactiver l'option Voisin" : "Activer l'option Voisin"}
+            aria-label={neighborOn ? "Désactiver l'option Voisin" : "Activer l'option Voisin"}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${neighborOn ? "bg-[#D4AF37]" : "bg-slate-200"}`}
           >
             <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${neighborOn ? "translate-x-6" : "translate-x-1"}`} />
           </button>
           <div className="text-sm">
             <div className="font-medium">Voisin</div>
-            <div className="text-xs text-slate-500">ExonÃ©ration si &lt; 1 km d&apos;un autre client</div>
+            <div className="text-xs text-slate-500">Exonération si &lt; 1 km d&apos;un autre client</div>
           </div>
         </div>
         {neighborOn && (
@@ -526,7 +756,7 @@ export default function AppointmentForm() {
             <label className="text-[10px] tracking-widest uppercase text-slate-500">De quel client est-il voisin ?</label>
             <input
               type="text"
-              placeholder="Nom, prÃ©nom, tÃ©lÃ©phone, communeâ€¦"
+              placeholder="Nom, prénom, téléphone, commune…"
               value={neighborSearch}
               onChange={(e) => setNeighborSearch(e.target.value)}
               data-testid="neighbor-search-input"
@@ -550,12 +780,12 @@ export default function AppointmentForm() {
                       className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
                     >
                       <div className="font-medium">{c.first_name} {c.last_name}</div>
-                      <div className="text-xs text-slate-500">{c.address || "â€” pas d'adresse â€”"}</div>
+                      <div className="text-xs text-slate-500">{c.address || "— pas d'adresse —"}</div>
                     </button>
                   ))}
               </div>
             )}
-            {checkingNeighbor && <div className="text-xs text-slate-500">VÃ©rification en coursâ€¦</div>}
+            {checkingNeighbor && <div className="text-xs text-slate-500">Vérification en cours…</div>}
             {neighborCheck && (
               <div
                 data-testid="neighbor-result"
@@ -564,7 +794,7 @@ export default function AppointmentForm() {
                 {neighborCheck.message}
                 {neighborCheck.valid && (
                   <div className="text-xs text-emerald-700 mt-1">
-                    Remise voisin : âˆ’{money(neighborCheck.discount || 0)} Â· SupplÃ©ment facturÃ© : {money(0)}
+                    Remise voisin : −{money(neighborCheck.discount || 0)} · Supplément facturé : {money(0)}
                   </div>
                 )}
               </div>
@@ -575,9 +805,9 @@ export default function AppointmentForm() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <label className="text-[10px] tracking-widest uppercase text-slate-500">Prix final (Ã©crasable)</label>
+          <label className="text-[10px] tracking-widest uppercase text-slate-500">Prix final (écrasable)</label>
           <input disabled={readOnly} type="number" step="0.01" value={form.price_final_override ?? ""} placeholder={String(preview.base)} onChange={(e) => setForm({ ...form, price_final_override: e.target.value === "" ? null : parseFloat(e.target.value) })} className={fieldBase} data-testid="rdv-price-input" />
-          {preview.family && <div className="text-xs text-[#C5A059] mt-1">âœ¨ Pack Famille dÃ©tectÃ© â€” 45â‚¬</div>}
+          {preview.family && <div className="text-xs text-[#C5A059] mt-1">✨ Pack Famille détecté — 45€</div>}
         </div>
       </div>
 
@@ -603,11 +833,11 @@ export default function AppointmentForm() {
           <div>Base : {money(preview.base - preview.fuel)}</div>
           {preview.discount > 0 ? (
             <>
-              <div className="line-through text-slate-400">SupplÃ©ment thÃ©orique : {money(preview.theoretical)}</div>
-              <div className="text-[#166534]">Remise voisin : âˆ’{money(preview.discount)}</div>
+              <div className="line-through text-slate-400">Supplément théorique : {money(preview.theoretical)}</div>
+              <div className="text-[#166534]">Remise voisin : −{money(preview.discount)}</div>
             </>
           ) : (
-            <div>DÃ©placement : {money(preview.fuel)}</div>
+            <div>Déplacement : {money(preview.fuel)}</div>
           )}
         </div>
       </div>
@@ -639,7 +869,7 @@ export default function AppointmentForm() {
             <div className="bg-gradient-to-r from-[#D4AF37]/10 to-white border border-[#D4AF37]/40 rounded-xl p-4 space-y-3" data-testid="referral-reward-banner">
               <div className="text-sm text-[#8A6A1F] flex items-start gap-2">
                 <Gift className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                <span>Ce client dispose de <strong>{clientReferral.rewards_available} coupe{clientReferral.rewards_available > 1 ? "s" : ""} offerte{clientReferral.rewards_available > 1 ? "s" : ""}</strong> grÃ¢ce au parrainage ({clientReferral.godchildren_count} filleul{clientReferral.godchildren_count > 1 ? "s" : ""}).</span>
+                <span>Ce client dispose de <strong>{clientReferral.rewards_available} coupe{clientReferral.rewards_available > 1 ? "s" : ""} offerte{clientReferral.rewards_available > 1 ? "s" : ""}</strong> grâce au parrainage ({clientReferral.godchildren_count} filleul{clientReferral.godchildren_count > 1 ? "s" : ""}).</span>
               </div>
               <button
                 type="button"
@@ -647,7 +877,7 @@ export default function AppointmentForm() {
                 data-testid="use-referral-toggle"
                 className={`w-full text-xs flex items-center justify-center gap-2 px-3 py-2.5 rounded-full ${useReferral ? "bg-gold-gradient text-white shadow-premium" : "border border-[#D4AF37] text-[#C5A059]"}`}
               >
-                <Gift className="w-3.5 h-3.5" /> {useReferral ? "Coupe offerte appliquÃ©e (prestation la plus chÃ¨re)" : "Appliquer la coupe offerte"}
+                <Gift className="w-3.5 h-3.5" /> {useReferral ? "Coupe offerte appliquée (prestation la plus chère)" : "Appliquer la coupe offerte"}
               </button>
             </div>
           )}
@@ -660,17 +890,19 @@ export default function AppointmentForm() {
           </div>
           {form.services.length > 0 && (
             <div data-testid="stylist-section">
-              <label className="text-[10px] tracking-widest uppercase text-slate-500">Qui a rÃ©alisÃ© chaque prestation ?</label>
+              <label className="text-[10px] tracking-widest uppercase text-slate-500">Qui a réalisé chaque prestation ?</label>
               <ul className="mt-2 space-y-2">
                 {form.services.map((fs) => {
                   const svc = services.find((s) => s.id === fs.service_id);
                   if (!svc) return null;
-                  const current = stylists[fs.service_id] || "Julien";
+                  const options = employees.map((member) => member.name).filter(Boolean);
+                  const fallback = rdv?.assigned_employee_name || user?.name || activeCompany?.name || "";
+                  const current = stylists[fs.service_id] || fallback;
                   return (
                     <li key={fs.service_id} className="flex items-center justify-between gap-3 bg-slate-50 rounded-xl px-4 py-2.5">
                       <span className="text-sm font-medium truncate">{svc.name}</span>
                       <div className="flex gap-1.5 flex-shrink-0">
-                        {STYLISTS.map((st) => (
+                        {(options.length ? options : [fallback]).filter(Boolean).map((st) => (
                           <button
                             key={st}
                             type="button"
@@ -689,9 +921,9 @@ export default function AppointmentForm() {
             </div>
           )}
           <div>
-            <label className="text-[10px] tracking-widest uppercase text-slate-500">Temps passÃ© (minutes)</label>
-            <input type="number" min="0" step="5" data-testid="rdv-duration-input" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder={timerStatus !== "idle" ? "Auto (chronomÃ¨tre)" : "Ex : 45"} className={fieldBase} />
-            <div className="text-xs text-slate-500 mt-1">{timerStatus !== "idle" ? "Laissez vide : la durÃ©e du chronomÃ¨tre sera enregistrÃ©e automatiquement." : "EnregistrÃ© Ã  la validation du paiement (sera affichÃ© dans la fiche client et les stats)"}</div>
+            <label className="text-[10px] tracking-widest uppercase text-slate-500">Temps passé (minutes)</label>
+            <input type="number" min="0" step="5" data-testid="rdv-duration-input" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder={timerStatus !== "idle" ? "Auto (chronomètre)" : "Ex : 45"} className={fieldBase} />
+            <div className="text-xs text-slate-500 mt-1">{timerStatus !== "idle" ? "Laissez vide : la durée du chronomètre sera enregistrée automatiquement." : "Enregistré à la validation du paiement (sera affiché dans la fiche client et les stats)"}</div>
           </div>
           <button onClick={finish} data-testid="finish-rdv-btn" className="w-full bg-gold-gradient text-white rounded-full px-8 py-4 font-medium flex items-center justify-center gap-2">
             <CheckCircle2 className="w-4 h-4" /> Valider le paiement & terminer
@@ -704,7 +936,7 @@ export default function AppointmentForm() {
         <div className="bg-gradient-to-br from-[#D4AF37]/5 to-white border border-[#D4AF37]/30 rounded-2xl p-6 space-y-4" data-testid="recurrence-section">
           <div>
             <div className="text-[10px] tracking-widest uppercase text-slate-500 flex items-center gap-1.5"><Repeat className="w-3.5 h-3.5 text-[#D4AF37]" /> Programmer le prochain RDV</div>
-            <div className="text-xs text-slate-500 mt-1">MÃªme client, mÃªmes prestations, mÃªme heure â€” dans :</div>
+            <div className="text-xs text-slate-500 mt-1">Même client, mêmes prestations, même heure — dans :</div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {[4, 5, 6].map((w) => (
@@ -730,7 +962,7 @@ export default function AppointmentForm() {
             </label>
           </div>
           <button onClick={scheduleNext} data-testid="recur-create-btn" className="w-full border border-[#D4AF37] text-[#8A6A1F] rounded-full px-6 py-3 text-sm font-medium flex items-center justify-center gap-2 hover:bg-[#D4AF37]/10">
-            <Repeat className="w-4 h-4" /> CrÃ©er le RDV du {(() => {
+            <Repeat className="w-4 h-4" /> Créer le RDV du {(() => {
               const base = form.date ? new Date(form.date) : new Date();
               const next = new Date(base.getTime() + recurWeeks * 7 * 86400000);
               return next.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
@@ -747,7 +979,7 @@ export default function AppointmentForm() {
             data-testid="save-rdv-btn"
             className="bg-[#0A192F] text-white rounded-full px-8 py-3 font-medium hover:bg-[#1E3A8A] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600"
           >
-            {form.services.length === 0 ? "SÃ©lectionnez une prestation" : id ? "Enregistrer les modifications" : "CrÃ©er le rendez-vous"}
+            {form.services.length === 0 ? "Sélectionnez une prestation" : id ? "Enregistrer les modifications" : "Créer le rendez-vous"}
           </button>
         )}
         {id && !isDone && rdv?.status !== "cancelled" && (

@@ -166,16 +166,6 @@ async def require_company_context(request: Request):
             else:
                 raise HTTPException(status_code=409, detail="Select an active company")
 
-            if accepting_invite and membership.get("status") == "invited":
-                activation = await client.patch(
-                    f"{url}/rest/v1/company_members",
-                    params={"company_id": f"eq.{membership['company_id']}", "user_id": f"eq.{user_id}"},
-                    json={"status": "active", "joined_at": datetime.now(timezone.utc).isoformat()},
-                    headers=headers,
-                )
-                activation.raise_for_status()
-                membership["status"] = "active"
-
             company_response = await client.get(
                 f"{url}/rest/v1/companies",
                 params={
@@ -211,7 +201,7 @@ async def require_company_context(request: Request):
                     detail={
                         "code": "subscription_required",
                         "status": subscription_status,
-                        "message": subscription.get("blocked_reason") or "Votre abonnement doit Ãªtre rÃ©gularisÃ©.",
+                        "message": subscription.get("blocked_reason") or "Votre abonnement doit être régularisé.",
                     },
                 )
 
@@ -266,3 +256,9 @@ def require_permission(request: Request, permission: str) -> CompanyContext:
     if not has_permission(context, permission):
         raise HTTPException(status_code=403, detail="Permission insuffisante")
     return context
+
+
+def can_access_appointment(context: CompanyContext, appointment: dict) -> bool:
+    if has_permission(context, "appointments_all"):
+        return True
+    return has_permission(context, "appointments_own") and appointment.get("assigned_employee_id") == context.user_id

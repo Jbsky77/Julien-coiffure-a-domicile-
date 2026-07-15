@@ -23,7 +23,7 @@ from app.services.referrals import compute_referral_info
 from app.services.routing import route
 from app.services.stock import reconcile_formula, reverse_formula, save_draft_formula
 from app.utils.dates import now_utc, parse_iso
-from app.tenancy import has_permission
+from app.tenancy import can_access_appointment, has_permission
 
 router = APIRouter()
 
@@ -40,17 +40,24 @@ async def _assignee(request: Request, user_id: str | None) -> tuple[str | None, 
         membership.raise_for_status()
         rows = membership.json()
         if not rows:
-            raise HTTPException(400, "EmployÃ© inactif ou extÃ©rieur Ã  l'entreprise")
+            raise HTTPException(400, "Employé inactif ou extérieur à l'entreprise")
         auth_user = await client.get(f"{url}/auth/v1/admin/users/{user_id}", headers=headers)
         name = rows[0].get("display_name")
         if auth_user.status_code == 200:
             data = auth_user.json()
             name = name or (data.get("user_metadata") or {}).get("full_name") or data.get("email")
-    return user_id, name or "EmployÃ©"
+    return user_id, name or "Employé"
 
 
 async def _audit(request: Request, action: str, entity_id: str, details: dict):
     await db.audit_logs.insert_one({"id": f"aud_{uuid.uuid4().hex[:12]}", "action": action, "entity_type": "appointment", "entity_id": entity_id, "actor_user_id": request.state.company.user_id, "details": details, "created_at": now_utc().isoformat()})
+
+
+def _require_appointment_access(request: Request, appointment: dict) -> None:
+    """Prevent ID-based access to another employee's appointment."""
+    context = request.state.company
+    if not can_access_appointment(context, appointment):
+        raise HTTPException(403, "Ce rendez-vous est attribué à un autre membre de l'équipe")
 
 
 async def _validate_and_apply_neighbor(client_id: str, is_neighbor: bool, neighbor_id):
@@ -89,6 +96,8 @@ async def _validate_and_apply_neighbor(client_id: str, is_neighbor: bool, neighb
 @router.get("/appointments")
 async def appointments_list(request: Request, user: User = Depends(get_current_user)):
     context = request.state.company
+    if not has_permission(context, "appointments_all") and not has_permission(context, "appointments_own"):
+        raise HTTPException(403, "Vous n'avez pas accès aux rendez-vous")
     view = request.query_params.get("view")
     employee_id = request.query_params.get("employee_id")
     if not has_permission(context, "appointments_all"):
@@ -106,10 +115,13 @@ async def appointments_list(request: Request, user: User = Depends(get_current_u
 
 @router.post("/appointments")
 async def appointments_create(payload: AppointmentCreate, request: Request, user: User = Depends(get_current_user)):
+    context = request.state.company
+    if not has_permission(context, "appointments_all") and not has_permission(context, "appointments_own"):
+        raise HTTPException(403, "Vous n'avez pas la permission de créer un rendez-vous")
     client_doc = await db.clients.find_one({"id": payload.client_id}, {"_id": 0})
     if not client_doc:
         raise HTTPException(404, "Client not found")
-    # Neighbor validation (if requested) â€” fetches theoretical supp too
+    # Neighbor validation (if requested) — fetches theoretical supp too
     neighbor_meta = await _validate_and_apply_neighbor(
         payload.client_id, payload.is_neighbor, payload.neighbor_of_client_id
     )
@@ -122,14 +134,13 @@ async def appointments_create(payload: AppointmentCreate, request: Request, user
         neighbor_of_client_id=payload.neighbor_of_client_id if (neighbor_meta and neighbor_meta["valid"]) else None,
     )
     client_name = f"{client_doc.get('first_name','')} {client_doc.get('last_name','')}".strip()
-    context = request.state.company
     requested_assignee = payload.assigned_employee_id
     if not has_permission(context, "appointments_all"):
         requested_assignee = context.user_id
     assigned_id, assigned_name = await _assignee(request, requested_assignee)
     duplicate = await db.appointments.find_one({"date": payload.date, "assigned_employee_id": assigned_id, "status": "scheduled"}) if assigned_id else None
     if duplicate:
-        raise HTTPException(409, "Cet employÃ© possÃ¨de dÃ©jÃ  un rendez-vous Ã  cette heure")
+        raise HTTPException(409, "Cet employé possède déjà un rendez-vous à cette heure")
     rdv = Appointment(
         client_id=payload.client_id,
         client_name=client_name,
@@ -169,6 +180,7 @@ async def appointments_update(rid: str, payload: AppointmentUpdate, request: Req
     current = await db.appointments.find_one({"id": rid}, {"_id": 0})
     if not current:
         raise HTTPException(404, "Not found")
+    _require_appointment_access(request, current)
     if current.get("status") == "done":
         raise HTTPException(400, "Appointment already finished")
     services_input = payload.services if payload.services is not None else [
@@ -214,7 +226,7 @@ async def appointments_update(rid: str, payload: AppointmentUpdate, request: Req
         target_date = payload.date or current.get("date")
         duplicate = await db.appointments.find_one({"date": target_date, "assigned_employee_id": assigned_id, "status": "scheduled"}) if assigned_id else None
         if duplicate and duplicate.get("id") != rid:
-            raise HTTPException(409, "Cet employÃ© possÃ¨de dÃ©jÃ  un rendez-vous Ã  cette heure")
+            raise HTTPException(409, "Cet employé possède déjà un rendez-vous à cette heure")
         update["assigned_employee_id"] = assigned_id
         update["assigned_employee_name"] = assigned_name
     if payload.date is not None:
@@ -232,21 +244,22 @@ async def appointments_update(rid: str, payload: AppointmentUpdate, request: Req
 
 
 @router.post("/appointments/{rid}/start-timer")
-async def appointments_start_timer(rid: str, user: User = Depends(get_current_user)):
-    return await _timer_action(rid, "start")
+async def appointments_start_timer(rid: str, request: Request, user: User = Depends(get_current_user)):
+    return await _timer_action(rid, "start", request)
 
 
 @router.post("/appointments/{rid}/timer")
-async def appointments_timer(rid: str, payload: Dict[str, Any], user: User = Depends(get_current_user)):
-    return await _timer_action(rid, payload.get("action") or "")
+async def appointments_timer(rid: str, payload: Dict[str, Any], request: Request, user: User = Depends(get_current_user)):
+    return await _timer_action(rid, payload.get("action") or "", request)
 
 
-async def _timer_action(rid: str, action: str):
+async def _timer_action(rid: str, action: str, request: Request):
     rdv = await db.appointments.find_one({"id": rid}, {"_id": 0})
     if not rdv:
         raise HTTPException(404, "Not found")
+    _require_appointment_access(request, rdv)
     if rdv.get("status") == "done":
-        raise HTTPException(400, "Rendez-vous dÃ©jÃ  terminÃ©")
+        raise HTTPException(400, "Rendez-vous déjà terminé")
     now = datetime.now(timezone.utc)
     started = rdv.get("started_at")
     status = rdv.get("timer_status") or ("running" if started else "idle")
@@ -256,14 +269,14 @@ async def _timer_action(rid: str, action: str):
         update = {"started_at": now.isoformat(), "timer_seconds": 0, "timer_status": "running"}
     elif action == "pause":
         if status != "running" or not started:
-            raise HTTPException(400, "Le chronomÃ¨tre n'est pas en cours")
+            raise HTTPException(400, "Le chronomètre n'est pas en cours")
         st = parse_iso(started)
         if st:
             seconds += (now - st).total_seconds()
         update = {"started_at": None, "timer_seconds": seconds, "timer_status": "paused"}
     elif action == "resume":
         if status != "paused":
-            raise HTTPException(400, "Le chronomÃ¨tre n'est pas en pause")
+            raise HTTPException(400, "Le chronomètre n'est pas en pause")
         update = {"started_at": now.isoformat(), "timer_seconds": seconds, "timer_status": "running"}
     elif action == "stop":
         if status == "running" and started:
@@ -271,7 +284,7 @@ async def _timer_action(rid: str, action: str):
             if st:
                 seconds += (now - st).total_seconds()
         elif status != "paused":
-            raise HTTPException(400, "Le chronomÃ¨tre n'est pas actif")
+            raise HTTPException(400, "Le chronomètre n'est pas actif")
         update = {"started_at": None, "timer_seconds": seconds, "timer_status": "stopped"}
     else:
         raise HTTPException(400, "action inconnue (start|pause|resume|stop)")
@@ -298,10 +311,10 @@ async def _apply_referral_reward(rdv: dict, svcs: list, final: float):
     Returns (new_final, gifted_service)."""
     info = await compute_referral_info(rdv["client_id"])
     if info["rewards_available"] <= 0:
-        raise HTTPException(400, "Aucune rÃ©compense parrainage disponible")
+        raise HTTPException(400, "Aucune récompense parrainage disponible")
     candidates = [s for s in svcs if not s.get("is_gift")]
     if not candidates:
-        raise HTTPException(400, "Aucune prestation Ã©ligible Ã  la gratuitÃ©")
+        raise HTTPException(400, "Aucune prestation éligible à la gratuité")
     target = max(candidates, key=lambda s: s.get("price", 0) or 0)
     target["is_gift"] = True
     target["gift_source"] = "referral"
@@ -348,10 +361,11 @@ async def _update_client_after_finish(rdv: dict, svcs: list, now: datetime, refe
 
 
 @router.post("/appointments/{rid}/finish")
-async def appointments_finish(rid: str, payload: FinishAppointment, user: User = Depends(get_current_user)):
+async def appointments_finish(rid: str, payload: FinishAppointment, request: Request, user: User = Depends(get_current_user)):
     rdv = await db.appointments.find_one({"id": rid}, {"_id": 0})
     if not rdv:
         raise HTTPException(404, "Not found")
+    _require_appointment_access(request, rdv)
     if rdv.get("status") == "done":
         raise HTTPException(400, "Already finished")
     now = datetime.now(timezone.utc)
@@ -406,11 +420,12 @@ async def appointments_finish(rid: str, payload: FinishAppointment, user: User =
 
 
 @router.post("/appointments/{rid}/schedule-next")
-async def appointments_schedule_next(rid: str, payload: Dict[str, Any], user: User = Depends(get_current_user)):
+async def appointments_schedule_next(rid: str, payload: Dict[str, Any], request: Request, user: User = Depends(get_current_user)):
     """Create the next recurring appointment: same client/services/time, +N weeks."""
     rdv = await db.appointments.find_one({"id": rid}, {"_id": 0})
     if not rdv:
         raise HTTPException(404, "Not found")
+    _require_appointment_access(request, rdv)
     try:
         weeks = int(payload.get("weeks", 5))
     except (TypeError, ValueError):
@@ -449,20 +464,22 @@ async def appointments_schedule_next(rid: str, payload: Dict[str, Any], user: Us
 
 
 @router.post("/appointments/{rid}/cancel")
-async def appointments_cancel(rid: str, user: User = Depends(get_current_user)):
+async def appointments_cancel(rid: str, request: Request, user: User = Depends(get_current_user)):
     rdv = await db.appointments.find_one({"id": rid}, {"_id": 0})
     if not rdv:
         raise HTTPException(404, "Not found")
+    _require_appointment_access(request, rdv)
     reversed_usages = await reverse_formula(rdv, user.user_id, "Annulation du rendez-vous")
     await db.appointments.update_one({"id": rid}, {"$set": {"status": "cancelled", "product_usages": reversed_usages}})
     return await db.appointments.find_one({"id": rid}, {"_id": 0})
 
 
 @router.put("/appointments/{rid}/payment")
-async def appointments_update_payment(rid: str, payload: Dict[str, Any], user: User = Depends(get_current_user)):
+async def appointments_update_payment(rid: str, payload: Dict[str, Any], request: Request, user: User = Depends(get_current_user)):
     rdv = await db.appointments.find_one({"id": rid}, {"_id": 0})
     if not rdv:
         raise HTTPException(404, "Not found")
+    _require_appointment_access(request, rdv)
     update = {}
     if "payment_mode" in payload:
         update["payment_mode"] = payload["payment_mode"]
@@ -479,9 +496,10 @@ async def appointments_update_payment(rid: str, payload: Dict[str, Any], user: U
 
 
 @router.delete("/appointments/{rid}")
-async def appointments_delete(rid: str, user: User = Depends(get_current_user)):
+async def appointments_delete(rid: str, request: Request, user: User = Depends(get_current_user)):
     rdv = await db.appointments.find_one({"id": rid}, {"_id": 0})
     if rdv:
+        _require_appointment_access(request, rdv)
         await reverse_formula(rdv, user.user_id, "Suppression du rendez-vous")
     await db.appointments.delete_one({"id": rid})
     return {"ok": True}
@@ -491,12 +509,16 @@ async def appointments_delete(rid: str, user: User = Depends(get_current_user)):
 async def appointments_products_update(
     rid: str,
     payload: List[AppointmentProductUsageInput],
+    request: Request,
     user: User = Depends(get_current_user),
 ):
     """Save a draft formula or reconcile an already completed appointment."""
     rdv = await db.appointments.find_one({"id": rid}, {"_id": 0})
     if not rdv:
         raise HTTPException(404, "Rendez-vous introuvable")
+    _require_appointment_access(request, rdv)
+    if not has_permission(request.state.company, "product_usage") and not has_permission(request.state.company, "stock"):
+        raise HTTPException(403, "Vous n'avez pas la permission de modifier les produits utilisés")
     desired = [item.model_dump() for item in payload]
     usages = (
         await reconcile_formula(rdv, desired, user.user_id)

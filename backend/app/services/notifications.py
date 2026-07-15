@@ -1,7 +1,7 @@
 """Simple in-DB notification store.
 
 Two audiences:
-- admin: notifications visible only to Julien (badge in nav, dashboard widget)
+- admin: notifications visible to the company administrators (badge and dashboard widget)
 - client: notifications visible in the client's public space (identified by client_id)
 """
 import secrets
