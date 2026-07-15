@@ -144,7 +144,7 @@ export default function AdminDashboard() {
   const stats = overview.stats || {};
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50" data-testid="platform-admin-dashboard">
       <header className="bg-[#0A192F] text-white"><div className="max-w-7xl mx-auto px-5 md:px-8 py-6 flex items-center gap-4"><div className="w-11 h-11 rounded-2xl bg-white/10 flex items-center justify-center"><ShieldCheck className="w-6 h-6 text-[#D4AF37]" /></div><div className="flex-1"><div className="font-serif text-2xl">Pilotage plateforme</div><div className="text-xs text-white/60">ActivitÃ©, entreprises et abonnements</div></div><div className="hidden md:block text-right mr-2"><div className="text-sm">{user?.email}</div><div className="text-[10px] uppercase tracking-widest text-white/50">Super-administrateur</div></div><button type="button" onClick={logout} className="p-3 rounded-full hover:bg-white/10" aria-label="Se dÃ©connecter"><LogOut className="w-5 h-5" /></button></div></header>
       <main className="max-w-7xl mx-auto px-5 md:px-8 py-8">
         <div className="flex flex-col md:flex-row md:items-end gap-4 mb-6"><div className="flex-1"><div className="text-[10px] uppercase tracking-[0.3em] text-slate-500 mb-2">Vue dâ€™ensemble</div><h1 className="font-serif text-4xl md:text-5xl tracking-tight">Administration gÃ©nÃ©rale</h1></div><button type="button" onClick={load} disabled={loading} className="border border-slate-200 bg-white rounded-full px-4 py-2.5 flex items-center justify-center gap-2 text-sm"><RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Actualiser</button></div>
