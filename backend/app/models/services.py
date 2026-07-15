@@ -7,6 +7,7 @@ class Service(BaseModel):
     name: str
     price: float
     category: str  # HOMME, FEMME, ENFANT, AUTRE
+    theme: str = "COUPES_COIFFAGE"
     duration_minutes: int = 45  # durée théorique pour la planification
 
 
@@ -14,4 +15,5 @@ class ServiceCreate(BaseModel):
     name: str
     price: float
     category: str
+    theme: str = "COUPES_COIFFAGE"
     duration_minutes: int = 45
