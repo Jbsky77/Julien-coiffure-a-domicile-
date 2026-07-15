@@ -241,8 +241,7 @@ export default function PayrollModule() {
       document.kind === "payroll" ? document.calculation?.gross : document.calculation?.subtotal_ht,
       document.kind === "payroll" ? document.calculation?.net_paid : document.calculation?.total_ttc,
     ]));
-    const csv = rows.map((row) => row.map((cell) => '"' + String(cell ?? "").replace(/"/g, '""') + '"').join(";")).join("
-");
+    const csv = rows.map((row) => row.map((cell) => '"' + String(cell ?? "").replace(/"/g, '""') + '"').join(";")).join("\n");
     const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
