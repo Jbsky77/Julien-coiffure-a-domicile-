@@ -86,3 +86,5 @@ $$;
 
 revoke all on function public.apply_stock_movement(uuid, text, numeric, jsonb) from public, anon, authenticated;
 grant execute on function public.apply_stock_movement(uuid, text, numeric, jsonb) to service_role;
+
+-- Consolidated preview build.
