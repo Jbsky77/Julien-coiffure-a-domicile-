@@ -46,7 +46,10 @@ api.interceptors.request.use(async (config) => {
 });
 
 api.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    res.data = repairMojibake(res.data);
+    return res;
+  },
   (err) => {
     if (err.response?.status === 401 && err.response?.data?.detail === "Locked") {
       pinStorage.clear();
@@ -59,9 +62,30 @@ api.interceptors.response.use(
   }
 );
 
+const MOJIBAKE_REPLACEMENTS = [
+  ["â‚¬", "€"], ["Ã©", "é"], ["Ã¨", "è"], ["Ãª", "ê"],
+  ["Ã ", "à"], ["Ã¢", "â"], ["Ã§", "ç"], ["Ã´", "ô"],
+  ["Ã®", "î"], ["Ã¹", "ù"], ["Ã‰", "É"], ["â€™", "’"],
+  ["â€“", "–"], ["â€”", "—"], ["â€¦", "…"], ["Â ", " "],
+];
+
+export const repairMojibake = (value) => {
+  if (typeof value === "string") {
+    return MOJIBAKE_REPLACEMENTS.reduce(
+      (text, [broken, corrected]) => text.split(broken).join(corrected),
+      value
+    );
+  }
+  if (Array.isArray(value)) return value.map(repairMojibake);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, repairMojibake(item)]));
+  }
+  return value;
+};
+
 export const money = (n) => {
-  if (n === null || n === undefined || Number.isNaN(Number(n))) return "0,00 â‚¬";
-  return `${Number(n).toFixed(2).replace(".", ",")} â‚¬`;
+  if (n === null || n === undefined || Number.isNaN(Number(n))) return "0,00 €";
+  return `${Number(n).toFixed(2).replace(".", ",")} €`;
 };
 
 export const money2 = (n) => {
@@ -89,8 +113,8 @@ export const fmtMonth = (yyyymm) => {
 
 export const PAYMENT_MODES = [
   { id: "CB", label: "Carte Bancaire" },
-  { id: "CHEQUE", label: "ChÃ¨que" },
-  { id: "ESPECES", label: "EspÃ¨ces" },
+  { id: "CHEQUE", label: "Chèque" },
+  { id: "ESPECES", label: "Espèces" },
   { id: "VIREMENT", label: "Virement" },
 ];
 
