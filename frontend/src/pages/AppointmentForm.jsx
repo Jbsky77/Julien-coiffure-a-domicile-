@@ -70,28 +70,30 @@ export default function AppointmentForm() {
   const [neighborCheck, setNeighborCheck] = useState(null); // {valid, distance_km, discount, message, ...}
   const [checkingNeighbor, setCheckingNeighbor] = useState(false);
   const [serviceFilter, setServiceFilter] = useState("TOUS");
+  const [serviceAudience, setServiceAudience] = useState("AUTO");
   const [serviceSearch, setServiceSearch] = useState("");
   const [savingFormula, setSavingFormula] = useState(false);
 
   const selectedClient = useMemo(() => clients.find((client) => client.id === form.client_id) || null, [clients, form.client_id]);
   const selectedGender = (selectedClient?.gender || "").toUpperCase();
   const isFamilyPack = (service) => /famille/i.test(service?.name || "") || (service?.category || "").toUpperCase() === "FAMILLE";
-  const genderCompatibleServices = useMemo(() => services.filter((service) => {
+  const automaticAudience = selectedGender === "H" ? "HOMME" : selectedGender === "F" ? "FEMME" : "TOUS";
+  const activeAudience = serviceAudience === "AUTO" ? automaticAudience : serviceAudience;
+  const audienceCompatibleServices = useMemo(() => services.filter((service) => {
     if (form.services.some((picked) => picked.service_id === service.id)) return true;
+    if (activeAudience === "TOUS") return true;
+    if (activeAudience === "FAMILLE") return isFamilyPack(service);
     if (isFamilyPack(service)) return true;
-    const category = (service.category || "").toUpperCase();
-    if (selectedGender === "H") return category === "HOMME";
-    if (selectedGender === "F") return category === "FEMME";
-    return true;
-  }), [services, selectedGender, form.services]);
-  const visibleServices = useMemo(() => genderCompatibleServices.filter((service) => {
+    return (service.category || "").toUpperCase() === activeAudience;
+  }), [services, activeAudience, form.services]);
+  const visibleServices = useMemo(() => audienceCompatibleServices.filter((service) => {
     const query = serviceSearch.trim().toLocaleLowerCase("fr-FR");
     const theme = getServiceTheme(service);
     const themeLabel = SERVICE_THEMES.find((item) => item.id === theme)?.label || "";
     const matchesSearch = !query || `${service.name} ${service.category} ${themeLabel}`.toLocaleLowerCase("fr-FR").includes(query);
     const matchesFilter = serviceFilter === "TOUS" || theme === serviceFilter;
     return matchesSearch && matchesFilter;
-  }), [genderCompatibleServices, serviceFilter, serviceSearch]);
+  }), [audienceCompatibleServices, serviceFilter, serviceSearch]);
 
   const isDone = rdv?.status === "done";
   const timerStatus = rdv?.timer_status || (rdv?.started_at ? "running" : "idle");
@@ -663,9 +665,30 @@ export default function AppointmentForm() {
 
       <div>
         <label className="text-[10px] tracking-widest uppercase text-slate-500">Prestations</label>
-        {selectedClient && (selectedGender === "H" || selectedGender === "F") && (
-          <div className="mt-2 text-xs text-slate-500">Prestations adaptées à {selectedGender === "H" ? "un homme" : "une femme"}. Le pack famille reste toujours disponible.</div>
-        )}
+        <div className="mt-2 text-xs text-slate-500">
+          Sélection automatique : {automaticAudience === "HOMME" ? "prestations homme" : automaticAudience === "FEMME" ? "prestations femme" : "toutes les prestations"}. Vous pouvez afficher une autre catégorie à tout moment.
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Choisir les prestations par public" data-testid="service-audience-filter">
+          {[
+            { id: "AUTO", label: "Automatique" },
+            { id: "HOMME", label: "Homme" },
+            { id: "FEMME", label: "Femme" },
+            { id: "ENFANT", label: "Enfant" },
+            { id: "FAMILLE", label: "Pack famille" },
+            { id: "TOUS", label: "Tout afficher" },
+          ].map((audience) => (
+            <button
+              key={audience.id}
+              type="button"
+              onClick={() => setServiceAudience(audience.id)}
+              aria-pressed={serviceAudience === audience.id}
+              data-testid={"service-audience-" + audience.id.toLowerCase()}
+              className={"px-3 py-2 rounded-full border text-xs font-medium transition-colors " + (serviceAudience === audience.id ? "bg-[#0A192F] border-[#0A192F] text-white" : "border-slate-200 text-slate-600 hover:bg-slate-50")}
+            >
+              {audience.label}
+            </button>
+          ))}
+        </div>
         <input type="search" value={serviceSearch} onChange={(e) => setServiceSearch(e.target.value)} placeholder="Rechercher une prestation…" aria-label="Rechercher une prestation" className={`${fieldBase} mt-3`} data-testid="service-search" />
         <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Filtrer les prestations">
           <button type="button" onClick={() => setServiceFilter("TOUS")} aria-pressed={serviceFilter === "TOUS"} className={`px-3 py-1.5 rounded-full text-xs ${serviceFilter === "TOUS" ? "bg-[#0A192F] text-white" : "border border-slate-200 text-slate-600"}`}>
