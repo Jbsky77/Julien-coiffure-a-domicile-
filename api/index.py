@@ -12,15 +12,24 @@ from app.main import app  # noqa: E402
 
 
 class SPAStaticFiles(StaticFiles):
-    """Serve index.html for client-side React routes."""
+    """Serve React routes without retaining an obsolete HTML shell."""
 
     async def get_response(self, path: str, scope):
         try:
-            return await super().get_response(path, scope)
+            response = await super().get_response(path, scope)
         except HTTPException as exc:
             if exc.status_code != 404:
                 raise
-            return await super().get_response("index.html", scope)
+            response = await super().get_response("index.html", scope)
+
+        if "text/html" in response.headers.get("content-type", ""):
+            response.headers["Cache-Control"] = (
+                "no-store, no-cache, must-revalidate, max-age=0"
+            )
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+            response.headers["Clear-Site-Data"] = '"cache"'
+        return response
 
 
 FRONTEND_BUILD = ROOT_DIR / "frontend" / "build"
