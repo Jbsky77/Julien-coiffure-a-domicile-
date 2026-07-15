@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import axios from "axios";
-import { API, pinStorage } from "@/lib/api";
+import { api, pinStorage } from "@/lib/api";
 import PinLock from "@/components/app/PinLock";
 import { Scissors } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -29,7 +28,7 @@ export default function PinGate({ children }) {
     let lastErr = null;
     for (let attempt = 0; attempt < 12; attempt += 1) {
       try {
-        const r = await axios.get(`${API}/pin/status`, { timeout: 8000 });
+        const r = await api.get("/pin/status", { timeout: 8000 });
         const configured = !!r.data?.configured;
         const now = Date.now();
         const stillValid = configured && pinStorage.get() && pinStorage.expiresAt() > now;
