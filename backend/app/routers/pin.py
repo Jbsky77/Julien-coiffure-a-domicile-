@@ -27,7 +27,11 @@ router = APIRouter()
 
 # Base salt used to derive the HMAC secret from the stored PIN hash so
 # every PIN change invalidates all previously issued tokens.
-_STATIC_PEPPER = os.environ.get("PIN_PEPPER", "coiffure-pro-pin-pepper-v2").encode("utf-8")
+_STATIC_PEPPER = (
+    os.environ.get("PIN_PEPPER")
+    or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    or "coiffure-pro-local-development-only"
+).encode("utf-8")
 
 
 # ---------------- data helpers ----------------------------------------
