@@ -144,7 +144,7 @@ def _company_rows(companies: list[dict], memberships: list[dict], subscriptions:
             "billing_cycle": "monthly",
             "status": "incomplete",
             "current_period_end": None,
-            "blocked_reason": "Abonnement non configurÃ©",
+            "blocked_reason": "Abonnement non configuré",
         })
         members = active_members[company["id"]]
         rows.append({
@@ -268,7 +268,7 @@ async def analytics(
             continue
         stats["appointments"] += 1
         status = doc.get("status") or "scheduled"
-        if status in {"canceled", "cancelled", "annule", "annulÃ©"}:
+        if status in {"canceled", "cancelled", "annule", "annulé"}:
             stats["canceled"] += 1
         if status == "done":
             stats["completed"] += 1
