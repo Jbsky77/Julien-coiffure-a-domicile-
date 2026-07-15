@@ -23,6 +23,17 @@ class MemberInvite(BaseModel):
     permissions: dict[str, bool] = Field(default_factory=dict)
 
 
+
+
+class MemberCreate(BaseModel):
+    first_name: str = Field(min_length=1, max_length=100)
+    last_name: str = Field(min_length=1, max_length=100)
+    email: str
+    password: str = Field(min_length=8, max_length=128)
+    role: Literal["admin", "employee", "reception"] = "employee"
+    permissions: dict[str, bool] = Field(default_factory=dict)
+
+
 class MemberUpdate(BaseModel):
     role: Literal["admin", "employee", "reception"] | None = None
     status: Literal["active", "suspended", "inactive"] | None = None
@@ -55,6 +66,82 @@ async def _find_user(client, url, headers, email):
 async def _auth_user(client, url, headers, user_id):
     response = await client.get(f"{url}/auth/v1/admin/users/{user_id}", headers=headers)
     return response.json() if response.status_code == 200 else {}
+
+
+@router.post("/create")
+async def create_member(payload: MemberCreate, request: Request):
+    """Create an active employee account without sending an invitation."""
+    context = _manager(request)
+    if context.role == "admin" and payload.role == "admin":
+        raise HTTPException(403, "Seul le propriétaire peut ajouter un administrateur")
+
+    email = payload.email.strip().lower()
+    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+        raise HTTPException(400, "Adresse e-mail invalide")
+    first_name = payload.first_name.strip()
+    last_name = payload.last_name.strip()
+    if not first_name or not last_name:
+        raise HTTPException(400, "Le prénom et le nom sont obligatoires")
+
+    url, secret = _config()
+    headers = _headers(secret)
+    now = datetime.now(timezone.utc)
+    user_id = None
+    async with httpx.AsyncClient(timeout=30) as client:
+        if await _find_user(client, url, headers, email):
+            raise HTTPException(409, "Un compte existe déjà avec cette adresse e-mail")
+
+        created = await client.post(
+            f"{url}/auth/v1/admin/users",
+            json={
+                "email": email,
+                "password": payload.password,
+                "email_confirm": True,
+                "user_metadata": {
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "full_name": f"{first_name} {last_name}",
+                },
+            },
+            headers=headers,
+        )
+        if created.status_code >= 400:
+            body = created.json()
+            detail = body.get("msg") or body.get("message") or "Création du compte impossible"
+            raise HTTPException(400, detail)
+        user_id = created.json().get("id")
+        if not user_id:
+            raise HTTPException(502, "Compte employé introuvable après sa création")
+
+        membership = {
+            "company_id": context.company_id,
+            "user_id": user_id,
+            "role": payload.role,
+            "status": "active",
+            "permissions": payload.permissions,
+            "display_name": f"{first_name} {last_name}",
+            "invited_by": context.user_id,
+            "invited_at": None,
+            "invitation_expires_at": None,
+            "joined_at": now.isoformat(),
+            "updated_at": now.isoformat(),
+        }
+        saved = await client.post(
+            f"{url}/rest/v1/company_members",
+            json=membership,
+            headers={**headers, "Prefer": "return=representation"},
+        )
+        if saved.status_code >= 400:
+            await client.delete(f"{url}/auth/v1/admin/users/{user_id}", headers=headers)
+            raise HTTPException(400, "Le compte n'a pas pu être rattaché à l'entreprise")
+
+    await db.audit_logs.insert_one({
+        "id": f"aud_{os.urandom(6).hex()}", "action": "member.created",
+        "entity_type": "company_member", "entity_id": user_id,
+        "actor_user_id": context.user_id,
+        "details": {"role": payload.role}, "created_at": now.isoformat(),
+    })
+    return {"ok": True, "message": "Employé créé et accès activé"}
 
 
 @router.get("")
