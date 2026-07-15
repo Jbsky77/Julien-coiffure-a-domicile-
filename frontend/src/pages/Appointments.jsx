@@ -3,6 +3,7 @@ import { api, money, fmtDate, fmtTime, genderClasses, genderLabel } from "@/lib/
 import { Link, useNavigate } from "react-router-dom";
 import { CalendarClock, Plus, CheckCircle2, Circle, LayoutList, CalendarDays, CalendarRange } from "lucide-react";
 import CalendarView from "@/components/app/CalendarView";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Appointments() {
   const [list, setList] = useState([]);
@@ -10,17 +11,23 @@ export default function Appointments() {
   const [tab, setTab] = useState("upcoming");
   const [view, setView] = useState("list");
   const [cursor, setCursor] = useState(new Date());
+  const [members, setMembers] = useState([]);
+  const [employeeFilter, setEmployeeFilter] = useState("");
+  const { activeCompany } = useAuth();
+  const canSeeAll = ["owner", "admin", "reception", "platform_admin"].includes(activeCompany?.role) || activeCompany?.permissions?.appointments_all;
   const navigate = useNavigate();
 
   useEffect(() => {
     (async () => {
-      const [r, c] = await Promise.all([api.get("/appointments"), api.get("/clients")]);
+      const params = employeeFilter === "mine" ? { view: "mine" } : employeeFilter === "unassigned" ? { view: "unassigned" } : employeeFilter ? { employee_id: employeeFilter } : {};
+      const [r, c, m] = await Promise.all([api.get("/appointments", { params }), api.get("/clients"), api.get("/company/members")]);
       setList(r.data);
       const map = {};
       c.data.forEach((x) => { map[x.id] = x; });
       setClientMap(map);
+      setMembers((m.data.members || []).filter((member) => member.status === "active"));
     })();
-  }, []);
+  }, [employeeFilter]);
 
   const now = new Date();
   const upcoming = list.filter((r) => r.status === "scheduled");
@@ -41,10 +48,16 @@ export default function Appointments() {
       </div>
 
       <div className="flex gap-2 items-center flex-wrap">
-        <button onClick={() => setTab("upcoming")} data-testid="tab-upcoming" className={`px-4 py-2 rounded-full text-sm ${tab === "upcoming" ? "bg-[#0A192F] text-white" : "border border-slate-200 text-slate-600"}`}>À venir ({upcoming.length})</button>
+        <button onClick={() => setTab("upcoming")} data-testid="tab-upcoming" className={`px-4 py-2 rounded-full text-sm ${tab === "upcoming" ? "bg-[#0A192F] text-white" : "border border-slate-200 text-slate-600"}`}>Ã€ venir ({upcoming.length})</button>
         <button onClick={() => setTab("done")} data-testid="tab-done" className={`px-4 py-2 rounded-full text-sm ${tab === "done" ? "bg-[#0A192F] text-white" : "border border-slate-200 text-slate-600"}`}>Historique ({done.length})</button>
-        <button onClick={() => setTab("cancelled")} data-testid="tab-cancelled" className={`px-4 py-2 rounded-full text-sm ${tab === "cancelled" ? "bg-[#991B1B] text-white" : "border border-slate-200 text-slate-600"}`}>Annulés ({cancelled.length})</button>
+        <button onClick={() => setTab("cancelled")} data-testid="tab-cancelled" className={`px-4 py-2 rounded-full text-sm ${tab === "cancelled" ? "bg-[#991B1B] text-white" : "border border-slate-200 text-slate-600"}`}>AnnulÃ©s ({cancelled.length})</button>
         <div className="flex-1" />
+        <select value={employeeFilter} onChange={(e) => setEmployeeFilter(e.target.value)} className="border border-slate-200 rounded-full px-4 py-2 text-sm bg-white" aria-label="Filtrer par employÃ©">
+          {canSeeAll && <option value="">Agenda de l'entreprise</option>}
+          <option value="mine">Mes rendez-vous</option>
+          {canSeeAll && <option value="unassigned">Non attribuÃ©s</option>}
+          {canSeeAll && members.map((member) => <option key={member.user_id} value={member.user_id}>{member.name}</option>)}
+        </select>
         <div className="flex gap-1 bg-slate-100 rounded-full p-1">
           <button onClick={() => setView("list")} data-testid="view-list" title="Liste" className={`px-3 py-1.5 rounded-full ${view === "list" ? "bg-white shadow-sm" : "text-slate-500"}`}><LayoutList className="w-4 h-4" /></button>
           <button onClick={() => setView("week")} data-testid="view-week" title="Semaine" className={`px-3 py-1.5 rounded-full ${view === "week" ? "bg-white shadow-sm" : "text-slate-500"}`}><CalendarDays className="w-4 h-4" /></button>
@@ -74,13 +87,13 @@ export default function Appointments() {
                         {r.client_name}
                       </div>
                       {r.family_pack_applied && <span className="text-[9px] tracking-wider uppercase px-2 py-0.5 rounded-full bg-[#D4AF37]/10 text-[#C5A059] border border-[#D4AF37]/30">Pack Famille</span>}
-                      {r.gift_applied && <span className="text-[9px] tracking-wider uppercase px-2 py-0.5 rounded-full bg-[#D4AF37]/10 text-[#C5A059] border border-[#D4AF37]/30">Gratuité</span>}
+                      {r.gift_applied && <span className="text-[9px] tracking-wider uppercase px-2 py-0.5 rounded-full bg-[#D4AF37]/10 text-[#C5A059] border border-[#D4AF37]/30">GratuitÃ©</span>}
                     </div>
-                    <div className="text-xs text-slate-500 mt-1">{fmtDate(r.date)} · {fmtTime(r.date)} · {r.services.map(s => s.name).join(", ") || "—"}</div>
+                    <div className="text-xs text-slate-500 mt-1">{fmtDate(r.date)} Â· {fmtTime(r.date)} Â· {r.services.map(s => s.name).join(", ") || "â€”"}</div>
                   </div>
                   <div className="text-right">
                     <div className="font-serif text-xl">{money(r.price_final)}</div>
-                    <div className="text-[10px] tracking-wider uppercase text-slate-400">{r.payment_mode || "—"}</div>
+                    <div className="text-[10px] tracking-wider uppercase text-slate-400">{r.payment_mode || "â€”"}</div>
                   </div>
                 </Link>
               </li>
