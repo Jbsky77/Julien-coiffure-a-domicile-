@@ -108,7 +108,7 @@ function ActivityView({ data }) {
 }
 
 function AdminMap({ data }) {
-  const points = data.map?.points || [];
+  const points = useMemo(() => data.map?.points || [], [data.map?.points]);
   const center = useMemo(() => points.length ? [points.reduce((sum, p) => sum + p.lat, 0) / points.length, points.reduce((sum, p) => sum + p.lng, 0) / points.length] : [46.6, 2.4], [points]);
   const companies = [...new Set(points.map((p) => p.company_id))];
   const colors = Object.fromEntries(companies.map((id, index) => [id, COLORS[index % COLORS.length]]));
