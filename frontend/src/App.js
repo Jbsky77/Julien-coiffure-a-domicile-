@@ -2,6 +2,7 @@ import React from "react";
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import "@/App.css";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { ThemeProvider } from "@/context/ThemeContext";
 import { Toaster } from "sonner";
 import Dashboard from "@/pages/Dashboard";
 import AdminDashboard from "@/pages/AdminDashboard";
@@ -12,6 +13,7 @@ import ClientDetail from "@/pages/ClientDetail";
 import Accounting from "@/pages/Accounting";
 import Stock from "@/pages/Stock";
 import Settings from "@/pages/Settings";
+import Team from "@/pages/Team";
 import Analytics from "@/pages/Analytics";
 import Tour from "@/pages/Tour";
 import ClientStatus from "@/pages/ClientStatus";
@@ -46,6 +48,7 @@ function RootRouter() {
         <Route path="/compta" element={<Accounting />} />
         <Route path="/stock" element={<Stock />} />
         <Route path="/reglages" element={<Settings />} />
+        <Route path="/equipe" element={<Team />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/tour" element={<Tour />} />
         <Route path="/clients-status" element={<ClientStatus />} />
@@ -58,7 +61,7 @@ function RootRouter() {
 
 function AdminRoute() {
   const { user, loading, isPlatformAdmin, activeCompany } = useAuth();
-  if (loading) return <div className="min-h-screen flex items-center justify-center">Chargement…</div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center">Chargementâ€¦</div>;
   if (!user) return <Navigate to="/login" replace />;
   if (!isPlatformAdmin) return <Navigate to="/" replace />;
   if (activeCompany) return <Navigate to="/" replace />;
@@ -67,10 +70,10 @@ function AdminRoute() {
 
 function PrivateApp() {
   const { user, loading, activeCompany, isPlatformAdmin } = useAuth();
-  if (loading) return <div className="min-h-screen flex items-center justify-center">Chargement…</div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center">Chargementâ€¦</div>;
   if (!user) return <Navigate to="/login" replace />;
   if (isPlatformAdmin && !activeCompany) return <Navigate to="/admin" replace />;
-  if (!activeCompany) return <div className="min-h-screen flex items-center justify-center p-6 text-center">Aucune entreprise active n’est associée à ce compte.</div>;
+  if (!activeCompany) return <div className="min-h-screen flex items-center justify-center p-6 text-center">Aucune entreprise active nâ€™est associÃ©e Ã  ce compte.</div>;
 
   if (isPlatformAdmin) {
     return <RootRouter />;
@@ -101,10 +104,12 @@ function AppRouter() {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <AppRouter />
-        <Toaster position="top-right" richColors closeButton />
-      </BrowserRouter>
+      <ThemeProvider>
+        <BrowserRouter>
+          <AppRouter />
+          <Toaster position="top-right" richColors closeButton />
+        </BrowserRouter>
+      </ThemeProvider>
     </AuthProvider>
   );
 }

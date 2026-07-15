@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 
 import httpx
@@ -20,6 +21,7 @@ class CompanyContext:
     email: str
     company_id: str
     role: str
+    permissions: dict[str, bool] | None = None
     company_name: str = ""
     is_platform_admin: bool = False
     subscription_status: str = ""
@@ -139,12 +141,13 @@ async def require_company_context(request: Request):
                 subscription_status=subscription_status,
             )
         else:
+            accepting_invite = request.url.path == "/api/company/members/accept"
             membership_response = await client.get(
                 f"{url}/rest/v1/company_members",
                 params={
                     "user_id": f"eq.{user_id}",
-                    "status": "eq.active",
-                    "select": "company_id,role,status",
+                    "status": "in.(active,invited)" if accepting_invite else "eq.active",
+                    "select": "company_id,role,status,permissions",
                     "order": "created_at.asc",
                 },
                 headers=headers,
@@ -162,6 +165,16 @@ async def require_company_context(request: Request):
                 raise HTTPException(status_code=403, detail="No active company membership")
             else:
                 raise HTTPException(status_code=409, detail="Select an active company")
+
+            if accepting_invite and membership.get("status") == "invited":
+                activation = await client.patch(
+                    f"{url}/rest/v1/company_members",
+                    params={"company_id": f"eq.{membership['company_id']}", "user_id": f"eq.{user_id}"},
+                    json={"status": "active", "joined_at": datetime.now(timezone.utc).isoformat()},
+                    headers=headers,
+                )
+                activation.raise_for_status()
+                membership["status"] = "active"
 
             company_response = await client.get(
                 f"{url}/rest/v1/companies",
@@ -198,7 +211,7 @@ async def require_company_context(request: Request):
                     detail={
                         "code": "subscription_required",
                         "status": subscription_status,
-                        "message": subscription.get("blocked_reason") or "Votre abonnement doit être régularisé.",
+                        "message": subscription.get("blocked_reason") or "Votre abonnement doit Ãªtre rÃ©gularisÃ©.",
                     },
                 )
 
@@ -207,6 +220,7 @@ async def require_company_context(request: Request):
                 email=user.get("email") or "",
                 company_id=membership["company_id"],
                 role=membership["role"],
+                permissions=membership.get("permissions") or {},
                 company_name=company.get("name") or "",
                 subscription_status=subscription_status,
             )
@@ -223,4 +237,32 @@ def require_role(request: Request, *allowed_roles: str) -> CompanyContext:
         return context
     if context.role not in allowed_roles:
         raise HTTPException(status_code=403, detail="Insufficient company role")
+    return context
+
+
+ROLE_PERMISSIONS = {
+    "owner": {"*"},
+    "admin": {"appointments_all", "appointments_own", "clients", "stock", "product_usage", "history", "orders", "team"},
+    "reception": {"appointments_all", "appointments_own", "clients", "history"},
+    "employee": {"appointments_own", "clients", "product_usage", "history"},
+    "accountant": {"history"},
+}
+
+
+def has_permission(context: CompanyContext, permission: str) -> bool:
+    if context.is_platform_admin or context.role == "owner":
+        return True
+    explicit = context.permissions or {}
+    if permission in explicit:
+        return bool(explicit[permission])
+    defaults = ROLE_PERMISSIONS.get(context.role, set())
+    return "*" in defaults or permission in defaults
+
+
+def require_permission(request: Request, permission: str) -> CompanyContext:
+    context = getattr(request.state, "company", None)
+    if context is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    if not has_permission(context, permission):
+        raise HTTPException(status_code=403, detail="Permission insuffisante")
     return context
