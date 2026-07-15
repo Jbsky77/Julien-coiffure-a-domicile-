@@ -124,7 +124,19 @@ export default function Tour() {
                     {s.conflict && " — Conflit probable"}
                   </div>
                 </div>
-                <div className={`${gc.bg} border-2 ${gc.border} rounded-2xl p-4`} data-testid={`tour-stop-${i}`}>
+                <div
+                  className={`${gc.bg} border-2 ${gc.border} rounded-2xl p-4 cursor-pointer hover:shadow-premium transition-all focus:outline-none focus:ring-2 focus:ring-[#D4AF37]`}
+                  data-testid={`tour-stop-${i}`}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Ouvrir le rendez-vous de ${s.client_name}`}
+                  onClick={(event) => {
+                    if (!event.target.closest("a,button")) navigate(`/rdv/${s.id}`);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") navigate(`/rdv/${s.id}`);
+                  }}
+                >
                   <div className="flex items-start gap-3">
                     <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[#0A192F] text-white flex items-center justify-center font-serif text-lg">{i + 1}</div>
                     <div className="flex-1 min-w-0">
