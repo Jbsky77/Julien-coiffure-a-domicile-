@@ -21,7 +21,7 @@ const attachSubscriptions = async (companies) => {
       plan_code: "starter",
       billing_cycle: "monthly",
       status: "incomplete",
-      blocked_reason: "Abonnement non configurÃ©",
+      blocked_reason: "Abonnement non configuré",
     },
   }));
 };
@@ -100,7 +100,7 @@ export function AuthProvider({ children }) {
     setUser(authUser ? {
       user_id: authUser.id,
       email: authUser.email,
-      name: authUser.email?.toLowerCase() === "julien46bouche@gmail.com" ? "Bouche Julien" : authUser.email,
+      name: authUser.user_metadata?.full_name || authUser.email,
       picture: "",
     } : null);
     try {
@@ -146,7 +146,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const expired = () => {
-      sessionStorage.setItem("jb_login_message", "Votre session a expirÃ©. Reconnectez-vous pour continuer.");
+      sessionStorage.setItem("jb_login_message", "Votre session a expiré. Reconnectez-vous pour continuer.");
       setSession(null);
       setUser(null);
       window.location.replace("/login");

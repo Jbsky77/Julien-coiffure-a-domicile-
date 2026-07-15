@@ -109,7 +109,7 @@ function IcalBlock() {
     <div className="flex items-center gap-2 flex-wrap">
       <input data-testid="ical-url" readOnly value={url || err || "Chargement…"} className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-full px-4 py-2 text-xs text-slate-600" />
       <button onClick={copy} disabled={!url} data-testid="ical-copy" className="rounded-full px-4 py-2 border border-slate-200 text-sm flex items-center gap-2 disabled:opacity-40"><Copy className="w-4 h-4" /> Copier</button>
-      {url && <a href={url} download="julienbouche.ics" data-testid="ical-download" className="rounded-full px-4 py-2 bg-[#0A192F] text-white text-sm flex items-center gap-2"><Calendar className="w-4 h-4" /> Télécharger .ics</a>}
+      {url && <a href={url} download="calendrier-rendez-vous.ics" data-testid="ical-download" className="rounded-full px-4 py-2 bg-[#0A192F] text-white text-sm flex items-center gap-2"><Calendar className="w-4 h-4" /> Télécharger .ics</a>}
       {url && <button onClick={rotate} data-testid="ical-rotate" className="rounded-full px-4 py-2 border border-slate-200 text-sm text-slate-600">Régénérer</button>}
     </div>
   );
@@ -148,7 +148,7 @@ export default function Settings() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `sauvegarde-julienbouche-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `sauvegarde-entreprise-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
       const total = Object.values(r.data.counts || {}).reduce((x, y) => x + y, 0);
@@ -256,7 +256,7 @@ export default function Settings() {
         <div className="text-[10px] tracking-widest uppercase text-slate-500 mb-5">Identité (signature & visuels)</div>
         <div>
           <label className="text-[10px] uppercase tracking-widest text-slate-500">Prénom (signature SMS / visuels Avant·Après)</label>
-          <input className={fb} data-testid="set-brand-name" value={settings.brand_name || ""} onChange={(e) => setSettings({ ...settings, brand_name: e.target.value })} placeholder="Julien" />
+          <input className={fb} data-testid="set-brand-name" value={settings.brand_name || ""} onChange={(e) => setSettings({ ...settings, brand_name: e.target.value })} placeholder="Nom de votre entreprise" />
           <div className="text-[10px] text-slate-500 mt-2">Apparaît dans la signature des SMS de relance et sur les visuels Avant·Après partagés.</div>
         </div>
         <button onClick={saveSettings} data-testid="save-brand-btn" className="mt-6 bg-[#0A192F] text-white rounded-full px-6 py-3 font-medium flex items-center gap-2"><Save className="w-4 h-4" /> Enregistrer</button>

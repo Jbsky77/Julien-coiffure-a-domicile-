@@ -1,10 +1,10 @@
-"""Appointment requests: client-initiated bookings pending Julien approval.
+"""Appointment requests initiated by clients and reviewed by the company.
 
 Lifecycle:
   pending          — created by client via public space
-  counter_proposed — Julien proposed a different slot; awaiting client
+  counter_proposed — the company proposed a different slot; awaiting client
   accepted         — both parties agreed → an Appointment is created
-  rejected         — Julien refused
+  rejected         — the company refused
   cancelled        — client withdrew / expired
 """
 import secrets

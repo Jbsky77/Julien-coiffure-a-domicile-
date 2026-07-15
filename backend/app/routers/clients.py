@@ -1,5 +1,6 @@
 """Clients CRUD + CRM status + relance log + import."""
 from datetime import datetime, timezone
+import secrets
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -42,6 +43,7 @@ async def clients_create(payload: ClientCreate, user: User = Depends(get_current
     if c.lat is None and c.address:
         c.lat, c.lng = await auto_geocode(c.address)
     await db.clients.insert_one(c.model_dump())
+    await db.sync_public_client_token(c.model_dump())
     return c.model_dump()
 
 
@@ -67,6 +69,7 @@ async def clients_import(payload: Dict[str, Any], user: User = Depends(get_curre
             birthday=it.get("birthday") or None,
         )
         await db.clients.insert_one(c.model_dump())
+        await db.sync_public_client_token(c.model_dump())
         created += 1
     return {"created": created}
 
@@ -92,7 +95,7 @@ async def clients_update(cid: str, payload: Dict[str, Any], user: User = Depends
         payload["referred_by"] = rb
         if rb:
             if rb == cid:
-                raise HTTPException(400, "Un client ne peut pas Ãªtre son propre parrain")
+                raise HTTPException(400, "Un client ne peut pas être son propre parrain")
             sponsor = await db.clients.find_one({"id": rb}, {"_id": 0, "id": 1})
             if not sponsor:
                 raise HTTPException(400, "Parrain introuvable")
@@ -113,6 +116,7 @@ async def clients_delete(cid: str, user: User = Depends(get_current_user)):
     for appointment in appointments:
         await reverse_formula(appointment, user.user_id, "Suppression de la fiche client")
     await db.clients.delete_one({"id": cid})
+    await db.revoke_public_client_token(cid)
     await db.appointments.delete_many({"client_id": cid})
     return {"ok": True}
 
@@ -122,3 +126,14 @@ async def log_relance(cid: str, user: User = Depends(get_current_user)):
     now = datetime.now(timezone.utc).isoformat()
     await db.relances.insert_one({"client_id": cid, "date": now})
     return {"ok": True, "date": now}
+
+
+@router.post("/clients/{cid}/public-link/rotate")
+async def rotate_client_public_link(cid: str, user: User = Depends(get_current_user)):
+    client = await db.clients.find_one({"id": cid}, {"_id": 0})
+    if not client:
+        raise HTTPException(404, "Client introuvable")
+    token = secrets.token_urlsafe(32)
+    await db.clients.update_one({"id": cid}, {"$set": {"access_token": token}})
+    await db.sync_public_client_token({"id": cid, "access_token": token})
+    return {"ok": True, "access_token": token}

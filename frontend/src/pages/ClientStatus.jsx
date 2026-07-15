@@ -14,7 +14,7 @@ const STATUS_META = {
 export default function ClientStatus() {
   const [list, setList] = useState([]);
   const [filter, setFilter] = useState("at_risk");
-  const [brandName, setBrandName] = useState("Julien");
+  const [brandName, setBrandName] = useState("Mon entreprise");
 
   useEffect(() => {
     (async () => {
@@ -22,7 +22,7 @@ export default function ClientStatus() {
       setList(r.data);
       try {
         const s = await api.get("/settings");
-        setBrandName(s.data.brand_name || "Julien");
+        setBrandName(s.data.brand_name || "Mon entreprise");
       } catch {}
     })();
   }, []);

@@ -11,7 +11,7 @@ class AppointmentService(BaseModel):
     price: float
     category: str
     is_gift: bool = False
-    stylist: str = "Julien"
+    stylist: str = ""
 
 
 class Appointment(BaseModel):
@@ -82,6 +82,6 @@ class FinishAppointment(BaseModel):
     payment_mode: str
     price_final: Optional[float] = None
     duration_minutes: Optional[int] = None
-    stylists: Optional[Dict[str, str]] = None  # service_id -> "Julien" | "Marley"
+    stylists: Optional[Dict[str, str]] = None  # service_id -> employee display name
     use_referral_reward: bool = False
     product_usages: Optional[List[AppointmentProductUsageInput]] = None

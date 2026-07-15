@@ -127,6 +127,42 @@ async def save_draft_formula(appointment: dict, desired: list[dict]) -> list[dic
     return [draft_usage(raw, appointment["id"], appointment["client_id"], previous.get(raw["id"])) for raw in desired]
 
 
+def _formula_movement_id(appointment: dict, usage_id: str, product_id: str, delta: float, previous_id: str | None, phase: str) -> str:
+    seed = f"{appointment['id']}:{usage_id}:{product_id}:{quantity(delta)}:{previous_id or 'initial'}:{phase}"
+    return f"mov_{hashlib.sha256(seed.encode('utf-8')).hexdigest()[:20]}"
+
+
+def _formula_operation(appointment: dict, item: dict, usage_id: str, delta: float, movement_type: str,
+                       movement_id: str, note: str, created_by: str | None) -> dict:
+    return {
+        "stock_key": item["id"],
+        "delta": quantity(delta),
+        "movement": {
+            "id": movement_id,
+            "stock_item_id": item["id"],
+            "catalog_product_id": item.get("catalog_product_id"),
+            "movement_type": movement_type,
+            "appointment_id": appointment["id"],
+            "client_id": appointment["client_id"],
+            "appointment_product_usage_id": usage_id,
+            "reason": note,
+            "created_by": created_by,
+        },
+    }
+
+
+async def _apply_formula_batch(appointment: dict, operations: list[dict], usages: list[dict]) -> list[dict]:
+    if not operations:
+        return usages
+    result = await db.rpc("apply_stock_formula", {
+        "p_company_id": get_active_company(),
+        "p_appointment_key": appointment["id"],
+        "p_operations": operations,
+        "p_product_usages": usages,
+    })
+    return result["product_usages"]
+
+
 async def reconcile_formula(appointment: dict, desired: list[dict], created_by: str | None) -> list[dict]:
     """Apply only the difference from the last applied formula.
 
@@ -137,21 +173,21 @@ async def reconcile_formula(appointment: dict, desired: list[dict], created_by: 
         old_list = appointment.get("product_usages") or []
         old_by_id = {item.get("id"): item for item in old_list if item.get("consumption_status") == "applied"}
         desired_by_id = {raw["id"]: raw for raw in desired}
+        operations = []
 
-        # Restore removed usages or usages whose selected reference changed.
         for usage_id, old in old_by_id.items():
             raw = desired_by_id.get(usage_id)
             if raw and raw.get("catalog_product_id") == old.get("catalog_product_id"):
                 continue
             item = await ensure_stock_item(old["catalog_product_id"])
-            _, movement = await record_movement(
-                item, old["used_stock_units"], "appointment_reversal",
-                appointment_id=appointment["id"], client_id=appointment["client_id"],
-                usage_id=usage_id, note="Restitution aprÃ¨s suppression ou changement de produit",
-                created_by=created_by,
+            movement_id = _formula_movement_id(
+                appointment, usage_id, old["catalog_product_id"], old["used_stock_units"],
+                old.get("stock_movement_id"), "restore",
             )
-            old["consumption_status"] = "reversed"
-            old["reversal_movement_id"] = movement["id"]
+            operations.append(_formula_operation(
+                appointment, item, usage_id, old["used_stock_units"], "appointment_reversal",
+                movement_id, "Restitution après suppression ou changement de produit", created_by,
+            ))
 
         result = []
         for raw in desired:
@@ -164,52 +200,51 @@ async def reconcile_formula(appointment: dict, desired: list[dict], created_by: 
             new_units = quantity(raw["used_stock_units"])
             delta = quantity(Decimal(str(old_units)) - Decimal(str(new_units)))
             item = await ensure_stock_item(raw["catalog_product_id"])
-            movement = None
-            before = quantity(item.get("quantity"))
-            after = before
+            movement_id = None
             if delta:
-                item, movement = await record_movement(
-                    item, delta,
-                    "appointment_usage" if delta < 0 else "appointment_reversal",
-                    appointment_id=appointment["id"], client_id=appointment["client_id"],
-                    usage_id=raw["id"],
-                    note="Consommation rendez-vous" if delta < 0 else "Correction de dose rendez-vous",
-                    created_by=created_by,
+                movement_id = _formula_movement_id(
+                    appointment, raw["id"], raw["catalog_product_id"], delta,
+                    (old or {}).get("stock_movement_id"), "reconcile",
                 )
-                before, after = movement["quantity_before"], movement["quantity_after"]
-            elif old:
-                before = old.get("stock_before")
-                after = old.get("stock_after")
-            now = now_iso()
+                operations.append(_formula_operation(
+                    appointment, item, raw["id"], delta,
+                    "appointment_usage" if delta < 0 else "appointment_reversal",
+                    movement_id, "Consommation rendez-vous" if delta < 0 else "Correction de dose rendez-vous",
+                    created_by,
+                ))
             result.append({
                 **draft_usage(raw, appointment["id"], appointment["client_id"], old),
                 "stock_item_id": item["id"],
-                "stock_before": before,
-                "stock_after": after,
+                "stock_before": (old or {}).get("stock_before"),
+                "stock_after": (old or {}).get("stock_after"),
                 "consumption_status": "applied",
-                "stock_movement_id": movement["id"] if movement else (old or {}).get("stock_movement_id"),
-                "updated_at": now,
+                "stock_movement_id": movement_id or (old or {}).get("stock_movement_id"),
+                "updated_at": now_iso(),
             })
-        return result
+        return await _apply_formula_batch(appointment, operations, result)
 
 
 async def reverse_formula(appointment: dict, created_by: str | None, reason: str) -> list[dict]:
     async with _stock_lock:
         result = []
+        operations = []
         for old in appointment.get("product_usages") or []:
             if old.get("consumption_status") != "applied":
                 result.append(old)
                 continue
             item = await ensure_stock_item(old["catalog_product_id"])
-            _, movement = await record_movement(
-                item, old["used_stock_units"], "appointment_reversal",
-                appointment_id=appointment["id"], client_id=appointment["client_id"],
-                usage_id=old["id"], note=reason, created_by=created_by,
+            movement_id = _formula_movement_id(
+                appointment, old["id"], old["catalog_product_id"], old["used_stock_units"],
+                old.get("stock_movement_id"), "reverse",
             )
+            operations.append(_formula_operation(
+                appointment, item, old["id"], old["used_stock_units"], "appointment_reversal",
+                movement_id, reason, created_by,
+            ))
             result.append({
                 **old,
                 "consumption_status": "reversed",
-                "reversal_movement_id": movement["id"],
+                "reversal_movement_id": movement_id,
                 "updated_at": now_iso(),
             })
-        return result
+        return await _apply_formula_batch(appointment, operations, result)

@@ -24,10 +24,10 @@ router = APIRouter()
 async def _resolve_client(token: str) -> dict:
     if not token or len(token) < 16:
         raise HTTPException(404, "Lien invalide")
-    doc = await db.clients.find_one({"access_token": token}, {"_id": 0})
-    if not doc:
+    resolved = await db.resolve_public_client(token)
+    if not resolved:
         raise HTTPException(404, "Lien invalide ou expiré")
-    return doc
+    return resolved[1]
 
 
 @router.get("/public/client/{token}")
@@ -59,7 +59,7 @@ async def get_client_space(token: str):
                     "name": s["name"],
                     "price": s["price"],
                     "is_gift": s.get("is_gift", False),
-                    "stylist": s.get("stylist", "Julien"),
+                    "stylist": s.get("stylist") or r.get("assigned_employee_name") or "",
                 }
                 for s in r.get("services") or []
             ],

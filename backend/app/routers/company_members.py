@@ -10,6 +10,7 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from app.db import db
 from app.tenancy import CompanyContext, require_role
 
 router = APIRouter(prefix="/company/members", tags=["company-members"])
@@ -63,10 +64,16 @@ async def list_members(request: Request):
         raise HTTPException(401, "Authentification requise")
     url, secret = _config()
     headers = _headers(secret)
+    can_manage = context.role in {"owner", "admin"} or context.is_platform_admin
     async with httpx.AsyncClient(timeout=30) as client:
         response = await client.get(
             f"{url}/rest/v1/company_members",
-            params={"company_id": f"eq.{context.company_id}", "select": "*", "order": "created_at.asc"},
+            params={
+                "company_id": f"eq.{context.company_id}",
+                **({} if can_manage else {"status": "eq.active"}),
+                "select": "*" if can_manage else "user_id,display_name,role,status",
+                "order": "created_at.asc",
+            },
             headers=headers,
         )
         response.raise_for_status()
@@ -76,8 +83,8 @@ async def list_members(request: Request):
             metadata = user.get("user_metadata") or {}
             result.append({
                 **membership,
-                "email": user.get("email") or "",
-                "name": membership.get("display_name") or metadata.get("full_name") or user.get("email") or "EmployÃ©",
+                "email": (user.get("email") or "") if can_manage else "",
+                "name": membership.get("display_name") or metadata.get("full_name") or user.get("email") or "Employé",
                 "is_current_user": membership["user_id"] == context.user_id,
                 "invitation_pending": membership.get("status") == "invited",
             })
@@ -88,7 +95,7 @@ async def list_members(request: Request):
 async def invite_member(payload: MemberInvite, request: Request):
     context = _manager(request)
     if context.role == "admin" and payload.role == "admin":
-        raise HTTPException(403, "Seul le propriÃ©taire peut ajouter un administrateur")
+        raise HTTPException(403, "Seul le propriétaire peut ajouter un administrateur")
     email = payload.email.strip().lower()
     if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
         raise HTTPException(400, "Adresse e-mail invalide")
@@ -97,9 +104,10 @@ async def invite_member(payload: MemberInvite, request: Request):
     now = datetime.now(timezone.utc)
     async with httpx.AsyncClient(timeout=30) as client:
         user = await _find_user(client, url, headers, email)
-        invited = user is None
-        if invited:
-            redirect = f"{os.environ.get('PUBLIC_APP_URL', 'https://julien-coiffure-domicile.vercel.app').rstrip('/')}/accept-invite"
+        new_user = user is None
+        redirect_base = f"{os.environ.get('PUBLIC_APP_URL', 'https://julien-coiffure-domicile.vercel.app').rstrip('/')}/accept-invite?company={context.company_id}"
+        if new_user:
+            redirect = f"{redirect_base}&existing=0"
             response = await client.post(
                 f"{url}/auth/v1/invite",
                 params={"redirect_to": redirect},
@@ -109,9 +117,21 @@ async def invite_member(payload: MemberInvite, request: Request):
             if response.status_code >= 400:
                 raise HTTPException(400, response.json().get("msg") or "Impossible d'envoyer l'invitation")
             user = response.json()
+        else:
+            redirect = f"{redirect_base}&existing=1"
+            # Existing users receive a passwordless link so they are explicitly
+            # informed and can accept the new company membership themselves.
+            response = await client.post(
+                f"{url}/auth/v1/otp",
+                params={"redirect_to": redirect},
+                json={"email": email, "create_user": False},
+                headers=headers,
+            )
+            if response.status_code >= 400:
+                raise HTTPException(400, "Impossible d'envoyer l'e-mail d'invitation")
         user_id = user.get("id")
         if not user_id:
-            raise HTTPException(502, "Compte employÃ© introuvable")
+            raise HTTPException(502, "Compte employé introuvable")
         check = await client.get(
             f"{url}/rest/v1/company_members",
             params={"company_id": f"eq.{context.company_id}", "user_id": f"eq.{user_id}", "select": "role", "limit": 1},
@@ -119,18 +139,18 @@ async def invite_member(payload: MemberInvite, request: Request):
         )
         check.raise_for_status()
         if check.json() and check.json()[0]["role"] == "owner":
-            raise HTTPException(400, "Le propriÃ©taire ne peut pas Ãªtre modifiÃ©")
+            raise HTTPException(400, "Le propriétaire ne peut pas être modifié")
         body = {
             "company_id": context.company_id,
             "user_id": user_id,
             "role": payload.role,
-            "status": "invited" if invited else "active",
+            "status": "invited",
             "permissions": payload.permissions,
             "display_name": payload.name.strip() or None,
             "invited_by": context.user_id,
             "invited_at": now.isoformat(),
-            "invitation_expires_at": (now + timedelta(hours=1)).isoformat() if invited else None,
-            "joined_at": None if invited else now.isoformat(),
+            "invitation_expires_at": (now + timedelta(hours=1)).isoformat(),
+            "joined_at": None,
             "updated_at": now.isoformat(),
         }
         saved = await client.post(
@@ -140,7 +160,7 @@ async def invite_member(payload: MemberInvite, request: Request):
             headers={**headers, "Prefer": "resolution=merge-duplicates,return=representation"},
         )
         saved.raise_for_status()
-    return {"ok": True, "message": "Invitation envoyÃ©e par e-mail" if invited else "EmployÃ© ajoutÃ© Ã  l'entreprise"}
+    return {"ok": True, "message": "Invitation envoyée par e-mail"}
 
 
 @router.post("/accept")
@@ -148,14 +168,99 @@ async def accept_invitation(request: Request):
     context = getattr(request.state, "company", None)
     if context is None:
         raise HTTPException(401, "Session d'invitation requise")
+    url, secret = _config()
+    headers = _headers(secret)
+    now = datetime.now(timezone.utc)
+    async with httpx.AsyncClient(timeout=20) as client:
+        response = await client.get(
+            f"{url}/rest/v1/company_members",
+            params={"company_id": f"eq.{context.company_id}", "user_id": f"eq.{context.user_id}", "select": "status,invitation_expires_at", "limit": 1},
+            headers=headers,
+        )
+        response.raise_for_status()
+        rows = response.json()
+        if not rows or rows[0].get("status") != "invited":
+            raise HTTPException(409, "Cette invitation a déjà été utilisée ou révoquée")
+        expires_at = rows[0].get("invitation_expires_at")
+        if not expires_at or datetime.fromisoformat(expires_at.replace("Z", "+00:00")) <= now:
+            raise HTTPException(410, "Cette invitation a expiré. Demandez un nouvel envoi.")
+        activation = await client.patch(
+            f"{url}/rest/v1/company_members",
+            params={"company_id": f"eq.{context.company_id}", "user_id": f"eq.{context.user_id}", "status": "eq.invited"},
+            json={"status": "active", "joined_at": now.isoformat(), "invitation_expires_at": None, "updated_at": now.isoformat()},
+            headers={**headers, "Prefer": "return=representation"},
+        )
+        activation.raise_for_status()
+        if not activation.json():
+            raise HTTPException(409, "Invitation déjà utilisée")
+    await db.audit_logs.insert_one({
+        "id": f"aud_{os.urandom(6).hex()}", "action": "member.invitation_accepted",
+        "entity_type": "company_member", "entity_id": context.user_id,
+        "actor_user_id": context.user_id, "details": {}, "created_at": now.isoformat(),
+    })
     return {"ok": True, "company_id": context.company_id}
+
+
+@router.post("/{user_id}/resend")
+async def resend_invitation(user_id: str, request: Request):
+    context = _manager(request)
+    url, secret = _config()
+    headers = _headers(secret)
+    redirect_base = f"{os.environ.get('PUBLIC_APP_URL', 'https://julien-coiffure-domicile.vercel.app').rstrip('/')}/accept-invite?company={context.company_id}"
+    now = datetime.now(timezone.utc)
+    async with httpx.AsyncClient(timeout=20) as client:
+        membership = await client.get(
+            f"{url}/rest/v1/company_members",
+            params={"company_id": f"eq.{context.company_id}", "user_id": f"eq.{user_id}", "status": "eq.invited", "select": "user_id", "limit": 1},
+            headers=headers,
+        )
+        membership.raise_for_status()
+        if not membership.json():
+            raise HTTPException(409, "Aucune invitation en attente")
+        auth_user = await _auth_user(client, url, headers, user_id)
+        email = auth_user.get("email")
+        if not email:
+            raise HTTPException(404, "Adresse e-mail introuvable")
+        redirect = f"{redirect_base}&existing={'1' if auth_user.get('confirmed_at') else '0'}"
+        sent = await client.post(
+            f"{url}/auth/v1/otp", params={"redirect_to": redirect},
+            json={"email": email, "create_user": False}, headers=headers,
+        )
+        if sent.status_code >= 400:
+            raise HTTPException(400, "Impossible de renvoyer l'invitation")
+        renewed = await client.patch(
+            f"{url}/rest/v1/company_members",
+            params={"company_id": f"eq.{context.company_id}", "user_id": f"eq.{user_id}"},
+            json={"invited_at": now.isoformat(), "invitation_expires_at": (now + timedelta(hours=1)).isoformat(), "updated_at": now.isoformat()},
+            headers=headers,
+        )
+        renewed.raise_for_status()
+    return {"ok": True, "message": "Invitation renvoyée"}
+
+
+@router.post("/{user_id}/revoke")
+async def revoke_invitation(user_id: str, request: Request):
+    context = _manager(request)
+    url, secret = _config()
+    headers = _headers(secret)
+    async with httpx.AsyncClient(timeout=20) as client:
+        revoked = await client.patch(
+            f"{url}/rest/v1/company_members",
+            params={"company_id": f"eq.{context.company_id}", "user_id": f"eq.{user_id}", "status": "eq.invited"},
+            json={"status": "inactive", "invitation_expires_at": None, "updated_at": datetime.now(timezone.utc).isoformat()},
+            headers={**headers, "Prefer": "return=representation"},
+        )
+        revoked.raise_for_status()
+        if not revoked.json():
+            raise HTTPException(409, "Aucune invitation en attente")
+    return {"ok": True}
 
 
 @router.patch("/{user_id}")
 async def update_member(user_id: str, payload: MemberUpdate, request: Request):
     context = _manager(request)
     if user_id == context.user_id and (payload.role is not None or payload.status is not None):
-        raise HTTPException(400, "Vous ne pouvez pas modifier votre propre rÃ´le ou statut")
+        raise HTTPException(400, "Vous ne pouvez pas modifier votre propre rôle ou statut")
     url, secret = _config()
     headers = _headers(secret)
     async with httpx.AsyncClient(timeout=20) as client:
@@ -167,12 +272,12 @@ async def update_member(user_id: str, payload: MemberUpdate, request: Request):
         response.raise_for_status()
         rows = response.json()
         if not rows:
-            raise HTTPException(404, "EmployÃ© introuvable")
+            raise HTTPException(404, "Employé introuvable")
         target = rows[0]
         if target["role"] == "owner":
-            raise HTTPException(400, "Le propriÃ©taire ne peut pas Ãªtre modifiÃ©")
+            raise HTTPException(400, "Le propriétaire ne peut pas être modifié")
         if context.role == "admin" and (target["role"] == "admin" or payload.role == "admin"):
-            raise HTTPException(403, "Seul le propriÃ©taire gÃ¨re les administrateurs")
+            raise HTTPException(403, "Seul le propriétaire gère les administrateurs")
         changes = payload.model_dump(exclude_none=True)
         changes["updated_at"] = datetime.now(timezone.utc).isoformat()
         update = await client.patch(
@@ -189,7 +294,7 @@ async def update_member(user_id: str, payload: MemberUpdate, request: Request):
 async def remove_member(user_id: str, request: Request):
     context = _manager(request)
     if user_id == context.user_id:
-        raise HTTPException(400, "Vous ne pouvez pas retirer votre propre accÃ¨s")
+        raise HTTPException(400, "Vous ne pouvez pas retirer votre propre accès")
     url, secret = _config()
     headers = _headers(secret)
     async with httpx.AsyncClient(timeout=20) as client:
@@ -201,11 +306,11 @@ async def remove_member(user_id: str, request: Request):
         response.raise_for_status()
         rows = response.json()
         if not rows:
-            raise HTTPException(404, "EmployÃ© introuvable")
+            raise HTTPException(404, "Employé introuvable")
         if rows[0]["role"] == "owner":
-            raise HTTPException(400, "Le propriÃ©taire ne peut pas Ãªtre retirÃ©")
+            raise HTTPException(400, "Le propriétaire ne peut pas être retiré")
         if context.role == "admin" and rows[0]["role"] == "admin":
-            raise HTTPException(403, "Seul le propriÃ©taire peut retirer un administrateur")
+            raise HTTPException(403, "Seul le propriétaire peut retirer un administrateur")
         updated = await client.patch(
             f"{url}/rest/v1/company_members",
             params={"company_id": f"eq.{context.company_id}", "user_id": f"eq.{user_id}"},

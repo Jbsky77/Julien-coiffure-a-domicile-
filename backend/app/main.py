@@ -1,8 +1,12 @@
 """FastAPI app entrypoint. Mounts every domain router under /api."""
 import logging
 import os
+import hashlib
+import re
+import time
+from collections import defaultdict, deque
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 
@@ -38,7 +42,7 @@ from app.routers.pin import _token_is_valid, _read_security
 from app.routers.services import ensure_default_services, migrate_service_durations
 from app.services.migrations import backfill_client_access_tokens, remove_legacy_referrals
 from app.services.settings import get_settings
-from app.tenancy import require_company_context, require_platform_admin_context, require_permission
+from app.tenancy import require_company_context, require_platform_admin_context, require_permission, require_role
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -87,6 +91,50 @@ _OPEN_PATHS = {
     "/api/pin/set",
 }
 
+_LOCAL_RATE_BUCKETS: dict[str, deque] = defaultdict(deque)
+
+
+def _rate_rule(path: str, method: str) -> tuple[int, int] | None:
+    if path.endswith("/pdf") and path.startswith("/api/public/client/"):
+        return 10, 60
+    if method == "POST" and "/booking-requests" in path and path.startswith("/api/public/sites/"):
+        return 10, 600
+    if path.startswith("/api/public/client/"):
+        return 120, 60
+    if path.startswith("/api/public/sites/"):
+        return 120, 60
+    return None
+
+
+async def _enforce_rate_limit(request: Request) -> None:
+    rule = _rate_rule(request.url.path, request.method)
+    if not rule:
+        return
+    limit, window_seconds = rule
+    forwarded = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+    client_ip = forwarded or (request.client.host if request.client else "unknown")
+    route_group = re.sub(r"/api/public/client/[^/]+", "/api/public/client/:token", request.url.path)
+    route_group = re.sub(r"/api/public/sites/[^/]+", "/api/public/sites/:site", route_group)
+    key = hashlib.sha256(f"{client_ip}:{request.method}:{route_group}".encode()).hexdigest()
+    try:
+        allowed = await db.rpc("consume_rate_limit", {
+            "p_key": key, "p_limit": limit, "p_window_seconds": window_seconds,
+        })
+        if not allowed:
+            raise HTTPException(status_code=429, detail="Trop de tentatives. Réessayez dans quelques instants.")
+        return
+    except HTTPException:
+        raise
+    except Exception:
+        # Safe fallback for local development or before the migration is applied.
+        now = time.monotonic()
+        bucket = _LOCAL_RATE_BUCKETS[key]
+        while bucket and bucket[0] <= now - window_seconds:
+            bucket.popleft()
+        if len(bucket) >= limit:
+            raise HTTPException(status_code=429, detail="Trop de tentatives. Réessayez dans quelques instants.")
+        bucket.append(now)
+
 
 def _requires_pin_token(path: str) -> bool:
     """Return whether this API path must already include an unlocked PIN token."""
@@ -107,6 +155,7 @@ async def pin_guard(request: Request, call_next):
     is_ical_feed = path.startswith("/api/calendar/") and path.endswith(".ics")
 
     try:
+        await _enforce_rate_limit(request)
         if is_public:
             parts = path.split("/")
             if len(parts) > 4 and parts[3] == "client":
@@ -137,6 +186,12 @@ async def pin_guard(request: Request, call_next):
                 if path.startswith(prefix):
                     require_permission(request, permission)
                     break
+            if request.method != "GET" and (path.startswith("/api/settings") or path.startswith("/api/services")):
+                require_role(request, "owner", "admin")
+            if path.startswith("/api/accounting/reset"):
+                require_role(request, "owner", "admin")
+            if path.startswith("/api/appointment-requests"):
+                require_permission(request, "appointments_all")
 
         if _requires_pin_token(path) and not is_platform_admin_api and not (company_context and company_context.is_platform_admin):
             sec = await _read_security()
@@ -154,12 +209,20 @@ async def pin_guard(request: Request, call_next):
             reset_active_company(company_token)
 
 
+allowed_origins = [
+    origin.strip().rstrip("/")
+    for origin in os.environ.get(
+        "ALLOWED_ORIGINS",
+        "https://julien-coiffure-domicile.vercel.app",
+    ).split(",")
+    if origin.strip()
+]
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origin_regex=".*",
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=allowed_origins,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Company-ID", "X-Pin-Token"],
 )
 
 

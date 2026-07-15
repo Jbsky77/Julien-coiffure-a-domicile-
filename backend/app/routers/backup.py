@@ -5,6 +5,7 @@ from app.db import db
 from app.dependencies import get_current_user
 from app.models.auth import User
 from app.utils.dates import now_utc
+from app.services.settings import get_settings
 
 router = APIRouter()
 
@@ -24,6 +25,7 @@ BACKUP_COLLECTIONS = [
 
 @router.get("/backup/export")
 async def backup_export(user: User = Depends(get_current_user)):
+    settings = await get_settings()
     data = {}
     counts = {}
     for name in BACKUP_COLLECTIONS:
@@ -31,7 +33,7 @@ async def backup_export(user: User = Depends(get_current_user)):
         data[name] = docs
         counts[name] = len(docs)
     return {
-        "app": "Coiffure à domicile Julien Bouche",
+        "app": settings.brand_name or "Mon entreprise",
         "format_version": 1,
         "exported_at": now_utc().isoformat(),
         "counts": counts,

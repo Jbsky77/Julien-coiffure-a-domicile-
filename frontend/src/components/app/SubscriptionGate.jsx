@@ -21,7 +21,8 @@ export default function SubscriptionGate({ children }) {
 
   const contactSupport = () => {
     const subject = encodeURIComponent(`Régularisation abonnement — ${activeCompany?.name || "Entreprise"}`);
-    window.location.href = `mailto:admin@admin.fr?subject=${subject}`;
+    const supportEmail = process.env.REACT_APP_SUPPORT_EMAIL || "support@coiffure-pro.fr";
+    window.location.href = `mailto:${supportEmail}?subject=${subject}`;
   };
 
   return (

@@ -101,7 +101,7 @@ export default function ClientSpace() {
 
   const shareReferral = async () => {
     const firstName = data?.client?.first_name || "";
-    const brandName = data?.brand?.name || "Julien Bouche";
+    const brandName = data?.brand?.name || "Mon entreprise";
     const msg = `Salut, je te recommande ${brandName}, coiffeur à domicile ! Prestation vraiment top. Contacte-le au 07 44 42 64 62 pour prendre RDV. Dis-lui que ${firstName} t'envoie 😉`;
     // Try native share first (best on mobile PWA)
     if (navigator.share) {
@@ -124,7 +124,7 @@ export default function ClientSpace() {
   if (!data) return <LoadingScreen />;
 
   const { client, appointments, requests, loyalty, notifications, brand, invoices, referral } = data;
-  const reviewLink = brand.review_url_short || brand.review_url || `https://www.google.com/search?q=${encodeURIComponent((brand.name || "Julien Bouche") + " coiffeur à domicile avis")}`;
+  const reviewLink = brand.review_url_short || brand.review_url || `https://www.google.com/search?q=${encodeURIComponent((brand.name || "Mon entreprise") + " coiffure avis")}`;
   const activeCounter = requests.find((r) => r.status === "counter_proposed");
   const doneAppointments = appointments.filter((a) => a.status === "done");
   const upcomingAppointments = appointments
@@ -467,7 +467,7 @@ export default function ClientSpace() {
           <section className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 space-y-4" data-testid="request-form">
             <div>
               <h3 className="font-serif text-2xl">Demander un rendez-vous</h3>
-              <p className="text-sm text-slate-500 mt-1">Choisissez vos prestations et une date. Julien vous confirmera rapidement.</p>
+              <p className="text-sm text-slate-500 mt-1">Choisissez vos prestations et une date. L’entreprise vous confirmera rapidement.</p>
             </div>
             <div>
               <label className="text-[10px] uppercase tracking-widest text-slate-500">Date et heure souhaitées</label>

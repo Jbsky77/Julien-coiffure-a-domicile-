@@ -137,7 +137,7 @@ export default function Accounting() {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(22);
     doc.setTextColor("#0A192F");
-    doc.text("Coiffure à domicile Julien Bouche", 14, 20);
+    doc.text("Rapport comptable de l’entreprise", 14, 20);
     doc.setFontSize(11);
     doc.setTextColor("#64748B");
     doc.text(`Comptabilité · ${fmtMonth(yyyymm)}`, 14, 28);

@@ -11,6 +11,6 @@ async def get_current_user(request: Request) -> User:
     return User(
         user_id=context.user_id,
         email=context.email,
-        name="Bouche Julien" if context.email.lower() == "julien46bouche@gmail.com" else context.email,
+        name=context.email,
         picture="",
     )

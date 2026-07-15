@@ -89,7 +89,7 @@ def build_invoice_pdf(invoice: dict, client: dict, brand_name: str) -> bytes:
         c.setFillColor(NAVY)
         c.drawString(21 * mm, y, s.get("name", ""))
         c.setFillColor(SLATE)
-        c.drawString(110 * mm, y, s.get("stylist", "Julien"))
+        c.drawString(110 * mm, y, s.get("stylist") or invoice.get("assigned_employee_name") or "")
         if s.get("is_gift"):
             c.setFillColor(GOLD)
             c.drawRightString(w - 21 * mm, y, "Offerte (fidélité)")
