@@ -116,11 +116,28 @@ function IcalBlock() {
 }
 
 const CATS = ["HOMME", "FEMME", "ENFANT", "AUTRE"];
+const THEMES = [
+  { id: "VENTE_PRODUITS", label: "Vente de produits", color: "bg-emerald-100 text-emerald-800 border-emerald-200" },
+  { id: "COLORATIONS", label: "Colorations", color: "bg-violet-100 text-violet-800 border-violet-200" },
+  { id: "BALAYAGES_MECHES", label: "Balayages et mèches", color: "bg-amber-100 text-amber-800 border-amber-200" },
+  { id: "COUPES_COIFFAGE", label: "Coupes et coiffage", color: "bg-blue-100 text-blue-800 border-blue-200" },
+  { id: "FORFAITS", label: "Forfaits", color: "bg-rose-100 text-rose-800 border-rose-200" },
+];
+const inferTheme = (service) => {
+  if (service?.theme) return service.theme;
+  const name = (service?.name || "").toLocaleLowerCase("fr-FR");
+  if (/produit|shampoing|soin à vendre/.test(name)) return "VENTE_PRODUITS";
+  if (/balayage|mèche/.test(name)) return "BALAYAGES_MECHES";
+  if (/couleur|coloration|patine/.test(name)) return "COLORATIONS";
+  if (/forfait|pack/.test(name)) return "FORFAITS";
+  return "COUPES_COIFFAGE";
+};
+const themeInfo = (service) => THEMES.find((theme) => theme.id === inferTheme(service)) || THEMES[3];
 
 export default function Settings() {
   const [settings, setSettings] = useState(null);
   const [services, setServices] = useState([]);
-  const [addForm, setAddForm] = useState({ name: "", price: 0, category: "HOMME", duration_minutes: 30 });
+  const [addForm, setAddForm] = useState({ name: "", price: 0, category: "HOMME", theme: "COUPES_COIFFAGE", duration_minutes: 30 });
   const [exporting, setExporting] = useState(false);
 
   const exportBackup = async () => {
@@ -159,7 +176,7 @@ export default function Settings() {
     if (!addForm.name) return toast.error("Nom requis");
     await api.post("/services", addForm);
     toast.success("Prestation ajoutée");
-    setAddForm({ name: "", price: 0, category: "HOMME", duration_minutes: 30 });
+    setAddForm({ name: "", price: 0, category: "HOMME", theme: "COUPES_COIFFAGE", duration_minutes: 30 });
     load();
   };
 
@@ -315,6 +332,22 @@ export default function Settings() {
           </div>
           <div className="text-[10px] text-slate-500 -mt-2">{addForm.category === "HOMME" ? "Apparaîtra dans les fiches M." : addForm.category === "FEMME" ? "Apparaîtra dans les fiches Mme" : addForm.category === "ENFANT" ? "Apparaîtra dans les fiches < 18 ans" : "Apparaîtra dans toutes les fiches"}</div>
           <div>
+            <label className="text-[10px] uppercase tracking-widest text-slate-500">Thème</label>
+            <div className="flex flex-wrap gap-2 mt-2" data-testid="svc-theme-picker">
+              {THEMES.map((theme) => (
+                <button
+                  key={theme.id}
+                  type="button"
+                  onClick={() => setAddForm({ ...addForm, theme: theme.id })}
+                  data-testid={`svc-add-theme-${theme.id}`}
+                  className={`px-3 py-2 rounded-xl border text-xs font-medium transition-all ${addForm.theme === theme.id ? theme.color + " shadow-sm" : "border-slate-200 text-slate-600 bg-white"}`}
+                >
+                  {theme.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
             <label className="text-[10px] uppercase tracking-widest text-slate-500">Pour qui ?</label>
             <div className="flex flex-wrap gap-2 mt-2">
               {[
@@ -347,6 +380,7 @@ export default function Settings() {
         <ul className="divide-y divide-slate-100">
           {services.map((s) => {
             const catColor = s.category === "HOMME" ? "bg-blue-100 text-blue-700" : s.category === "FEMME" ? "bg-pink-100 text-pink-700" : s.category === "ENFANT" ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-700";
+            const theme = themeInfo(s);
             return (
               <li key={s.id} className="py-3" data-testid={`svc-row-${s.id}`}>
                 <div className="flex items-center gap-2 flex-wrap">
@@ -354,6 +388,15 @@ export default function Settings() {
                   <input className="flex-1 min-w-[140px] bg-transparent border-b border-slate-200 py-1 focus:border-[#0A192F] focus:outline-none" defaultValue={s.name} onBlur={(e) => e.target.value !== s.name && updateService(s.id, { name: e.target.value })} />
                   <select className="text-xs bg-transparent border-b border-slate-200 py-1 focus:border-[#0A192F] focus:outline-none" defaultValue={s.category} onChange={(e) => updateService(s.id, { category: e.target.value })}>
                     {CATS.map((c) => <option key={c}>{c}</option>)}
+                  </select>
+                  <span className={`text-[9px] px-2 py-1 rounded-full border ${theme.color}`}>{theme.label}</span>
+                  <select
+                    aria-label="Thème de la prestation"
+                    className="text-xs bg-transparent border-b border-slate-200 py-1 focus:border-[#0A192F] focus:outline-none"
+                    value={inferTheme(s)}
+                    onChange={(e) => updateService(s.id, { theme: e.target.value })}
+                  >
+                    {THEMES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
                   </select>
                   <button onClick={() => deleteService(s.id)} className="text-[#991B1B] hover:bg-red-50 p-2 rounded-full" data-testid={`svc-del-${s.id}`}><Trash2 className="w-4 h-4" /></button>
                 </div>

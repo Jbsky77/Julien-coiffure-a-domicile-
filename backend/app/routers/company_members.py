@@ -16,6 +16,7 @@ router = APIRouter(prefix="/company/members", tags=["company-members"])
 
 class MemberInvite(BaseModel):
     email: str
+    password: str | None = None
     role: Literal["admin", "employee"] = "employee"
 
 
@@ -102,24 +103,28 @@ async def invite_member(payload: MemberInvite, request: Request):
         raise HTTPException(status_code=400, detail="Adresse e-mail invalide")
     url, secret = _config()
     headers = _admin_headers(secret)
-    public_url = os.environ.get("PUBLIC_APP_URL", "https://julien-coiffure-domicile.vercel.app").rstrip("/")
-
     async with httpx.AsyncClient(timeout=30) as client:
         user = await _find_user_by_email(client, url, headers, email)
-        invited = False
+        created = False
         if user is None:
+            password = str(payload.password or "")
+            if len(password) < 8:
+                raise HTTPException(status_code=400, detail="Le mot de passe doit contenir au moins 8 caractères")
             response = await client.post(
-                f"{url}/auth/v1/invite",
-                params={"redirect_to": f"{public_url}/accept-invite"},
-                json={"email": email, "data": {"invited_to_company": context.company_id}},
+                f"{url}/auth/v1/admin/users",
+                json={
+                    "email": email,
+                    "password": password,
+                    "email_confirm": True,
+                    "user_metadata": {"invited_to_company": context.company_id},
+                },
                 headers=headers,
             )
             if response.status_code >= 400:
                 detail = response.json().get("msg") if response.headers.get("content-type", "").startswith("application/json") else None
-                raise HTTPException(status_code=400, detail=detail or "Impossible d'envoyer l'invitation")
-            invite_payload = response.json()
-            user = invite_payload.get("user") or invite_payload
-            invited = True
+                raise HTTPException(status_code=400, detail=detail or "Impossible de créer le compte employé")
+            user = response.json()
+            created = True
 
         user_id = user.get("id")
         if not user_id:
@@ -155,9 +160,9 @@ async def invite_member(payload: MemberInvite, request: Request):
 
     return {
         "ok": True,
-        "invited": invited,
+        "created": created,
         "email": email,
-        "message": "Invitation envoyée par e-mail" if invited else "Employé ajouté à l'entreprise",
+        "message": "Compte employé créé et activé" if created else "Employé ajouté à l'entreprise",
     }
 
 

@@ -5,6 +5,22 @@ import { toast } from "sonner";
 import { ArrowLeft, Gift, Send, Trash2, CheckCircle2, Pencil, Sparkles, Clock, Repeat, AlertTriangle, UserRound, Timer, Play, Pause, Square, MapPin, Phone, MessageSquare } from "lucide-react";
 
 const STYLISTS = ["Julien", "Marley"];
+const SERVICE_THEMES = [
+  { id: "VENTE_PRODUITS", label: "Produits", active: "bg-emerald-600 text-white", idle: "border-emerald-200 text-emerald-800 bg-emerald-50" },
+  { id: "COLORATIONS", label: "Colorations", active: "bg-violet-600 text-white", idle: "border-violet-200 text-violet-800 bg-violet-50" },
+  { id: "BALAYAGES_MECHES", label: "Balayages & mèches", active: "bg-amber-500 text-white", idle: "border-amber-200 text-amber-800 bg-amber-50" },
+  { id: "COUPES_COIFFAGE", label: "Coupes & coiffage", active: "bg-blue-600 text-white", idle: "border-blue-200 text-blue-800 bg-blue-50" },
+  { id: "FORFAITS", label: "Forfaits", active: "bg-rose-600 text-white", idle: "border-rose-200 text-rose-800 bg-rose-50" },
+];
+const getServiceTheme = (service) => {
+  if (service?.theme) return service.theme;
+  const name = (service?.name || "").toLocaleLowerCase("fr-FR");
+  if (/produit|shampoing|soin à vendre/.test(name)) return "VENTE_PRODUITS";
+  if (/balayage|mèche/.test(name)) return "BALAYAGES_MECHES";
+  if (/couleur|coloration|patine/.test(name)) return "COLORATIONS";
+  if (/forfait|pack/.test(name)) return "FORFAITS";
+  return "COUPES_COIFFAGE";
+};
 
 const isoToLocalInput = (iso) => {
   const d = new Date(iso);
@@ -63,10 +79,11 @@ export default function AppointmentForm() {
     return true;
   }), [services, selectedGender, form.services]);
   const visibleServices = useMemo(() => genderCompatibleServices.filter((service) => {
-    const category = (service.category || "").toUpperCase();
     const query = serviceSearch.trim().toLocaleLowerCase("fr-FR");
-    const matchesSearch = !query || `${service.name} ${service.category}`.toLocaleLowerCase("fr-FR").includes(query);
-    const matchesFilter = serviceFilter === "TOUS" || (serviceFilter === "FORFAITS" ? /forfait|pack/i.test(service.name || "") : category === serviceFilter);
+    const theme = getServiceTheme(service);
+    const themeLabel = SERVICE_THEMES.find((item) => item.id === theme)?.label || "";
+    const matchesSearch = !query || `${service.name} ${service.category} ${themeLabel}`.toLocaleLowerCase("fr-FR").includes(query);
+    const matchesFilter = serviceFilter === "TOUS" || theme === serviceFilter;
     return matchesSearch && matchesFilter;
   }), [genderCompatibleServices, serviceFilter, serviceSearch]);
 
@@ -620,9 +637,18 @@ export default function AppointmentForm() {
         )}
         <input type="search" value={serviceSearch} onChange={(e) => setServiceSearch(e.target.value)} placeholder="Rechercher une prestation…" aria-label="Rechercher une prestation" className={`${fieldBase} mt-3`} data-testid="service-search" />
         <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Filtrer les prestations">
-          {["TOUS", "HOMME", "FEMME", "ENFANT", "FORFAITS", "COULEUR", "MÈCHES"].map((filter) => (
-            <button key={filter} type="button" onClick={() => setServiceFilter(filter)} aria-pressed={serviceFilter === filter} className={`px-3 py-1.5 rounded-full text-xs ${serviceFilter === filter ? "bg-[#0A192F] text-white" : "border border-slate-200 text-slate-600"}`}>
-              {filter === "TOUS" ? "Tous" : filter.charAt(0) + filter.slice(1).toLocaleLowerCase("fr-FR")}
+          <button type="button" onClick={() => setServiceFilter("TOUS")} aria-pressed={serviceFilter === "TOUS"} className={`px-3 py-1.5 rounded-full text-xs ${serviceFilter === "TOUS" ? "bg-[#0A192F] text-white" : "border border-slate-200 text-slate-600"}`}>
+            Tous
+          </button>
+          {SERVICE_THEMES.map((theme) => (
+            <button
+              key={theme.id}
+              type="button"
+              onClick={() => setServiceFilter(theme.id)}
+              aria-pressed={serviceFilter === theme.id}
+              className={`px-3 py-1.5 rounded-full border text-xs ${serviceFilter === theme.id ? theme.active : theme.idle}`}
+            >
+              {theme.label}
             </button>
           ))}
         </div>
@@ -636,7 +662,7 @@ export default function AppointmentForm() {
                 <button disabled={readOnly} onClick={() => toggleService(s.id)} data-testid={`svc-toggle-${s.id}`} className="w-full text-left flex items-center justify-between">
                   <div>
                     <div className="font-medium">{s.name}</div>
-                    <div className="text-xs text-slate-500">{s.category} · {money(s.price)}{isDone && picked ? ` · par ${(rdv?.services.find((x) => x.service_id === s.id)?.stylist) || "Julien"}` : ""}</div>
+                    <div className="text-xs text-slate-500">{SERVICE_THEMES.find((item) => item.id === getServiceTheme(s))?.label || "Coupes & coiffage"} · {s.category} · {money(s.price)}{isDone && picked ? ` · par ${(rdv?.services.find((x) => x.service_id === s.id)?.stylist) || "Julien"}` : ""}</div>
                   </div>
                   <div className="text-xs text-slate-400">{count}/5</div>
                 </button>

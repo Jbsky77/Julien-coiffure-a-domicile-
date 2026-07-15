@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api, genderClasses, genderLabel, computeAge } from "@/lib/api";
 import { Plus, Search, Upload } from "lucide-react";
 import { toast } from "sonner";
@@ -59,6 +59,8 @@ export default function Clients() {
   const [form, setForm] = useState({ first_name: "", last_name: "", phone: "", address: "", comment: "", birthday: "", referred_by: "" });
   const [addressParts, setAddressParts] = useState(emptyParts);
   const [addressCoords, setAddressCoords] = useState(null);
+  const [createdClient, setCreatedClient] = useState(null);
+  const navigate = useNavigate();
   const fileRef = useRef(null);
 
   const load = async () => {
@@ -76,7 +78,8 @@ export default function Clients() {
       address_parts: addressParts,
       ...(addressCoords || {}),
     };
-    await api.post("/clients", payload);
+    const response = await api.post("/clients", payload);
+    setCreatedClient(response.data);
     toast.success("Client créé");
     setShowAdd(false);
     setForm({ first_name: "", last_name: "", gender: "", phone: "", address: "", comment: "", birthday: "", referred_by: "" });
@@ -187,6 +190,45 @@ export default function Clients() {
           );
         })}
       </ul>
+      {createdClient && (
+        <div className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4" role="presentation">
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl p-6 space-y-5" role="dialog" aria-modal="true" aria-labelledby="created-client-title" data-testid="created-client-rdv-dialog">
+            <div>
+              <div className="text-[10px] tracking-[0.3em] uppercase text-[#C5A059] mb-2">Client enregistré</div>
+              <h2 id="created-client-title" className="font-serif text-2xl">Créer son premier rendez-vous ?</h2>
+              <p className="text-sm text-slate-500 mt-2">
+                {createdClient.first_name} {createdClient.last_name} sera automatiquement sélectionné dans le rendez-vous.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button
+                type="button"
+                onClick={() => navigate(`/rdv/nouveau?client=${createdClient.id}`)}
+                className="flex-1 bg-[#0A192F] text-white rounded-full px-5 py-3 text-sm font-medium"
+                data-testid="created-client-new-rdv"
+              >
+                Créer le rendez-vous
+              </button>
+              <button
+                type="button"
+                onClick={() => setCreatedClient(null)}
+                className="flex-1 border border-slate-200 rounded-full px-5 py-3 text-sm text-slate-600"
+                data-testid="created-client-later"
+              >
+                Plus tard
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setCreatedClient(null)}
+              aria-label="Fermer"
+              className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white border border-slate-200 text-slate-500"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
