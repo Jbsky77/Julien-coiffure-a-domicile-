@@ -1,4 +1,6 @@
+
 -- Non-destructive team evolution and atomic stock movements.
+-- Release verification marker: complete team and stock phase.
 alter table public.company_members
   add column if not exists display_name text,
   add column if not exists invited_by uuid,
