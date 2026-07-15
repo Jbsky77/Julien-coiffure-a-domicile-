@@ -21,7 +21,7 @@ const attachSubscriptions = async (companies) => {
       plan_code: "starter",
       billing_cycle: "monthly",
       status: "incomplete",
-      blocked_reason: "Abonnement non configuré",
+      blocked_reason: "Abonnement non configurÃ©",
     },
   }));
 };
@@ -65,13 +65,14 @@ export function AuthProvider({ children }) {
     } else {
       const { data, error } = await supabase
         .from("company_members")
-        .select("company_id,role,status,company:companies(id,name,slug,legal_name,siret,email,phone,city,logo_url,locale,timezone,status,created_at)")
+        .select("company_id,role,status,permissions,company:companies(id,name,slug,legal_name,siret,email,phone,city,logo_url,locale,timezone,status,created_at)")
         .eq("user_id", authUser.id)
         .eq("status", "active");
       if (error) throw error;
       available = await attachSubscriptions((data || []).map((item) => ({
         ...item.company,
         role: item.role,
+        permissions: item.permissions || {},
         membershipStatus: item.status,
       })).filter(Boolean));
     }
@@ -143,6 +144,17 @@ export function AuthProvider({ children }) {
     };
   }, [applySession]);
 
+  useEffect(() => {
+    const expired = () => {
+      sessionStorage.setItem("jb_login_message", "Votre session a expirÃ©. Reconnectez-vous pour continuer.");
+      setSession(null);
+      setUser(null);
+      window.location.replace("/login");
+    };
+    window.addEventListener("jb:session-expired", expired);
+    return () => window.removeEventListener("jb:session-expired", expired);
+  }, []);
+
   const signIn = async (email, password) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
@@ -153,7 +165,14 @@ export function AuthProvider({ children }) {
     localStorage.removeItem(COMPANY_KEY);
     localStorage.removeItem(IMPERSONATION_KEY);
     setActiveCompanyIdState(null);
-    await supabase.auth.signOut();
+    Object.keys(localStorage).filter((key) => key.startsWith("jb_") && !key.startsWith("jb_theme_")).forEach((key) => localStorage.removeItem(key));
+    if ("caches" in window) {
+      const keys = await window.caches.keys();
+      await Promise.all(keys.filter((key) => key.startsWith("jb-")).map((key) => window.caches.delete(key)));
+    }
+    await supabase.auth.signOut({ scope: "local" });
+    window.history.replaceState(null, "", "/login");
+    window.location.replace("/login");
   };
 
   const setActiveCompanyId = (companyId) => {

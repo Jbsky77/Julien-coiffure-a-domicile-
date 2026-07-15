@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
+from app.models.stock import AppointmentProductUsageInput
 from datetime import datetime, timezone
 import uuid
 
@@ -17,6 +18,8 @@ class Appointment(BaseModel):
     id: str = Field(default_factory=lambda: f"rdv_{uuid.uuid4().hex[:10]}")
     client_id: str
     client_name: str = ""
+    assigned_employee_id: Optional[str] = None
+    assigned_employee_name: Optional[str] = None
     date: str  # ISO datetime
     services: List[AppointmentService] = []
     kilometrage: float = 0
@@ -47,10 +50,12 @@ class Appointment(BaseModel):
     neighbor_routing_source: Optional[str] = None  # "osrm" | "haversine"
     neighbor_discount: float = 0  # remise voisin
     supplement_manually_overridden: bool = False
+    product_usages: List[Dict[str, Any]] = []
 
 
 class AppointmentCreate(BaseModel):
     client_id: str
+    assigned_employee_id: Optional[str] = None
     date: str
     services: List[Dict[str, Any]] = []  # list of {service_id, is_gift?}
     kilometrage: float = 0
@@ -58,16 +63,19 @@ class AppointmentCreate(BaseModel):
     price_final_override: Optional[float] = None
     is_neighbor: bool = False
     neighbor_of_client_id: Optional[str] = None
+    product_usages: List[AppointmentProductUsageInput] = []
 
 
 class AppointmentUpdate(BaseModel):
     date: Optional[str] = None
+    assigned_employee_id: Optional[str] = None
     services: Optional[List[Dict[str, Any]]] = None
     kilometrage: Optional[float] = None
     notes: Optional[str] = None
     price_final_override: Optional[float] = None
     is_neighbor: Optional[bool] = None
     neighbor_of_client_id: Optional[str] = None
+    product_usages: Optional[List[AppointmentProductUsageInput]] = None
 
 
 class FinishAppointment(BaseModel):
@@ -76,3 +84,4 @@ class FinishAppointment(BaseModel):
     duration_minutes: Optional[int] = None
     stylists: Optional[Dict[str, str]] = None  # service_id -> "Julien" | "Marley"
     use_referral_reward: bool = False
+    product_usages: Optional[List[AppointmentProductUsageInput]] = None

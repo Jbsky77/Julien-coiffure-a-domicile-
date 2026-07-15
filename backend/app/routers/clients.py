@@ -12,6 +12,7 @@ from app.services.client_status import compute_client_statuses
 from app.services.geocoding import auto_geocode
 from app.services.next_visit import compute_next_visit
 from app.services.referrals import compute_referral_info
+from app.services.stock import reverse_formula
 from app.utils.phone import phone_payload
 
 router = APIRouter()
@@ -79,7 +80,7 @@ async def clients_get(cid: str, user: User = Depends(get_current_user)):
     next_visit = await compute_next_visit(cid)
     referral = await compute_referral_info(cid)
     doc.update(phone_payload(doc.get("phone")))
-    rdvs.sort(key=lambda r: (r.get("date") or "", r.get("created_at") or ""))
+    rdvs.sort(key=lambda r: (r.get("date") or "", r.get("created_at") or ""), reverse=True)
     return {"client": doc, "appointments": rdvs, "next_visit": next_visit, "referral": referral}
 
 
@@ -91,7 +92,7 @@ async def clients_update(cid: str, payload: Dict[str, Any], user: User = Depends
         payload["referred_by"] = rb
         if rb:
             if rb == cid:
-                raise HTTPException(400, "Un client ne peut pas être son propre parrain")
+                raise HTTPException(400, "Un client ne peut pas Ãªtre son propre parrain")
             sponsor = await db.clients.find_one({"id": rb}, {"_id": 0, "id": 1})
             if not sponsor:
                 raise HTTPException(400, "Parrain introuvable")
@@ -108,6 +109,9 @@ async def clients_update(cid: str, payload: Dict[str, Any], user: User = Depends
 
 @router.delete("/clients/{cid}")
 async def clients_delete(cid: str, user: User = Depends(get_current_user)):
+    appointments = await db.appointments.find({"client_id": cid}, {"_id": 0}).to_list(5000)
+    for appointment in appointments:
+        await reverse_formula(appointment, user.user_id, "Suppression de la fiche client")
     await db.clients.delete_one({"id": cid})
     await db.appointments.delete_many({"client_id": cid})
     return {"ok": True}

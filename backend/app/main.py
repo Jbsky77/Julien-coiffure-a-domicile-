@@ -38,7 +38,7 @@ from app.routers.pin import _token_is_valid, _read_security
 from app.routers.services import ensure_default_services, migrate_service_durations
 from app.services.migrations import backfill_client_access_tokens, remove_legacy_referrals
 from app.services.settings import get_settings
-from app.tenancy import require_company_context, require_platform_admin_context
+from app.tenancy import require_company_context, require_platform_admin_context, require_permission
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -123,6 +123,20 @@ async def pin_guard(request: Request, call_next):
             await require_platform_admin_context(request)
         elif is_api and not is_ical_feed:
             company_token, company_context = await require_company_context(request)
+
+        if company_context and not company_context.is_platform_admin:
+            permission_prefixes = {
+                "/api/clients": "clients",
+                "/api/photos": "clients",
+                "/api/stock": "stock",
+                "/api/accounting": "history",
+                "/api/analytics": "history",
+                "/api/backup": "history",
+            }
+            for prefix, permission in permission_prefixes.items():
+                if path.startswith(prefix):
+                    require_permission(request, permission)
+                    break
 
         if _requires_pin_token(path) and not is_platform_admin_api and not (company_context and company_context.is_platform_admin):
             sec = await _read_security()
