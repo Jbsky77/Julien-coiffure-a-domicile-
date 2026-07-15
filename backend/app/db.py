@@ -256,6 +256,16 @@ class Store:
         rows = response.json()
         return rows[0]["company_id"] if rows else None
 
+    async def rpc(self, function_name: str, payload: dict) -> Any:
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.post(
+                f"{self.base_url}/rest/v1/rpc/{function_name}",
+                json=payload,
+                headers=self.headers,
+            )
+        response.raise_for_status()
+        return response.json()
+
     async def resolve_public_client(self, access_token: str) -> tuple[str, dict] | None:
         """Resolve a public client token and return its trusted company context."""
         rows = await self.request("GET", params={
