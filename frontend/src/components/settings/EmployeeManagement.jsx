@@ -16,6 +16,7 @@ export default function EmployeeManagement() {
   const canManage = ["owner", "admin"].includes(activeCompany?.role);
   const [members, setMembers] = useState([]);
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [role, setRole] = useState("employee");
   const [loading, setLoading] = useState(false);
   const [inviting, setInviting] = useState(false);
@@ -47,9 +48,10 @@ export default function EmployeeManagement() {
     if (!normalizedEmail) return toast.error("Adresse e-mail requise");
     setInviting(true);
     try {
-      const response = await api.post("/company/members/invite", { email: normalizedEmail, role });
+      const response = await api.post("/company/members/invite", { email: normalizedEmail, password, role });
       toast.success(response.data.message || "Employé ajouté");
       setEmail("");
+      setPassword("");
       setRole("employee");
       await load();
     } catch (error) {
@@ -79,12 +81,12 @@ export default function EmployeeManagement() {
         <div>
           <div className="text-[10px] tracking-widest uppercase text-slate-500">Équipe</div>
           <h2 className="font-serif text-2xl">Employés et accès</h2>
-          <p className="text-sm text-slate-500 mt-1">Invitez un employé à accéder aux données de {activeCompany?.name}.</p>
+          <p className="text-sm text-slate-500 mt-1">Créez un accès immédiatement utilisable pour {activeCompany?.name}.</p>
         </div>
       </div>
 
       <form onSubmit={invite} className="bg-slate-50 rounded-2xl p-4 mb-6 space-y-4" data-testid="employee-invite-form">
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_190px] gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_190px] gap-4">
           <label className="text-sm">
             <span className="text-[10px] uppercase tracking-widest text-slate-500">Adresse e-mail professionnelle</span>
             <input
@@ -95,6 +97,20 @@ export default function EmployeeManagement() {
               placeholder="employe@exemple.fr"
               className="mt-2 w-full bg-white border border-slate-200 rounded-xl px-4 py-3 outline-none focus:border-[#0A192F]"
               data-testid="employee-email"
+            />
+          </label>
+          <label className="text-sm">
+            <span className="text-[10px] uppercase tracking-widest text-slate-500">Mot de passe initial</span>
+            <input
+              type="password"
+              required
+              minLength={8}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="8 caractères minimum"
+              autoComplete="new-password"
+              className="mt-2 w-full bg-white border border-slate-200 rounded-xl px-4 py-3 outline-none focus:border-[#0A192F]"
+              data-testid="employee-password"
             />
           </label>
           <label className="text-sm">
@@ -111,7 +127,7 @@ export default function EmployeeManagement() {
           </label>
         </div>
         <div className="text-xs text-slate-500">
-          Un e-mail sécurisé permettra au nouvel employé de choisir son mot de passe.
+          Le compte sera actif immédiatement, sans confirmation par e-mail. Transmettez ces identifiants à l’employé par un moyen sûr.
         </div>
         <button
           type="submit"
@@ -120,7 +136,7 @@ export default function EmployeeManagement() {
           data-testid="employee-invite-button"
         >
           <UserPlus className="w-4 h-4" />
-          {inviting ? "Invitation en cours…" : "Ajouter l'employé"}
+          {inviting ? "Création en cours…" : "Créer le compte employé"}
         </button>
       </form>
 
