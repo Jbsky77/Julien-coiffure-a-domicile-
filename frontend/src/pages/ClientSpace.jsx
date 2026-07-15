@@ -400,7 +400,7 @@ export default function ClientSpace() {
                         <div className="font-medium text-sm">{fmtDate(a.date)}</div>
                         <div className="text-xs text-slate-500 mt-0.5">{a.services.map((s) => s.name).join(" · ")}</div>
                       </div>
-                      <div className="text-sm font-semibold text-[#0A192F]">{money(a.price_final)} €</div>
+                      <div className="text-sm font-semibold text-[#0A192F]">{money(a.price_final)}</div>
                     </div>
                   </li>
                 ))}
@@ -424,7 +424,7 @@ export default function ClientSpace() {
                       <div className="font-medium text-sm mt-1">{fmtDate(inv.date)}</div>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <div className="font-serif text-2xl text-[#0A192F]">{money(inv.price_final)} €</div>
+                      <div className="font-serif text-2xl text-[#0A192F]">{money(inv.price_final)}</div>
                       {inv.payment_mode && <div className="text-[10px] text-slate-400">{PAYMENT_LABELS[inv.payment_mode] || inv.payment_mode}</div>}
                     </div>
                   </div>
@@ -438,14 +438,14 @@ export default function ClientSpace() {
                         {s.is_gift ? (
                           <span className="text-xs text-[#C5A059] font-medium flex items-center gap-1"><Gift className="w-3 h-3" /> Offerte</span>
                         ) : (
-                          <span className="text-slate-600">{money(s.price)} €</span>
+                          <span className="text-slate-600">{money(s.price)}</span>
                         )}
                       </li>
                     ))}
                     {inv.fuel_supplement > 0 && (
                       <li className="flex items-center justify-between text-sm text-slate-500">
                         <span>Supplément déplacement</span>
-                        <span>{money(inv.fuel_supplement)} €</span>
+                        <span>{money(inv.fuel_supplement)}</span>
                       </li>
                     )}
                   </ul>
@@ -501,7 +501,7 @@ export default function ClientSpace() {
                         </span>
                         {s.name}
                       </span>
-                      <span className="text-xs text-slate-500">{money(s.price)}€ · {s.duration_minutes}min</span>
+                      <span className="text-xs text-slate-500">{money(s.price)} · {s.duration_minutes}min</span>
                     </button>
                   );
                 })}

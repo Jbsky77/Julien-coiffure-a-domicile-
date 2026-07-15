@@ -37,16 +37,35 @@
 }
 
 .dark body { background: #07101f; color: #f8fafc; }
-.dark .bg-white, .dark .bg-white\/90, .dark .bg-white\/95 { background-color: rgba(15, 27, 45, .96) !important; }
+.dark .min-h-screen { color: #f8fafc; }
+.dark .bg-white, .dark .bg-white\/90, .dark .bg-white\/95 { background-color: rgba(15, 27, 45, .98) !important; }
 .dark .bg-slate-50, .dark .bg-slate-50\/95, .dark .bg-slate-100 { background-color: #111f33 !important; }
-.dark .from-pink-50 { --tw-gradient-from: #101827 !important; }
+.dark .bg-red-50 { background-color: #35151c !important; }
+.dark .bg-green-50 { background-color: #102a22 !important; }
+.dark .bg-blue-50 { background-color: #102341 !important; }
+.dark .bg-pink-50 { background-color: #301827 !important; }
+.dark .bg-amber-50, .dark .bg-amber-100 { background-color: #35270e !important; }
+.dark .from-pink-50 { --tw-gradient-from: #0b1424 !important; }
 .dark .via-slate-50 { --tw-gradient-via: #07101f !important; }
-.dark .to-blue-50 { --tw-gradient-to: #0b1830 !important; }
+.dark .to-blue-50 { --tw-gradient-to: #0a1730 !important; }
 .dark .text-slate-900, .dark .text-slate-800, .dark .text-\[\#0A192F\] { color: #f8fafc !important; }
 .dark .text-slate-600, .dark .text-slate-500 { color: #cbd5e1 !important; }
 .dark .text-slate-400 { color: #94a3b8 !important; }
+.dark .text-green-700, .dark .text-\[\#166534\] { color: #86efac !important; }
+.dark .text-red-700, .dark .text-\[\#991B1B\] { color: #fca5a5 !important; }
+.dark .text-blue-600 { color: #93c5fd !important; }
+.dark .text-pink-600 { color: #f9a8d4 !important; }
+.dark .text-amber-950, .dark .text-\[\#8A6A1F\] { color: #fde68a !important; }
+.dark .text-\[\#C5A059\], .dark .text-\[\#D4AF37\] { color: #f5d96b !important; }
 .dark .border-slate-100, .dark .border-slate-200, .dark .border-slate-300 { border-color: #334155 !important; }
-.dark input, .dark select, .dark textarea { background-color: #0b1729; color: #f8fafc; border-color: #475569; }
+.dark .border-red-100, .dark .border-green-100, .dark .border-blue-100, .dark .border-amber-200 { border-color: #475569 !important; }
+.dark input, .dark select, .dark textarea { background-color: #0b1729 !important; color: #f8fafc !important; border-color: #64748b !important; }
+.dark input::placeholder, .dark textarea::placeholder { color: #94a3b8 !important; opacity: 1; }
+.dark option { background: #0b1729; color: #f8fafc; }
+.dark .hover\:bg-slate-50:hover { background-color: #1e293b !important; }
+.dark .hover\:bg-red-50:hover { background-color: #451a22 !important; }
+.dark .shadow-premium { box-shadow: 0 12px 35px rgba(0, 0, 0, .32); }
+.dark .divider { background: linear-gradient(90deg, transparent, #475569, transparent); }
 .dark ::-webkit-scrollbar-thumb { border-color: #07101f; background: #475569; }
 
 @layer base {
@@ -119,7 +138,7 @@ body {
 .no-scrollbar { scrollbar-width: none; }
 
 /* Dot separator */
-.dot-sep::before { content: "Â·"; margin: 0 0.5rem; color: #94a3b8; }
+.dot-sep::before { content: "·"; margin: 0 0.5rem; color: #94a3b8; }
 
 /* Progress gold slot */
 .slot { width: 14px; height: 14px; border-radius: 9999px; background: #E2E8F0; transition: all 0.3s ease; }

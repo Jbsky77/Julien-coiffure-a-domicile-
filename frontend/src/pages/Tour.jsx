@@ -124,19 +124,7 @@ export default function Tour() {
                     {s.conflict && " — Conflit probable"}
                   </div>
                 </div>
-                <div
-                  className={`${gc.bg} border-2 ${gc.border} rounded-2xl p-4 cursor-pointer hover:shadow-premium transition-all focus:outline-none focus:ring-2 focus:ring-[#D4AF37]`}
-                  data-testid={`tour-stop-${i}`}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`Ouvrir le rendez-vous de ${s.client_name}`}
-                  onClick={(event) => {
-                    if (!event.target.closest("a,button")) navigate(`/rdv/${s.id}`);
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") navigate(`/rdv/${s.id}`);
-                  }}
-                >
+                <div className={`${gc.bg} border-2 ${gc.border} rounded-2xl p-4`} data-testid={`tour-stop-${i}`}>
                   <div className="flex items-start gap-3">
                     <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[#0A192F] text-white flex items-center justify-center font-serif text-lg">{i + 1}</div>
                     <div className="flex-1 min-w-0">
@@ -157,8 +145,8 @@ export default function Tour() {
                       <div className="text-xs text-slate-500 mt-1 truncate">{s.services.map((x) => x.name).join(", ")}</div>
                       {(s.theoretical_supplement > 0 || s.billed_supplement > 0) && (
                         <div className="text-[10px] text-slate-500 mt-1">
-                          Suppl. théorique {money(s.theoretical_supplement)} € · facturé <span className="font-medium text-[#0A192F]">{money(s.billed_supplement)} €</span>
-                          {s.neighbor_discount > 0 && <> · <span className="text-[#8A6A1F]">−{money(s.neighbor_discount)} € voisin</span></>}
+                          Suppl. théorique {money(s.theoretical_supplement)} · facturé <span className="font-medium text-[#0A192F]">{money(s.billed_supplement)}</span>
+                          {s.neighbor_discount > 0 && <> · <span className="text-[#8A6A1F]">−{money(s.neighbor_discount)} voisin</span></>}
                         </div>
                       )}
                       <div className="flex items-center justify-between mt-3">
