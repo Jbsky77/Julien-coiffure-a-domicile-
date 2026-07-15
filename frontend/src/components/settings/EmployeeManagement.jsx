@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Mail, PauseCircle, PlayCircle, Trash2, UserPlus, Users, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -22,7 +22,7 @@ export default function EmployeeManagement() {
   const [loading, setLoading] = useState(false);
   const [inviting, setInviting] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!canManage) return;
     setLoading(true);
     try {
@@ -31,9 +31,9 @@ export default function EmployeeManagement() {
     } catch (error) {
       toast.error(error.response?.data?.detail || "Impossible de charger l'équipe");
     } finally { setLoading(false); }
-  };
+  }, [activeCompany?.id, canManage]);
 
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [activeCompany?.id, canManage]);
+  useEffect(() => { load(); }, [load]);
   if (!canManage) return <div className="rounded-2xl bg-amber-50 border border-amber-200 p-5">Vous n'avez pas la permission de gérer l'équipe.</div>;
 
   const invite = async (event) => {
