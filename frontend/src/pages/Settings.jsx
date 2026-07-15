@@ -123,9 +123,9 @@ const SERVICE_CATEGORIES = [
 ];
 const CATS = SERVICE_CATEGORIES.map((category) => category.id);
 const serviceCategory = (service) => {
+  if (/famille|pack/i.test(service?.name || "")) return "FAMILLE";
   const category = (service?.category || "").toUpperCase();
   if (CATS.includes(category)) return category;
-  if (/famille|pack/i.test(service?.name || "")) return "FAMILLE";
   return "FAMILLE";
 };
 const THEMES = [
