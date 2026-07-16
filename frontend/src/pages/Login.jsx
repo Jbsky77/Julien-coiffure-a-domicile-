@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Scissors } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { Navigate } from "react-router-dom";
+import { Navigate, Link } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 
