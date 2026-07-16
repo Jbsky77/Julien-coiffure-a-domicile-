@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Eye, EyeOff, PauseCircle, PlayCircle, Trash2, UserPlus, Users } from "lucide-react";
+import { Eye, EyeOff, PauseCircle, Pencil, PlayCircle, Save, Trash2, UserPlus, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -21,6 +21,7 @@ export default function EmployeeManagement() {
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [editing, setEditing] = useState(null);
 
   const load = useCallback(async () => {
     if (!canManage || !companyId) return;
@@ -54,6 +55,15 @@ export default function EmployeeManagement() {
     catch (error) { toast.error(error.response?.data?.detail || "Modification impossible"); }
   };
 
+  const startEditing = (member) => {
+    setEditing({ user_id: member.user_id, role: member.role, permissions: { ...(member.permissions || {}) } });
+  };
+
+  const saveEditing = async (member) => {
+    await patchMember(member, { role: editing.role, permissions: editing.permissions });
+    setEditing(null);
+  };
+
   const remove = async (member) => {
     if (!window.confirm("Retirer l'accès de " + member.email + " tout en conservant son historique ?")) return;
     try { await api.delete("/company/members/" + member.user_id); await load(); toast.success("Accès retiré, historique conservé"); }
@@ -78,11 +88,28 @@ export default function EmployeeManagement() {
     </form>
     <div className="divide-y">{loading && <div className="py-4">Chargement…</div>}{members.map((member) => {
       const protectedMember = member.role === "owner" || member.is_current_user || (activeCompany?.role === "admin" && member.role === "admin");
-      return <div key={member.user_id} className="py-4 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center">{(member.name || "E")[0].toUpperCase()}</div>
-        <div className="flex-1 min-w-0"><div className="font-medium truncate">{member.name}</div><div className="text-xs text-slate-500">{member.email}</div></div>
-        <div className="text-right"><div className="text-xs font-medium">{ROLE_LABELS[member.role] || member.role}</div><div className="text-[10px] text-slate-500">{member.status}{member.email === user?.email ? " · votre compte" : ""}</div></div>
-        {!protectedMember && <><button type="button" onClick={() => patchMember(member, { status: member.status === "active" ? "suspended" : "active" })} title={member.status === "active" ? "Suspendre" : "Réactiver"}>{member.status === "active" ? <PauseCircle className="w-4 h-4 text-amber-700" /> : <PlayCircle className="w-4 h-4 text-green-700" />}</button><button type="button" onClick={() => remove(member)} title="Retirer"><Trash2 className="w-4 h-4 text-red-700" /></button></>}
+      const isEditing = editing?.user_id === member.user_id;
+      return <div key={member.user_id} className="py-4 space-y-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center">{(member.name || "E")[0].toUpperCase()}</div>
+          <div className="flex-1 min-w-[180px]"><div className="font-medium truncate">{member.name}</div><div className="text-xs text-slate-500">{member.email}</div></div>
+          <div className="text-right"><div className="text-xs font-medium">{ROLE_LABELS[member.role] || member.role}</div><div className="text-[10px] text-slate-500">{member.status}{member.email === user?.email ? " · votre compte" : ""}</div></div>
+          {!protectedMember && <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => startEditing(member)} className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-3 py-2 text-xs font-medium hover:bg-slate-50"><Pencil className="w-4 h-4" />Modifier</button>
+            <button type="button" onClick={() => patchMember(member, { status: member.status === "active" ? "suspended" : "active" })} className="inline-flex items-center gap-2 rounded-full border border-amber-300 px-3 py-2 text-xs font-medium text-amber-800 hover:bg-amber-50">{member.status === "active" ? <PauseCircle className="w-4 h-4" /> : <PlayCircle className="w-4 h-4" />}{member.status === "active" ? "Suspendre" : "Réactiver"}</button>
+            <button type="button" onClick={() => remove(member)} className="inline-flex items-center gap-2 rounded-full border border-red-300 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-50"><Trash2 className="w-4 h-4" />Supprimer</button>
+          </div>}
+        </div>
+        {isEditing && <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-4">
+          <div className="flex items-center justify-between"><h3 className="font-medium">Modifier {member.name}</h3><button type="button" onClick={() => setEditing(null)} aria-label="Fermer"><X className="w-4 h-4" /></button></div>
+          <label className="block text-sm">Rôle
+            <select value={editing.role} onChange={(e) => setEditing({ ...editing, role: e.target.value })} className="mt-1 w-full bg-white border rounded-xl px-4 py-3">
+              <option value="employee">Employé</option><option value="reception">Accueil / réception</option>{activeCompany?.role === "owner" && <option value="admin">Administrateur</option>}
+            </select>
+          </label>
+          <div><div className="text-sm mb-2">Autorisations</div><div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-2">{PERMISSIONS.map(([key, label]) => <label key={key} className="flex items-center gap-2 text-xs bg-white border rounded-xl px-3 py-2"><input type="checkbox" checked={Boolean(editing.permissions[key])} onChange={(e) => setEditing({ ...editing, permissions: { ...editing.permissions, [key]: e.target.checked } })} />{label}</label>)}</div></div>
+          <div className="flex gap-2"><button type="button" onClick={() => saveEditing(member)} className="inline-flex items-center gap-2 rounded-full bg-[#0A192F] text-white px-5 py-2.5"><Save className="w-4 h-4" />Enregistrer</button><button type="button" onClick={() => setEditing(null)} className="rounded-full border px-5 py-2.5">Annuler</button></div>
+        </div>}
       </div>;
     })}</div>
   </section>;
