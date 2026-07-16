@@ -21,6 +21,8 @@ import MapPage from "@/pages/Map";
 import ClientSpace from "@/pages/ClientSpace";
 import AppointmentRequests from "@/pages/AppointmentRequests";
 import Login from "@/pages/Login";
+import Landing from "@/pages/Landing";
+import Signup from "@/pages/Signup";
 import AcceptInvite from "@/pages/AcceptInvite";
 import ResetPassword from "@/pages/ResetPassword";
 import Layout from "@/components/app/Layout";
@@ -71,7 +73,7 @@ function RootRouter() {
   return (
     <Routes>
       <Route element={<Protected />}>
-        <Route path="/" element={<Dashboard />} />
+        <Route path="/app" element={<Dashboard />} />
         <Route path="/rdv" element={<Appointments />} />
         <Route path="/rdv/nouveau" element={<AppointmentForm />} />
         <Route path="/rdv/:id" element={<AppointmentForm />} />
@@ -123,7 +125,9 @@ function PrivateApp() {
 function AppRouter() {
   return (
     <Routes>
-      <Route path="/c/:token" element={<ClientSpace />} />
+            <Route path="/" element={<Landing />} />
+      <Route path="/signup" element={<Signup />} />
+<Route path="/c/:token" element={<ClientSpace />} />
       <Route path="/login" element={<Login />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/accept-invite" element={<AcceptInvite />} />

@@ -18,7 +18,7 @@ export default function Login() {
   });
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">Chargement…</div>;
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to="/app" replace />;
 
   const submit = async (event) => {
     event.preventDefault();
@@ -87,7 +87,8 @@ export default function Login() {
           <button disabled={submitting} data-testid="login-btn" className="w-full bg-[#0A192F] text-white rounded-full px-8 py-4 font-medium hover:bg-[#1E3A8A] disabled:opacity-50">
             {submitting ? "Connexion…" : "Se connecter"}
           </button>
-        </form>
+                  <div className="text-center text-sm text-slate-600">Nouvelle entreprise ? <Link to="/signup" className="font-bold text-[#0A192F] hover:underline">S’inscrire</Link></div>
+</form>
       </div>
     </div>
   );
