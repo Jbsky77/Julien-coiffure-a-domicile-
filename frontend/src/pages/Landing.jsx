@@ -1,5 +1,5 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Scissors, CalendarDays, MapPinned, Users, Package, BarChart3, Route, ShieldCheck } from "lucide-react";
 
