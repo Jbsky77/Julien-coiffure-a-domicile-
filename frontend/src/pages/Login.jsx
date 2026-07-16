@@ -93,3 +93,6 @@ export default function Login() {
     </div>
   );
 }
+
+
+// Déploiement Vercel relancé le 16 juillet 2026.
