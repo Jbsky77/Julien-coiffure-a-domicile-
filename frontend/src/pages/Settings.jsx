@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { api, money, API } from "@/lib/api";
 import { toast } from "sonner";
-import { Plus, Trash2, Save, Copy, Calendar, Download, MapPin, CheckCircle2, AlertTriangle, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, Trash2, Save, Copy, Calendar, Download, MapPin, CheckCircle2, AlertTriangle, ChevronDown, ChevronRight, Moon } from "lucide-react";
 import EmployeeManagement from "@/components/settings/EmployeeManagement";
 import CompanyProfile from "@/components/settings/CompanyProfile";
+import { useTheme } from "@/context/ThemeContext";
 
 function BusinessAddressBlock({ settings, setSettings, onSave }) {
   const [checking, setChecking] = useState(false);
@@ -147,6 +148,7 @@ const inferTheme = (service) => {
 const themeInfo = (service) => THEMES.find((theme) => theme.id === inferTheme(service)) || THEMES[3];
 
 export default function Settings() {
+  const { isDark, toggle } = useTheme();
   const [settings, setSettings] = useState(null);
   const [services, setServices] = useState([]);
   const [addForm, setAddForm] = useState({ name: "", price: 0, category: "HOMME", theme: "COUPES_COIFFAGE", duration_minutes: 30 });
@@ -220,6 +222,20 @@ export default function Settings() {
         <div className="text-[10px] tracking-[0.3em] uppercase text-slate-500 mb-2">Paramètres</div>
         <h1 className="font-serif text-4xl md:text-5xl tracking-tight">Réglages</h1>
       </div>
+
+      <section className="bg-white border border-slate-100 rounded-2xl p-6 shadow-premium" data-testid="theme-settings">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2"><Moon className="w-5 h-5 text-[#8A6A1F]" /><h2 className="font-serif text-2xl">Apparence</h2></div>
+            <p className="text-sm text-slate-500 mt-1">L’application démarre en mode clair. Activez le mode sombre uniquement si vous le souhaitez.</p>
+          </div>
+          <button type="button" onClick={toggle} aria-pressed={isDark} className={"relative w-16 h-9 rounded-full transition-colors " + (isDark ? "bg-[#0A192F]" : "bg-slate-300")} data-testid="dark-mode-toggle">
+            <span className={"absolute top-1 left-1 w-7 h-7 rounded-full bg-white shadow transition-transform " + (isDark ? "translate-x-7" : "translate-x-0")} />
+            <span className="sr-only">Mode sombre {isDark ? "activé" : "désactivé"}</span>
+          </button>
+        </div>
+        <div className="mt-3 text-xs font-medium">{isDark ? "Mode sombre activé" : "Mode sombre désactivé"}</div>
+      </section>
 
       <CompanyProfile />
 
