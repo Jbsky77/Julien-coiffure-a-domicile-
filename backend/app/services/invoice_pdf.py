@@ -30,6 +30,10 @@ def _fmt_date(iso: str) -> str:
     return d.strftime("%d/%m/%Y à %Hh%M")
 
 
+def _employee_first_name(value: str | None) -> str:
+    return (value or "").strip().split()[0] if (value or "").strip() else ""
+
+
 def build_invoice_pdf(invoice: dict, client: dict, brand_name: str) -> bytes:
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
@@ -89,7 +93,7 @@ def build_invoice_pdf(invoice: dict, client: dict, brand_name: str) -> bytes:
         c.setFillColor(NAVY)
         c.drawString(21 * mm, y, s.get("name", ""))
         c.setFillColor(SLATE)
-        c.drawString(110 * mm, y, s.get("stylist") or invoice.get("assigned_employee_name") or "")
+        c.drawString(110 * mm, y, _employee_first_name(s.get("stylist") or invoice.get("assigned_employee_name")))
         if s.get("is_gift"):
             c.setFillColor(GOLD)
             c.drawRightString(w - 21 * mm, y, "Offerte (fidélité)")
