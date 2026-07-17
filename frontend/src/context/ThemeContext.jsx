@@ -6,25 +6,22 @@ const ThemeContext = createContext(null);
 export function ThemeProvider({ children }) {
   const { user } = useAuth();
   const key = user?.user_id ? `jb_theme_${user.user_id}` : "jb_theme_guest";
-  const [preference, setPreference] = useState(() => localStorage.getItem(key) || "system");
+  const [preference, setPreference] = useState(() => localStorage.getItem(key) || "light");
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
-    setPreference(localStorage.getItem(key) || "system");
+    setPreference(localStorage.getItem(key) || "light");
   }, [key]);
 
   useEffect(() => {
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
     const apply = () => {
-      const dark = preference === "dark" || (preference === "system" && media.matches);
+      const dark = preference === "dark";
       document.documentElement.classList.toggle("dark", dark);
       document.documentElement.style.colorScheme = dark ? "dark" : "light";
       setIsDark(dark);
     };
     apply();
-    media.addEventListener?.("change", apply);
     localStorage.setItem(key, preference);
-    return () => media.removeEventListener?.("change", apply);
   }, [key, preference]);
 
   const value = useMemo(() => ({
