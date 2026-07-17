@@ -90,6 +90,11 @@
 .dark .hover\:bg-amber-50:hover { background-color: #403015 !important; }
 .dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: #334155 !important; }
 
+.dark body, .dark #root, .dark main, .dark .min-h-screen { background-color: #07101f !important; }
+.dark .min-h-screen.bg-gradient-to-br { background-image: none !important; }
+.dark aside, .dark header, .dark nav, .dark [role="dialog"] { border-color: #334155 !important; }
+.dark [role="dialog"] { background-color: #0f1b2d !important; color: #f8fafc !important; }
+.dark table, .dark thead, .dark tbody, .dark tr, .dark td, .dark th { border-color: #334155 !important; }
 
 @layer base {
   :root {
