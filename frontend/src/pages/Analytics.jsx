@@ -161,23 +161,42 @@ function ComparisonBlock() {
 }
 
 export default function Analytics() {
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toLocaleDateString("fr-CA", { year: "numeric", month: "2-digit" }));
   const [d, setD] = useState(null);
-  useEffect(() => { (async () => { const r = await api.get("/analytics"); setD(r.data); })(); }, []);
+  const [loadingMonth, setLoadingMonth] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setLoadingMonth(true);
+    api.get("/analytics", { params: { month: selectedMonth } })
+      .then((response) => { if (active) setD(response.data); })
+      .catch((error) => toast.error(error.response?.data?.detail || "Statistiques indisponibles"))
+      .finally(() => { if (active) setLoadingMonth(false); });
+    return () => { active = false; };
+  }, [selectedMonth]);
+
   if (!d) return <div className="text-slate-500 text-sm">Chargement…</div>;
 
   return (
     <div className="space-y-6" data-testid="analytics-page">
-      <div>
-        <div className="text-[10px] tracking-[0.3em] uppercase text-slate-500 mb-2">Analytique</div>
-        <h1 className="font-serif text-3xl tracking-tight">Statistiques</h1>
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+        <div>
+          <div className="text-[10px] tracking-[0.3em] uppercase text-slate-500 mb-2">Analytique</div>
+          <h1 className="font-serif text-3xl tracking-tight">Statistiques</h1>
+          <p className="text-sm text-slate-500 mt-1">Résultats du mois sélectionné, du premier au dernier jour.</p>
+        </div>
+        <label className="text-sm font-medium">Mois affiché
+          <input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} className="ml-3 bg-white border border-slate-200 rounded-xl px-3 py-2" data-testid="analytics-month" />
+        </label>
       </div>
+      {loadingMonth && <div className="text-xs text-slate-500">Actualisation du mois…</div>}
 
       <ComparisonBlock />
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <div className="bg-white border border-[#D4AF37]/30 rounded-2xl p-4"><div className="text-[10px] uppercase tracking-widest text-slate-500">CA total</div><div className="font-serif text-xl mt-1 text-[#C5A059]">{money2(d.total_ca)} €</div></div>
+        <div className="bg-white border border-[#D4AF37]/30 rounded-2xl p-4"><div className="text-[10px] uppercase tracking-widest text-slate-500">CA du mois</div><div className="font-serif text-xl mt-1 text-[#C5A059]">{money2(d.total_ca)} €</div></div>
         <div className="bg-white border border-blue-100 rounded-2xl p-4"><div className="text-[10px] uppercase tracking-widest text-slate-500">RDV</div><div className="font-serif text-xl mt-1 text-blue-600">{d.total_rdv}</div></div>
-        <div className="bg-white border border-pink-100 rounded-2xl p-4"><div className="text-[10px] uppercase tracking-widest text-slate-500">Clients</div><div className="font-serif text-xl mt-1 text-pink-600">{d.total_clients}</div></div>
+        <div className="bg-white border border-pink-100 rounded-2xl p-4"><div className="text-[10px] uppercase tracking-widest text-slate-500">Clients du mois</div><div className="font-serif text-xl mt-1 text-pink-600">{d.total_clients}</div></div>
         <div className="bg-white border border-green-100 rounded-2xl p-4" data-testid="avg-age-stat"><div className="text-[10px] uppercase tracking-widest text-slate-500">Âge moyen</div><div className="font-serif text-xl mt-1 text-green-700">{d.average_age != null ? `${d.average_age} ans` : "—"}</div></div>
         <div className="bg-white border border-purple-100 rounded-2xl p-4" data-testid="avg-duration-stat"><div className="text-[10px] uppercase tracking-widest text-slate-500">Durée moy.</div><div className="font-serif text-xl mt-1 text-purple-600">{d.average_duration_minutes != null ? `${d.average_duration_minutes} min` : "—"}</div><div className="text-[9px] text-slate-500 mt-0.5">Total : {d.total_duration_minutes || 0} min</div></div>
       </div>
