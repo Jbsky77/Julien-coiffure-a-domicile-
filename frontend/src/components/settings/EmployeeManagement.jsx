@@ -17,7 +17,7 @@ export default function EmployeeManagement() {
   const canManage = ["owner", "admin"].includes(activeCompany?.role);
   const companyId = activeCompany?.id;
   const [members, setMembers] = useState([]);
-  const [form, setForm] = useState({ email: "", first_name: "", last_name: "", password: "", role: "employee", permissions: DEFAULT_PERMISSIONS });
+  const [form, setForm] = useState({ email: "", first_name: "", last_name: "", phone: "", password: "", role: "employee", permissions: DEFAULT_PERMISSIONS });
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -42,7 +42,7 @@ export default function EmployeeManagement() {
     try {
       const response = await api.post("/company/members/create", { ...form, email: form.email.trim().toLowerCase() });
       toast.success(response.data.message);
-      setForm({ email: "", first_name: "", last_name: "", password: "", role: "employee", permissions: DEFAULT_PERMISSIONS });
+      setForm({ email: "", first_name: "", last_name: "", phone: "", password: "", role: "employee", permissions: DEFAULT_PERMISSIONS });
       setShowPassword(false);
       await load();
     } catch (error) {
@@ -51,17 +51,40 @@ export default function EmployeeManagement() {
   };
 
   const patchMember = async (member, changes) => {
-    try { await api.patch("/company/members/" + member.user_id, changes); await load(); toast.success("Accès mis à jour"); }
-    catch (error) { toast.error(error.response?.data?.detail || "Modification impossible"); }
+    try {
+      await api.patch("/company/members/" + member.user_id, changes);
+      await load();
+      toast.success("Employé mis à jour");
+      return true;
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Modification impossible");
+      return false;
+    }
   };
 
   const startEditing = (member) => {
-    setEditing({ user_id: member.user_id, role: member.role, permissions: { ...(member.permissions || {}) } });
+    const nameParts = (member.name || "").trim().split(/\s+/);
+    setEditing({
+      user_id: member.user_id,
+      first_name: member.first_name || nameParts[0] || "",
+      last_name: member.last_name || nameParts.slice(1).join(" "),
+      email: member.email || "",
+      phone: member.phone || "",
+      role: member.role,
+      permissions: { ...(member.permissions || {}) },
+    });
   };
 
   const saveEditing = async (member) => {
-    await patchMember(member, { role: editing.role, permissions: editing.permissions });
-    setEditing(null);
+    const ok = await patchMember(member, {
+      first_name: editing.first_name.trim(),
+      last_name: editing.last_name.trim(),
+      email: editing.email.trim().toLowerCase(),
+      phone: editing.phone.trim(),
+      role: editing.role,
+      permissions: editing.permissions,
+    });
+    if (ok) setEditing(null);
   };
 
   const remove = async (member) => {
@@ -75,10 +98,11 @@ export default function EmployeeManagement() {
   return <section className="bg-white border border-slate-100 rounded-2xl p-6 shadow-premium">
     <div className="flex gap-3 mb-5"><Users className="w-6 h-6 text-[#8A6A1F]" /><div><h2 className="font-serif text-2xl">Employés et accès</h2><p className="text-sm text-slate-500">Créez directement le compte et choisissez ses accès pour {activeCompany?.name}.</p></div></div>
     <form onSubmit={createEmployee} className="bg-slate-50 rounded-2xl p-4 mb-6 space-y-4">
-      <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
         <input required placeholder="Prénom" value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} className="bg-white border rounded-xl px-4 py-3" />
         <input required placeholder="Nom" value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} className="bg-white border rounded-xl px-4 py-3" />
         <input type="email" required placeholder="employe@exemple.fr" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="bg-white border rounded-xl px-4 py-3" />
+        <input type="tel" placeholder="Téléphone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="bg-white border rounded-xl px-4 py-3" />
         <div className="relative"><input type={showPassword ? "text" : "password"} minLength={8} required autoComplete="new-password" placeholder="Mot de passe" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="w-full bg-white border rounded-xl pl-4 pr-11 py-3" /><button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}>{showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button></div>
         <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="bg-white border rounded-xl px-4 py-3"><option value="employee">Employé</option><option value="reception">Accueil / réception</option>{activeCompany?.role === "owner" && <option value="admin">Administrateur</option>}</select>
       </div>
@@ -102,6 +126,12 @@ export default function EmployeeManagement() {
         </div>
         {isEditing && <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-4">
           <div className="flex items-center justify-between"><h3 className="font-medium">Modifier {member.name}</h3><button type="button" onClick={() => setEditing(null)} aria-label="Fermer"><X className="w-4 h-4" /></button></div>
+          <div className="grid md:grid-cols-2 gap-3">
+            <label className="text-sm">Prénom<input required value={editing.first_name} onChange={(e) => setEditing({ ...editing, first_name: e.target.value })} className="mt-1 w-full bg-white border rounded-xl px-4 py-3" /></label>
+            <label className="text-sm">Nom<input required value={editing.last_name} onChange={(e) => setEditing({ ...editing, last_name: e.target.value })} className="mt-1 w-full bg-white border rounded-xl px-4 py-3" /></label>
+            <label className="text-sm">Adresse e-mail<input type="email" required value={editing.email} onChange={(e) => setEditing({ ...editing, email: e.target.value })} className="mt-1 w-full bg-white border rounded-xl px-4 py-3" /></label>
+            <label className="text-sm">Téléphone<input type="tel" value={editing.phone} onChange={(e) => setEditing({ ...editing, phone: e.target.value })} className="mt-1 w-full bg-white border rounded-xl px-4 py-3" /></label>
+          </div>
           <label className="block text-sm">Rôle
             <select value={editing.role} onChange={(e) => setEditing({ ...editing, role: e.target.value })} className="mt-1 w-full bg-white border rounded-xl px-4 py-3">
               <option value="employee">Employé</option><option value="reception">Accueil / réception</option>{activeCompany?.role === "owner" && <option value="admin">Administrateur</option>}
