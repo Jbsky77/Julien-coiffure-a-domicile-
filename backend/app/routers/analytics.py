@@ -11,8 +11,11 @@ router = APIRouter()
 
 
 @router.get("/analytics")
-async def analytics(user: User = Depends(get_current_user)):
-    return await compute_analytics()
+async def analytics(month: str | None = None, user: User = Depends(get_current_user)):
+    data = await compute_analytics(month)
+    if data.get("error") == "invalid_month":
+        raise HTTPException(400, "Mois invalide, format attendu : AAAA-MM")
+    return data
 
 
 @router.post("/analytics/compare")
