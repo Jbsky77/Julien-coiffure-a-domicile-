@@ -1,10 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, CalendarClock, Users, Receipt, Package, Settings as SettingsIcon, Scissors, TrendingUp, Route, AlertCircle, Search, Lock, Map as MapIcon, Bell, ChevronDown, LogOut, Moon, Sun } from "lucide-react";
+import { LayoutDashboard, CalendarClock, Users, Receipt, Package, Settings as SettingsIcon, Scissors, TrendingUp, Route, AlertCircle, Search, Lock, Map as MapIcon, Bell, ChevronDown, LogOut } from "lucide-react";
 import { api, pinStorage } from "@/lib/api";
 import GlobalSearch from "@/components/app/GlobalSearch";
 import { useAuth } from "@/context/AuthContext";
-import { useTheme } from "@/context/ThemeContext";
 
 const NAV = [
   { to: "/", label: "Accueil", icon: LayoutDashboard, tid: "nav-dashboard" },
@@ -29,7 +28,6 @@ const ALL_MENUS = [...NAV, ...MORE];
 export default function Layout({ children }) {
   const location = useLocation();
   const { activeCompany, activeCompanyId, companies, setActiveCompanyId, isImpersonating, stopImpersonation, logout } = useAuth();
-  const { isDark, toggle } = useTheme();
   const [searchOpen, setSearchOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
@@ -125,9 +123,6 @@ export default function Layout({ children }) {
           <button onClick={lockNow} data-testid="sidebar-lock" className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm text-slate-600 hover:bg-slate-50">
             <Lock className="w-4 h-4" strokeWidth={1.5} /> Verrouiller
           </button>
-          <button onClick={toggle} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm text-slate-600 hover:bg-slate-50" aria-label="Changer le thème">
-            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />} {isDark ? "Thème clair" : "Thème sombre"}
-          </button>
           <button onClick={logout} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm text-red-700 hover:bg-red-50">
             <LogOut className="w-4 h-4" /> Se déconnecter
           </button>
@@ -173,7 +168,6 @@ export default function Layout({ children }) {
             <button onClick={lockNow} data-testid="topbar-lock" className="p-2 rounded-full text-slate-500 hover:bg-slate-50" title="Verrouiller l'app">
               <Lock className="w-4 h-4" strokeWidth={1.5} />
             </button>
-            <button onClick={toggle} className="p-2 rounded-full text-slate-500 hover:bg-slate-50" aria-label={isDark ? "Activer le thème clair" : "Activer le thème sombre"}>{isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}</button>
             <button onClick={logout} className="p-2 rounded-full text-red-700 hover:bg-red-50" aria-label="Se déconnecter"><LogOut className="w-4 h-4" /></button>
           </div>
 
