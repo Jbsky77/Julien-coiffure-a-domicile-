@@ -21,6 +21,21 @@ from app.services.settings import get_settings
 router = APIRouter()
 
 
+def _public_employee_name(value: str | None) -> str:
+    """Expose only the employee's first name on every client-facing surface."""
+    return (value or "").strip().split()[0] if (value or "").strip() else ""
+
+
+def _public_appointment(appointment: dict) -> dict:
+    public = {**appointment}
+    public["assigned_employee_name"] = _public_employee_name(public.get("assigned_employee_name"))
+    public["services"] = [
+        {**service, "stylist": _public_employee_name(service.get("stylist") or public.get("assigned_employee_name"))}
+        for service in (public.get("services") or [])
+    ]
+    return public
+
+
 async def _resolve_client(token: str) -> dict:
     if not token or len(token) < 16:
         raise HTTPException(404, "Lien invalide")
@@ -43,6 +58,7 @@ async def get_client_space(token: str):
         meta={"type": "portal_visit", "client_id": c["id"]},
     )
     rdvs = await db.appointments.find({"client_id": c["id"]}, {"_id": 0}).sort("date", -1).to_list(500)
+    public_rdvs = [_public_appointment(r) for r in rdvs]
     reqs = await db.appointment_requests.find({"client_id": c["id"]}, {"_id": 0}).sort("created_at", -1).to_list(100)
     loyalty = await compute_loyalty_card(c["id"])
     notifs = await notifications.list_for_client(c["id"])
@@ -67,7 +83,7 @@ async def get_client_space(token: str):
             "price_final": r.get("price_final", 0),
             "payment_mode": r.get("payment_mode"),
         }
-        for r in rdvs
+        for r in public_rdvs
         if r.get("status") == "done"
     ]
     return {
@@ -80,7 +96,7 @@ async def get_client_space(token: str):
             "address": c.get("address", ""),
             "birthday": c.get("birthday"),
         },
-        "appointments": rdvs,
+        "appointments": public_rdvs,
         "requests": reqs,
         "loyalty": loyalty,
         "notifications": notifs,
@@ -234,7 +250,7 @@ async def public_invoice_pdf(token: str, rdv_id: str):
     if not rdv:
         raise HTTPException(404, "Facture introuvable")
     settings = await get_settings()
-    pdf = build_invoice_pdf(rdv, c, settings.invoice_brand_name)
+    pdf = build_invoice_pdf(_public_appointment(rdv), c, settings.invoice_brand_name)
     num = rdv.get("invoice_number") or rdv_id
     return Response(
         content=pdf,
