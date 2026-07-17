@@ -202,17 +202,38 @@ async def compare_periods(a_start: str, a_end: str, b_start: str, b_end: str) ->
     return {"a": a, "b": b, "deltas": deltas}
 
 
-async def compute_analytics() -> dict:
-    rdvs = await db.appointments.find({"status": "done"}, {"_id": 0}).to_list(20000)
-    clients = await db.clients.find({}, {"_id": 0}).to_list(5000)
+async def compute_analytics(month: Optional[str] = None) -> dict:
+    all_rdvs = await db.appointments.find({"status": "done"}, {"_id": 0}).to_list(20000)
+    all_clients = await db.clients.find({}, {"_id": 0}).to_list(5000)
+    rdvs = all_rdvs
+    clients = all_clients
+    period_label = "Toutes les données"
+
+    if month:
+        try:
+            year, month_number = (int(part) for part in month.split("-", 1))
+            start = datetime(year, month_number, 1, tzinfo=timezone.utc)
+            end = datetime(year + (month_number // 12), (month_number % 12) + 1, 1, tzinfo=timezone.utc)
+        except (TypeError, ValueError):
+            return {"error": "invalid_month"}
+        rdvs = []
+        for appointment in all_rdvs:
+            date = parse_iso(appointment.get("finished_at") or appointment.get("date"))
+            if date and start <= date < end:
+                rdvs.append(appointment)
+        active_client_ids = {appointment.get("client_id") for appointment in rdvs}
+        clients = [client for client in all_clients if client.get("id") in active_client_ids]
+        period_label = start.strftime("%m/%Y")
 
     age_stats, average_age, age_included, age_excluded = _age_stats(clients)
     durations = [r.get("duration_minutes") for r in rdvs if r.get("duration_minutes")]
 
     return {
+        "month": month,
+        "period_label": period_label,
         "top_services": _top_services(rdvs),
         "top_clients": _top_clients(rdvs),
-        "seasonal": _seasonal(rdvs),
+        "seasonal": _seasonal(all_rdvs),
         "weekdays": _weekdays(rdvs),
         "total_ca": round(sum(r["price_final"] for r in rdvs), 2),
         "total_rdv": len(rdvs),
