@@ -29,12 +29,17 @@ class MemberCreate(BaseModel):
     first_name: str = Field(min_length=1, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
     email: str
+    phone: str = Field(default="", max_length=30)
     password: str = Field(min_length=8, max_length=128)
     role: Literal["admin", "employee", "reception"] = "employee"
     permissions: dict[str, bool] = Field(default_factory=dict)
 
 
 class MemberUpdate(BaseModel):
+    first_name: str | None = Field(default=None, min_length=1, max_length=100)
+    last_name: str | None = Field(default=None, min_length=1, max_length=100)
+    email: str | None = None
+    phone: str | None = Field(default=None, max_length=30)
     role: Literal["admin", "employee", "reception"] | None = None
     status: Literal["active", "suspended", "inactive"] | None = None
     permissions: dict[str, bool] | None = None
@@ -101,6 +106,7 @@ async def create_member(payload: MemberCreate, request: Request):
                     "first_name": first_name,
                     "last_name": last_name,
                     "full_name": f"{first_name} {last_name}",
+                    "phone": payload.phone.strip(),
                 },
             },
             headers=headers,
@@ -171,6 +177,9 @@ async def list_members(request: Request):
             result.append({
                 **membership,
                 "email": (user.get("email") or "") if can_manage else "",
+                "first_name": metadata.get("first_name") or "",
+                "last_name": metadata.get("last_name") or "",
+                "phone": metadata.get("phone") or "",
                 "name": membership.get("display_name") or metadata.get("full_name") or user.get("email") or "Employé",
                 "is_current_user": membership["user_id"] == context.user_id,
                 "invitation_pending": membership.get("status") == "invited",
@@ -365,7 +374,41 @@ async def update_member(user_id: str, payload: MemberUpdate, request: Request):
             raise HTTPException(400, "Le propriétaire ne peut pas être modifié")
         if context.role == "admin" and (target["role"] == "admin" or payload.role == "admin"):
             raise HTTPException(403, "Seul le propriétaire gère les administrateurs")
-        changes = payload.model_dump(exclude_none=True)
+        auth_user = await _auth_user(client, url, headers, user_id)
+        metadata = auth_user.get("user_metadata") or {}
+        first_name = (payload.first_name if payload.first_name is not None else metadata.get("first_name", "")).strip()
+        last_name = (payload.last_name if payload.last_name is not None else metadata.get("last_name", "")).strip()
+        phone = (payload.phone if payload.phone is not None else metadata.get("phone", "")).strip()
+        auth_changes = {}
+        if payload.first_name is not None or payload.last_name is not None or payload.phone is not None:
+            if not first_name or not last_name:
+                raise HTTPException(400, "Le prénom et le nom sont obligatoires")
+            auth_changes["user_metadata"] = {
+                **metadata,
+                "first_name": first_name,
+                "last_name": last_name,
+                "full_name": f"{first_name} {last_name}",
+                "phone": phone,
+            }
+        if payload.email is not None:
+            email = payload.email.strip().lower()
+            if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+                raise HTTPException(400, "Adresse e-mail invalide")
+            auth_changes["email"] = email
+            auth_changes["email_confirm"] = True
+        if auth_changes:
+            auth_update = await client.put(
+                f"{url}/auth/v1/admin/users/{user_id}",
+                json=auth_changes,
+                headers=headers,
+            )
+            if auth_update.status_code >= 400:
+                body = auth_update.json()
+                raise HTTPException(400, body.get("msg") or body.get("message") or "Modification du compte impossible")
+
+        changes = payload.model_dump(exclude_none=True, exclude={"first_name", "last_name", "email", "phone"})
+        if payload.first_name is not None or payload.last_name is not None:
+            changes["display_name"] = f"{first_name} {last_name}"
         changes["updated_at"] = datetime.now(timezone.utc).isoformat()
         update = await client.patch(
             f"{url}/rest/v1/company_members",
