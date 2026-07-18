@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api, money, money2 } from "@/lib/api";
 import { Link } from "react-router-dom";
 import { Crown, Scissors, TrendingUp, Calendar, Users, Timer, ArrowRight, GitCompare, Gift } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, PieChart, Pie } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, PieChart, Pie, AreaChart, Area, LineChart, Line } from "recharts";
 import { toast } from "sonner";
 
 const isoStart = (y, m, d = 1) => `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}T00:00:00+00:00`;
@@ -210,7 +210,8 @@ export default function Analytics() {
         <div className="bg-white border border-purple-100 rounded-2xl p-4" data-testid="avg-duration-stat"><div className="text-[10px] uppercase tracking-widest text-slate-500">Durée moy.</div><div className="font-serif text-xl mt-1 text-purple-600">{d.average_duration_minutes != null ? `${d.average_duration_minutes} min` : "—"}</div><div className="text-[9px] text-slate-500 mt-0.5">Total : {d.total_duration_minutes || 0} min</div></div>
       </div>
 
-      <section className="bg-white border border-violet-100 rounded-2xl p-5 space-y-4 shadow-sm" data-testid="revenue-projection">
+      <section className="relative overflow-hidden rounded-[1.5rem] border border-violet-100 bg-white p-5 shadow-[0_16px_45px_-36px_rgba(76,29,149,.55)] space-y-4" data-testid="revenue-projection">
+        <div className="pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full bg-violet-100/60 blur-2xl" />
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
           <div>
             <div className="flex items-center gap-2"><TrendingUp className="w-4 h-4 text-violet-600" /><div className="text-[10px] uppercase tracking-widest text-slate-500">Projection mois, trimestre et année</div></div>
@@ -263,7 +264,7 @@ export default function Analytics() {
         )}
       </div>
 
-      <div className="bg-white border border-slate-100 rounded-2xl p-5" data-testid="age-stats">
+      <div className="rounded-[1.5rem] border border-slate-100 bg-white p-5 shadow-[0_16px_45px_-38px_rgba(15,23,42,.45)]" data-testid="age-stats">
         <div className="text-[10px] uppercase tracking-widest text-slate-500 mb-3">Répartition par âge</div>
         <div className="h-48">
           <ResponsiveContainer>
@@ -272,40 +273,39 @@ export default function Analytics() {
               <XAxis dataKey="range" tick={{ fontSize: 10, fill: "#64748b" }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 10, fill: "#64748b" }} axisLine={false} tickLine={false} allowDecimals={false} />
               <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 12 }} />
-              <Bar dataKey="count" radius={[6, 6, 0, 0]} fill="#7C3AED" />
+              <Bar dataKey="count" radius={[9, 9, 3, 3]}>{d.age_stats.map((_, i) => <Cell key={i} fill={i % 2 ? "#a78bfa" : "#6d5dfc"} />)}</Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      <div className="bg-white border border-slate-100 rounded-2xl p-5" data-testid="seasonal-chart">
-        <div className="flex items-center gap-2 mb-3"><Calendar className="w-4 h-4 text-[#D4AF37]" /><div className="text-[10px] uppercase tracking-widest text-slate-500">CA par mois · année en cours</div></div>
+      <div className="rounded-[1.5rem] border border-slate-100 bg-white p-5 shadow-[0_16px_45px_-38px_rgba(15,23,42,.45)]" data-testid="seasonal-chart">
+        <div className="mb-1 flex items-center justify-between gap-3"><div className="flex items-center gap-2"><Calendar className="h-4 w-4 text-violet-600" /><div className="text-[10px] uppercase tracking-widest text-slate-500">CA par mois · année en cours</div></div><span className="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-bold text-violet-700">Évolution</span></div>
+        <div className="h-60">
+          <ResponsiveContainer>
+            <AreaChart data={d.seasonal} margin={{ top: 18, left: -10, right: 12, bottom: 0 }}>
+              <defs><linearGradient id="seasonalGradient" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#7c3aed" stopOpacity={0.32}/><stop offset="100%" stopColor="#7c3aed" stopOpacity={0}/></linearGradient></defs>
+              <CartesianGrid strokeDasharray="2 5" stroke="#e9e8f6" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#64748b" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 10, fill: "#64748b" }} axisLine={false} tickLine={false} width={38} />
+              <Tooltip cursor={{ stroke: "#a78bfa", strokeDasharray: "4 4" }} contentStyle={{ borderRadius: 14, border: "1px solid #ede9fe", boxShadow: "0 12px 30px -18px rgba(76,29,149,.45)", fontSize: 12 }} formatter={(value) => [money2(value) + " €", "CA"]} />
+              <Area type="monotone" dataKey="ca" stroke="#7c3aed" strokeWidth={3} fill="url(#seasonalGradient)" activeDot={{ r: 5, fill: "#fff", stroke: "#7c3aed", strokeWidth: 3 }} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="rounded-[1.5rem] border border-slate-100 bg-white p-5 shadow-[0_16px_45px_-38px_rgba(15,23,42,.45)]" data-testid="weekdays-chart">
+        <div className="mb-1 flex items-center justify-between gap-3"><div className="text-[10px] uppercase tracking-widest text-slate-500">Meilleurs jours de la semaine</div><span className="rounded-full bg-sky-50 px-2.5 py-1 text-[10px] font-bold text-sky-700">Rythme hebdo</span></div>
         <div className="h-56">
           <ResponsiveContainer>
-            <BarChart data={d.seasonal} margin={{ top: 10, left: -10, right: 10, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+            <LineChart data={d.weekdays} margin={{ top: 18, left: -10, right: 12, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="2 5" stroke="#e4eef9" vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#64748b" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: "#64748b" }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 12 }} />
-              <Bar dataKey="ca" radius={[6, 6, 0, 0]}>
-                {d.seasonal.map((_, i) => <Cell key={i} fill={i % 2 ? "#7C3AED" : "#A78BFA"} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      <div className="bg-white border border-slate-100 rounded-2xl p-5" data-testid="weekdays-chart">
-        <div className="text-[10px] uppercase tracking-widest text-slate-500 mb-3">Meilleurs jours de la semaine</div>
-        <div className="h-48">
-          <ResponsiveContainer>
-            <BarChart data={d.weekdays} margin={{ top: 10, left: -10, right: 10, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#64748b" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: "#64748b" }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 12 }} />
-              <Bar dataKey="ca" radius={[6, 6, 0, 0]} fill="#7C3AED" />
-            </BarChart>
+              <YAxis tick={{ fontSize: 10, fill: "#64748b" }} axisLine={false} tickLine={false} width={38} />
+              <Tooltip cursor={{ stroke: "#7dd3fc", strokeDasharray: "4 4" }} contentStyle={{ borderRadius: 14, border: "1px solid #dbeafe", boxShadow: "0 12px 30px -18px rgba(14,116,144,.4)", fontSize: 12 }} formatter={(value) => [money2(value) + " €", "CA"]} />
+              <Line type="monotone" dataKey="ca" stroke="#0ea5e9" strokeWidth={3} dot={{ r: 3, fill: "#fff", stroke: "#0ea5e9", strokeWidth: 2 }} activeDot={{ r: 5, fill: "#fff", stroke: "#0284c7", strokeWidth: 3 }} />
+            </LineChart>
           </ResponsiveContainer>
         </div>
       </div>
