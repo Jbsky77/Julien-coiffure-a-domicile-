@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 from app.db import db
 
-router = APIRouter(prefix="/chat", tags=["chat"])
+router = APIRouter(tags=["chat"])
 
 def now():
     return datetime.now(timezone.utc).isoformat()
@@ -37,14 +37,14 @@ class ConversationCreate(BaseModel):
 class MessageCreate(BaseModel):
     body: str = Field(min_length=1, max_length=4000)
 
-@router.get("/participants")
+@router.get("/chat/participants")
 async def participants(request: Request):
     context = ctx(request)
     result = await __import__("app.routers.company_members", fromlist=["list_members"]).list_members(request)
     members = [{"id": m["user_id"], "name": m["name"], "role": m["role"]} for m in result["members"] if m["status"] == "active"]
     return {"members": members, "can_contact_platform_admin": context.role == "owner"}
 
-@router.get("/conversations")
+@router.get("/chat/conversations")
 async def conversations(request: Request):
     context = ctx(request)
     items = await db.chat_conversations.find({}).sort("updated_at", -1).to_list(None)
@@ -56,7 +56,7 @@ async def conversations(request: Request):
         item["last_message"] = own[-1]["body"] if own else ""
     return items
 
-@router.post("/conversations")
+@router.post("/chat/conversations")
 async def create_conversation(payload: ConversationCreate, request: Request):
     context = ctx(request)
     if payload.with_platform_admin and context.role != "owner":
@@ -70,7 +70,7 @@ async def create_conversation(payload: ConversationCreate, request: Request):
     await db.chat_conversations.insert_one(item)
     return item
 
-@router.get("/conversations/{cid}/messages")
+@router.get("/chat/conversations/{cid}/messages")
 async def messages(cid: str, request: Request):
     context = ctx(request)
     await ensure_visible(cid, context)
@@ -81,7 +81,7 @@ async def messages(cid: str, request: Request):
             await db.chat_messages.update_one({"id": item["id"]}, {"$set": {"read_by": item["read_by"]}})
     return items
 
-@router.post("/conversations/{cid}/messages")
+@router.post("/chat/conversations/{cid}/messages")
 async def send(cid: str, payload: MessageCreate, request: Request):
     context = ctx(request)
     await ensure_visible(cid, context)
@@ -99,7 +99,7 @@ async def public_identity(token):
         raise HTTPException(404, "Lien client invalide")
     return resolved[1]
 
-@router.get("/public/{token}")
+@router.get("/public/client/{token}/chat")
 async def public_threads(token: str):
     client = await public_identity(token)
     items = await db.chat_conversations.find({"client_id": client["id"]}).sort("updated_at", -1).to_list(None)
@@ -110,7 +110,7 @@ async def public_threads(token: str):
         item["messages"] = own
     return items
 
-@router.post("/public/{token}")
+@router.post("/public/client/{token}/chat")
 async def public_start(token: str, payload: ConversationCreate):
     client = await public_identity(token)
     cid = f"chat_{os.urandom(8).hex()}"
@@ -121,7 +121,7 @@ async def public_start(token: str, payload: ConversationCreate):
     await db.chat_conversations.insert_one(item)
     return item
 
-@router.post("/public/{token}/{cid}")
+@router.post("/public/client/{token}/chat/{cid}")
 async def public_send(token: str, cid: str, payload: MessageCreate):
     client = await public_identity(token)
     conversation = await db.chat_conversations.find_one({"id": cid, "client_id": client["id"]})
