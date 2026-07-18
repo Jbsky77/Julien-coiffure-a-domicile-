@@ -46,6 +46,17 @@ export default function Chat() {
     await api.post(`/chat/conversations/${active.id}/messages`, { body: text.trim() });
     setText(""); const r = await api.get(`/chat/conversations/${active.id}/messages`); setMessages(r.data); load();
   };
+  const removeMessage = async (message) => {
+    if (!active || !window.confirm("Supprimer définitivement ce message ?")) return;
+    try {
+      await api.delete(`/chat/conversations/${active.id}/messages/${message.id}`);
+      setMessages((current) => current.filter((item) => item.id !== message.id));
+      await load();
+      toast.success("Message supprimé");
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Impossible de supprimer le message");
+    }
+  };
 
   return <div className="space-y-6" data-testid="chat-page">
     <div className="flex items-end justify-between">
@@ -63,7 +74,7 @@ export default function Chat() {
       <section className="bg-white rounded-3xl border border-slate-100 flex flex-col overflow-hidden">
         {!active ? <div className="flex-1 flex flex-col items-center justify-center text-slate-400"><MessageCircle className="w-12 h-12 mb-3"/><p>Choisissez une conversation</p></div> :
         <><header className="p-5 border-b border-slate-100 flex items-center justify-between gap-3"><h2 className="font-semibold">{active.title}</h2><button onClick={removeConversation} className="inline-flex items-center gap-2 text-sm text-red-600 hover:bg-red-50 rounded-full px-3 py-2 transition" aria-label="Supprimer la conversation"><Trash2 className="w-4 h-4" /> Supprimer</button></header>
-        <div className="flex-1 overflow-y-auto p-5 space-y-3">{messages.map(m=><div key={m.id} className={`max-w-[80%] rounded-2xl px-4 py-3 ${m.sender_type==="client"?"bg-pink-50":"bg-violet-50"}`}><div className="text-xs font-medium text-slate-500 mb-1">{m.sender_name}</div><div className="text-sm whitespace-pre-wrap">{m.body}</div></div>)}</div>
+        <div className="flex-1 overflow-y-auto p-5 space-y-3">{messages.map(m=><div key={m.id} className={`max-w-[80%] rounded-2xl px-4 py-3 ${m.sender_type==="client"?"bg-pink-50":"bg-violet-50"}`}><div className="mb-1 flex items-center justify-between gap-3"><div className="text-xs font-medium text-slate-500">{m.sender_name}</div>{m.can_delete && <button onClick={() => removeMessage(m)} aria-label="Supprimer ce message" title="Supprimer ce message" className="rounded-lg p-1 text-slate-400 transition hover:bg-rose-100 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button>}</div><div className="text-sm whitespace-pre-wrap">{m.body}</div></div>)}</div>
         <div className="p-4 border-t border-slate-100 flex gap-2"><textarea value={text} onChange={e=>setText(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}} rows={2} placeholder="Écrire un message…" className="flex-1 border rounded-2xl px-4 py-3 resize-none"/><button onClick={send} className="w-12 h-12 rounded-full bg-violet-600 text-white flex items-center justify-center"><Send className="w-4 h-4"/></button></div></>}
       </section>
     </div>
