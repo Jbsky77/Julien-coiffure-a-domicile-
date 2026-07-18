@@ -3,7 +3,8 @@ from datetime import datetime, timezone
 import os
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
-from app.db import db
+from app.db import db, get_active_company
+import httpx
 
 router = APIRouter(tags=["chat"])
 
@@ -98,6 +99,20 @@ async def public_identity(token):
     if not resolved:
         raise HTTPException(404, "Lien client invalide")
     return resolved[1]
+
+@router.get("/public/client/{token}/chat/participants")
+async def public_participants(token: str):
+    await public_identity(token)
+    url = os.environ.get("SUPABASE_URL", "").rstrip("/")
+    secret = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+    headers = {"apikey": secret, "Authorization": f"Bearer {secret}"}
+    async with httpx.AsyncClient(timeout=20) as client:
+        response = await client.get(f"{url}/rest/v1/company_members", params={
+            "company_id": f"eq.{get_active_company()}", "status": "eq.active",
+            "role": "in.(owner,employee)", "select": "user_id,display_name,role", "order": "role.desc"
+        }, headers=headers)
+        response.raise_for_status()
+    return [{"id": row["user_id"], "name": "Responsable du salon" if row["role"] == "owner" else (row.get("display_name") or "Coiffeur"), "role": row["role"]} for row in response.json()]
 
 @router.get("/public/client/{token}/chat")
 async def public_threads(token: str):
