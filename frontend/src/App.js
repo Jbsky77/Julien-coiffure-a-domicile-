@@ -16,6 +16,7 @@ import Settings from "@/pages/Settings";
 import Team from "@/pages/Team";
 import Analytics from "@/pages/Analytics";
 import Tour from "@/pages/Tour";
+import Chat from "@/pages/Chat";
 import ClientStatus from "@/pages/ClientStatus";
 import MapPage from "@/pages/Map";
 import ClientSpace from "@/pages/ClientSpace";
@@ -88,6 +89,7 @@ function RootRouter() {
         <Route path="/clients-status" element={<ClientStatus />} />
         <Route path="/carte" element={<MapPage />} />
         <Route path="/demandes" element={<AppointmentRequests />} />
+        <Route path="/messages" element={<Chat />} />
       </Route>
     </Routes>
   );
