@@ -240,7 +240,7 @@ export default function Analytics() {
               <YAxis tick={{ fontSize: 10, fill: "#64748b" }} axisLine={false} tickLine={false} allowDecimals={false} />
               <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 12 }} />
               <Bar dataKey="count" radius={[6, 6, 0, 0]} fill="#0A192F" />
-            </BarChart>
+            </LineChart>
           </ResponsiveContainer>
         </div>
       </div>
@@ -256,8 +256,8 @@ export default function Analytics() {
               <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 12 }} />
               <Bar dataKey="ca" radius={[6, 6, 0, 0]}>
                 {d.seasonal.map((_, i) => <Cell key={i} fill={i % 2 ? "#0A192F" : "#1E3A8A"} />)}
-              </Bar>
-            </BarChart>
+              </Line>
+            </LineChart>
           </ResponsiveContainer>
         </div>
       </div>
@@ -272,7 +272,7 @@ export default function Analytics() {
               <YAxis tick={{ fontSize: 10, fill: "#64748b" }} axisLine={false} tickLine={false} />
               <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 12 }} />
               <Bar dataKey="ca" radius={[6, 6, 0, 0]} fill="#D4AF37" />
-            </BarChart>
+            </LineChart>
           </ResponsiveContainer>
         </div>
       </div>
