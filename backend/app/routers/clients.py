@@ -96,9 +96,20 @@ async def clients_update(cid: str, payload: Dict[str, Any], user: User = Depends
         if rb:
             if rb == cid:
                 raise HTTPException(400, "Un client ne peut pas être son propre parrain")
-            sponsor = await db.clients.find_one({"id": rb}, {"_id": 0, "id": 1})
-            if not sponsor:
-                raise HTTPException(400, "Parrain introuvable")
+            seen = {cid}
+            current_id = rb
+            while current_id:
+                if current_id in seen:
+                    raise HTTPException(400, "Cette relation créerait une boucle de parrainage")
+                seen.add(current_id)
+                current = await db.clients.find_one(
+                    {"id": current_id}, {"_id": 0, "id": 1, "referred_by": 1}
+                )
+                if not current:
+                    if current_id == rb:
+                        raise HTTPException(400, "Parrain introuvable")
+                    break
+                current_id = current.get("referred_by")
     has_coords = payload.get("lat") is not None and payload.get("lng") is not None
     if "address" in payload and payload["address"] and not has_coords:
         existing = await db.clients.find_one({"id": cid}, {"_id": 0}) or {}
