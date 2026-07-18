@@ -320,7 +320,17 @@ export default function ClientSpace() {
             </div>
 
             {/* Referral (parrainage) */}
-            {referral && (
+            {referral?.referred_by && (
+              <div className="bg-white border border-[#D4AF37]/30 rounded-3xl p-5 shadow-sm" data-testid="referral-child-card">
+                <div className="text-[10px] tracking-[0.3em] uppercase text-[#8A6A1F] mb-2 flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5" /> Filleul
+                </div>
+                <div className="text-sm text-slate-600">
+                  Vous avez été recommandé(e) par <span className="font-semibold text-[#0A192F]">{referral.referred_by_name || "votre parrain"}</span>.
+                </div>
+              </div>
+            )}
+            {referral && !referral.referred_by && (
               <div className="bg-white border border-[#D4AF37]/30 rounded-3xl p-5 shadow-sm space-y-4" data-testid="referral-card">
                 <div className="text-[10px] tracking-[0.3em] uppercase text-[#8A6A1F] flex items-center gap-1.5">
                   <Users className="w-3.5 h-3.5" /> Parrainage
