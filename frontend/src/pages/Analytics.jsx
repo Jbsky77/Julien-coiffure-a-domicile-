@@ -289,7 +289,7 @@ export default function Analytics() {
               <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 12 }} />
               <Bar dataKey="ca" radius={[6, 6, 0, 0]}>
                 {d.seasonal.map((_, i) => <Cell key={i} fill={i % 2 ? "#7C3AED" : "#A78BFA"} />)}
-              </Line>
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
