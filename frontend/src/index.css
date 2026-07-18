@@ -241,3 +241,18 @@ input:focus,select:focus,textarea:focus{border-color:rgba(139,124,246,.65)!impor
 @media(max-width:1023px){main{padding-bottom:5.5rem}}
 @media(prefers-reduced-motion:no-preference){main>*{animation:neo-enter .42s cubic-bezier(.22,.8,.28,1) both}}
 @keyframes neo-enter{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+
+
+/* Neo-Apple charts */
+.recharts-wrapper{font-family:-apple-system,BlinkMacSystemFont,"Outfit",sans-serif}
+.recharts-cartesian-grid line{stroke:rgba(123,110,150,.12)!important}
+.recharts-cartesian-axis-line,.recharts-cartesian-axis-tick-line{stroke:transparent!important}
+.recharts-cartesian-axis-tick text{fill:#8b8793!important;font-size:11px}
+.recharts-line-curve{stroke:#8b5cf6!important;stroke-width:2.25px!important;filter:drop-shadow(0 4px 5px rgba(139,92,246,.18))}
+.recharts-area-area{fill:url(#neoChartGradient);opacity:.16}
+.recharts-tooltip-wrapper{filter:drop-shadow(0 14px 28px rgba(55,45,80,.14))}
+.recharts-default-tooltip{border:1px solid rgba(255,255,255,.9)!important;border-radius:16px!important;background:rgba(255,255,255,.9)!important;backdrop-filter:blur(16px);padding:10px 14px!important}
+.recharts-legend-item-text{color:#777280!important;font-size:12px}
+.dark .recharts-cartesian-grid line{stroke:rgba(255,255,255,.09)!important}
+.dark .recharts-default-tooltip{background:rgba(20,20,22,.94)!important;border-color:rgba(255,255,255,.12)!important}
+.dark .recharts-default-tooltip *{color:#f8fafc!important}
