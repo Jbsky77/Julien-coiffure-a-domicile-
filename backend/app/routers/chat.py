@@ -87,7 +87,7 @@ async def send(cid: str, payload: MessageCreate, request: Request):
     context = ctx(request)
     await ensure_visible(cid, context)
     item = {"id": f"msg_{os.urandom(9).hex()}", "conversation_id": cid,
-            "sender_id": context.user_id, "sender_name": context.email,
+            "sender_id": context.user_id, "sender_name": "Service technique Coiffure à domicile" if context.is_platform_admin else ("Responsable du salon" if context.role == "owner" else context.display_name),
             "sender_type": "platform_admin" if context.is_platform_admin else "member",
             "body": payload.body.strip(), "read_by": [context.user_id], "created_at": now()}
     await db.chat_messages.insert_one(item)
