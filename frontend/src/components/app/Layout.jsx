@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, CalendarClock, Users, Receipt, Package, Settings as SettingsIcon, Scissors, TrendingUp, Route, AlertCircle, Search, Lock, Map as MapIcon, Bell, ChevronDown, LogOut } from "lucide-react";
+import { LayoutDashboard, CalendarClock, Users, Receipt, Package, Settings as SettingsIcon, Scissors, TrendingUp, Route, AlertCircle, Search, Lock, Map as MapIcon, Bell, ChevronDown, LogOut, MessageCircle } from "lucide-react";
 import { api, pinStorage } from "@/lib/api";
 import GlobalSearch from "@/components/app/GlobalSearch";
 import { useAuth } from "@/context/AuthContext";
@@ -14,6 +14,7 @@ const NAV = [
 ];
 
 const MORE = [
+  { to: "/messages", label: "Messages", icon: MessageCircle, tid: "nav-messages" },
   { to: "/demandes", label: "Demandes", icon: Bell, tid: "nav-demandes", badge: true },
   { to: "/tour", label: "Tournée", icon: Route, tid: "nav-tour" },
   { to: "/carte", label: "Carte", icon: MapIcon, tid: "nav-map" },
