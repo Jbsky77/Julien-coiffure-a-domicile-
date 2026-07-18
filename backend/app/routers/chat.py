@@ -90,10 +90,24 @@ async def messages(cid: str, request: Request):
     await ensure_visible(cid, context)
     items = await db.chat_messages.find({"conversation_id": cid}).sort("created_at", 1).to_list(None)
     for item in items:
+        item["can_delete"] = item.get("sender_id") == context.user_id or context.role == "owner" or context.is_platform_admin
         if context.user_id not in item.get("read_by", []):
             item["read_by"] = [*item.get("read_by", []), context.user_id]
             await db.chat_messages.update_one({"id": item["id"]}, {"$set": {"read_by": item["read_by"]}})
     return items
+
+@router.delete("/chat/conversations/{cid}/messages/{message_id}")
+async def delete_message(cid: str, message_id: str, request: Request):
+    context = ctx(request)
+    await ensure_visible(cid, context)
+    message = await db.chat_messages.find_one({"id": message_id, "conversation_id": cid})
+    if not message:
+        raise HTTPException(404, "Message introuvable")
+    if message.get("sender_id") != context.user_id and context.role != "owner" and not context.is_platform_admin:
+        raise HTTPException(403, "Vous pouvez uniquement supprimer vos propres messages")
+    await db.chat_messages.delete_one({"id": message_id})
+    await db.chat_conversations.update_one({"id": cid}, {"$set": {"updated_at": now()}})
+    return {"ok": True}
 
 @router.post("/chat/conversations/{cid}/messages")
 async def send(cid: str, payload: MessageCreate, request: Request):
@@ -136,12 +150,25 @@ async def public_threads(token: str):
         own = [m for m in messages if m.get("conversation_id") == item["id"]]
         item["unread_count"] = sum(1 for m in own if client["id"] not in m.get("read_by", []) and m.get("sender_type") != "client")
         item["messages"] = [
-            {**message, "sender_name": public_first_name(message.get("sender_name"))}
-            if message.get("sender_type") == "member" and message.get("sender_name") != "Responsable du salon"
-            else message
+            {
+                **({**message, "sender_name": public_first_name(message.get("sender_name"))}
+                   if message.get("sender_type") == "member" and message.get("sender_name") != "Responsable du salon"
+                   else message),
+                "can_delete": message.get("sender_id") == client["id"]
+            }
             for message in own
         ]
     return items
+
+@router.delete("/public/client/{token}/chat/{cid}/messages/{message_id}")
+async def public_delete_message(token: str, cid: str, message_id: str):
+    client = await public_identity(token)
+    message = await db.chat_messages.find_one({"id": message_id, "conversation_id": cid})
+    if not message or message.get("sender_id") != client["id"]:
+        raise HTTPException(404, "Message introuvable")
+    await db.chat_messages.delete_one({"id": message_id})
+    await db.chat_conversations.update_one({"id": cid, "client_id": client["id"]}, {"$set": {"updated_at": now()}})
+    return {"ok": True}
 
 @router.post("/public/client/{token}/chat")
 async def public_start(token: str, payload: ConversationCreate):
