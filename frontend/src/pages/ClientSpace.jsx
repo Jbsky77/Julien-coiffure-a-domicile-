@@ -125,6 +125,9 @@ export default function ClientSpace() {
   if (!data) return <LoadingScreen />;
 
   const { client, appointments, requests, loyalty, notifications, brand, invoices, referral } = data;
+  const isFemale = ["femme", "female", "féminin", "feminin", "f"].includes(
+    String(client.gender || "").trim().toLowerCase()
+  );
   const reviewLink = brand.review_url_short || brand.review_url || `https://www.google.com/search?q=${encodeURIComponent((brand.name || "Mon entreprise") + " coiffure avis")}`;
   const activeCounter = requests.find((r) => r.status === "counter_proposed");
   const doneAppointments = appointments.filter((a) => a.status === "done");
@@ -272,7 +275,7 @@ export default function ClientSpace() {
         {tab === "fidelite" && (
           <section className="space-y-4">
             {/* Loyalty summary card */}
-            <div className="bg-gradient-to-br from-[#0A192F] to-[#1E3A8A] text-white rounded-3xl p-6 shadow-premium" data-testid="loyalty-summary">
+            <div className={`bg-gradient-to-br ${isFemale ? "from-[#EC4899] via-[#DB2777] to-[#BE185D]" : "from-[#0A192F] to-[#1E3A8A]"} text-white rounded-3xl p-6 shadow-premium`} data-testid="loyalty-summary">
               <div className="text-[10px] tracking-[0.3em] uppercase text-white/60 mb-2">Carte de fidélité</div>
               <div className="flex items-baseline gap-6">
                 <div>
