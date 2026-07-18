@@ -11,6 +11,11 @@ router = APIRouter(tags=["chat"])
 def now():
     return datetime.now(timezone.utc).isoformat()
 
+def public_first_name(value):
+    """Never expose an employee surname in the public client space."""
+    clean = (value or "").strip()
+    return clean.split()[0] if clean else "Coiffeur"
+
 def ctx(request):
     value = getattr(request.state, "company", None)
     if not value:
@@ -112,7 +117,7 @@ async def public_participants(token: str):
             "role": "in.(owner,employee)", "select": "user_id,display_name,role", "order": "role.desc"
         }, headers=headers)
         response.raise_for_status()
-    return [{"id": row["user_id"], "name": "Responsable du salon" if row["role"] == "owner" else (row.get("display_name") or "Coiffeur"), "role": row["role"]} for row in response.json()]
+    return [{"id": row["user_id"], "name": "Responsable du salon" if row["role"] == "owner" else public_first_name(row.get("display_name")), "role": row["role"]} for row in response.json()]
 
 @router.get("/public/client/{token}/chat")
 async def public_threads(token: str):
@@ -122,7 +127,12 @@ async def public_threads(token: str):
     for item in items:
         own = [m for m in messages if m.get("conversation_id") == item["id"]]
         item["unread_count"] = sum(1 for m in own if client["id"] not in m.get("read_by", []) and m.get("sender_type") != "client")
-        item["messages"] = own
+        item["messages"] = [
+            {**message, "sender_name": public_first_name(message.get("sender_name"))}
+            if message.get("sender_type") == "member" and message.get("sender_name") != "Responsable du salon"
+            else message
+            for message in own
+        ]
     return items
 
 @router.post("/public/client/{token}/chat")
