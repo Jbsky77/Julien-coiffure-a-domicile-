@@ -4,6 +4,7 @@ import axios from "axios";
 import { API } from "@/lib/api";
 import { Bell, Calendar, Star, Gift, Scissors, ClipboardList, MessageSquare, Check, X, Sparkles, Clock, Award, Receipt, Download, Users, Share2 } from "lucide-react";
 import { toast, Toaster } from "sonner";
+import ClientChat from "@/components/app/ClientChat";
 
 const money = (v) => (Math.round((v || 0) * 100) / 100).toFixed(2);
 const fmtDate = (iso) => {
@@ -246,12 +247,13 @@ export default function ClientSpace() {
         )}
 
         {/* Tabs */}
-        <div className="grid grid-cols-4 gap-1 bg-white rounded-2xl p-1.5 shadow-sm">
+        <div className="grid grid-cols-5 gap-1 bg-white rounded-2xl p-1.5 shadow-sm">
           {[
             { id: "fidelite", label: "Fidélité", icon: Star },
             { id: "historique", label: "Historique", icon: ClipboardList },
             { id: "factures", label: "Factures", icon: Receipt },
             { id: "rdv", label: "RDV", icon: Sparkles },
+            { id: "messages", label: "Messages", icon: MessageSquare },
           ].map((t) => (
             <button
               key={t.id}
@@ -561,6 +563,8 @@ export default function ClientSpace() {
             )}
           </section>
         )}
+
+        {tab === "messages" && <ClientChat token={token} />}
 
         <footer className="text-center text-xs text-slate-400 pt-4">
           Espace privé · {brand.name}
