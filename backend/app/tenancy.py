@@ -25,6 +25,7 @@ class CompanyContext:
     company_name: str = ""
     is_platform_admin: bool = False
     subscription_status: str = ""
+    display_name: str = ""
 
 
 @dataclass(frozen=True)
@@ -139,6 +140,7 @@ async def require_company_context(request: Request):
                 company_name=company.get("name") or "",
                 is_platform_admin=True,
                 subscription_status=subscription_status,
+                display_name="Service technique Coiffure à domicile",
             )
         else:
             accepting_invite = request.url.path == "/api/company/members/accept"
@@ -213,6 +215,7 @@ async def require_company_context(request: Request):
                 permissions=membership.get("permissions") or {},
                 company_name=company.get("name") or "",
                 subscription_status=subscription_status,
+                display_name=((user.get("user_metadata") or {}).get("first_name") or (user.get("user_metadata") or {}).get("full_name") or user.get("email") or "Utilisateur").split()[0],
             )
 
     request.state.company = context
